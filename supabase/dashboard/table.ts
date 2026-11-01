@@ -312,6 +312,21 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
   const BLINDS = [[1, 2], [5, 10], [25, 50], [50, 100]];
   const BUYIN_BB = [50, 100, 200];
   const TURN_MS = 30000, NEXT_MS = 6000, MAX_TIMEOUTS = 2;
+  /* veřejné stoly (hraj s kýmkoli): 3 úrovně sázek, max 6 míst, jen virtuální body, bez botů na serveru */
+  const TIERS = [{ id: 'micro', sb: 1, bb: 2, buyInBB: 100 }, { id: 'mid', sb: 5, bb: 10, buyInBB: 50 }, { id: 'high', sb: 25, bb: 50, buyInBB: 50 }];
+  const PUB_MAX = 6, REAP_MS = 90000;          // kdo stojí mimo hru (čas / bez žetonů) déle než 90 s, je zvednut od stolu a žetony se vrátí
+  /* filtr přezdívek (veřejné stoly): bez diakritiky, leet → písmena, hledá kořeny sprostých slov / vydávání se za správce */
+  const BAD = ['kurv', 'kurev', 'mrdk', 'pice', 'pic', 'pyc', 'kokot', 'curak', 'cur', 'zmrd', 'mrd', 'hovn', 'sracka', 'srac', 'debil', 'kreten', 'idiot', 'buzn', 'negr', 'cigos', 'cikan', 'zid', 'hitler', 'nazi', 'fuck', 'fck', 'shit', 'bitch', 'cunt', 'dick', 'cock', 'pussy', 'nigg', 'nigga', 'fag', 'retard', 'whore', 'slut', 'porn', 'sex', 'admin', 'moderator', 'redriver', 'support'];
+  const BAD_EXACT = ['pica', 'pice', 'pico', 'picus', 'cur', 'mrd', 'zid', 'sex', 'fag', 'zmrd', 'srac'];
+  function normName(n) {
+    return String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      .replace(/[0@]/g, 'o').replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/4/g, 'a').replace(/5\$/g, 's').replace(/[$5]/g, 's').replace(/7/g, 't').replace(/[^a-z]/g, '');
+  }
+  function badName(n) {
+    const s = normName(n), words = String(n || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().split(/[^a-z0-9]+/).map(normName);
+    if (words.some(w => BAD_EXACT.includes(w))) return true;
+    return BAD.filter(b => b.length >= 4).some(b => s.includes(b));
+  }
 
   class CoreError extends Error { constructor(code) { super(code); this.code = code; } }
   const fail = code => { throw new CoreError(code); };
@@ -358,6 +373,16 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     }
 
     /* ---------- místnost ---------- */
+    /* veřejný stůl: bez hostitele, hra běží sama (rozdá se, jakmile sedí aspoň 2 hráči) */
+    function createPublic({ tier, code }) {
+      const T = TIERS.find(x => x.id === tier); if (!T) fail('bad_tier');
+      const st = Object.assign(checkSettings({ max: PUB_MAX, sb: T.sb, bb: T.bb, buyInBB: T.buyInBB }), { pub: true, tier: T.id });
+      return { v: 1, code: code || newPubCode(), host: null, status: 'playing', waiting: true, settings: st, seats: Array(PUB_MAX).fill(null),
+        handNo: 0, dealer: -1, hand: null, last: null, ver: 0, created: now(), updated: now(), botN: 0 };
+    }
+    function newPubCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = 'PUB-'; for (let k = 0; k < 6; k++) c += A[randInt(A.length)]; return c; }
+    const isPub = room => !!(room.settings && room.settings.pub);
+    const noPub = room => { if (isPub(room)) fail('public'); };
     function createRoom({ uid, name, code, settings }) {
       if (!uid) fail('auth');
       const st = checkSettings(settings);
@@ -371,12 +396,15 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       if (!uid) fail('auth');
       if (room.status === 'closed') fail('closed');
       const have = seatOf(room, uid); if (have >= 0) return { seat: have, cost: 0 };
+      if (isPub(room) && badName(name)) fail('bad_name');
       let i = room.seats.findIndex(s => !s);
       if (i < 0) {                             // plno → uvolni místo po botovi (mimo rozehranou ruku)
         i = room.seats.findIndex((s, k) => s && s.bot && !(room.hand && !room.hand.done && P(room.hand, k)));
         if (i < 0) fail('full');
       }
       room.seats[i] = { uid, name: cleanName(name), bot: false, stack: room.settings.buyIn, sitOut: false, timeouts: 0 };
+      // přisednutí během rozehrané ruky: hráč v ní není (nemá karty) a hraje až od další ruky
+      if (isPub(room) && room.waiting && !room.hand) startHand(room);
       touch(room); return { seat: i, cost: room.settings.buyIn };
     }
     /* vrací { refund } – žetony se vrací zpět do virtuálních bodů (žádný výběr peněz neexistuje) */
@@ -385,12 +413,12 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       const h = room.hand;
       if (h && !h.done) { const p = P(h, i); if (p && !p.folded) { p.folded = true; log(h, i, 'fold', 0); if (h.toAct === i) h.toAct = -1; advance(room); } }
       const refund = room.seats[i].stack; room.seats[i] = null;
-      if (room.host === uid) { const nh = humans(room)[0]; if (nh) room.host = nh.uid; }
+      if (room.host === uid && !isPub(room)) { const nh = humans(room)[0]; if (nh) room.host = nh.uid; }
       if (!humans(room).length) { room.status = 'closed'; room.hand = h && h.done ? h : null; }
       touch(room); return { refund };
     }
-    function addBot(room, uid) {
-      if (room.host !== uid) fail('not_host');
+    function addBot(room, uid, sys) {          // sys = jen lokální ukázka (mock) – server veřejným stolům boty nepřidává
+      if (!sys) { noPub(room); if (room.host !== uid) fail('not_host'); }
       const i = room.seats.findIndex(s => !s); if (i < 0) fail('full');
       room.botN = (room.botN || 0) + 1;
       const names = ['Bot Ada', 'Bot Bára', 'Bot Cyril', 'Bot Dan', 'Bot Ema', 'Bot Filip', 'Bot Gita', 'Bot Hugo', 'Bot Ivo'];
@@ -398,7 +426,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       touch(room); return { seat: i };
     }
     function removeBot(room, uid, i) {
-      if (room.host !== uid) fail('not_host');
+      noPub(room); if (room.host !== uid) fail('not_host');
       const s = room.seats[i]; if (!s || !s.bot) fail('bad_seat');
       if (room.hand && !room.hand.done && P(room.hand, i)) fail('in_hand');
       room.seats[i] = null; touch(room);
@@ -407,11 +435,19 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       const i = seatOf(room, uid); if (i < 0) fail('not_seated');
       const s = room.seats[i]; if (s.stack >= room.settings.bb) fail('not_busted');
       if (room.hand && !room.hand.done && P(room.hand, i)) fail('in_hand');
-      const cost = room.settings.buyIn - s.stack; s.stack = room.settings.buyIn; s.sitOut = false; s.timeouts = 0; touch(room); return { cost };
+      const cost = room.settings.buyIn - s.stack; s.stack = room.settings.buyIn; s.sitOut = false; s.timeouts = 0; s.outSince = 0;
+      if (isPub(room) && room.waiting && !room.hand) startHand(room);
+      touch(room); return { cost };
     }
-    function sitIn(room, uid) { const i = seatOf(room, uid); if (i < 0) fail('not_seated'); room.seats[i].sitOut = false; room.seats[i].timeouts = 0; touch(room); }
+    function sitIn(room, uid) {
+      const i = seatOf(room, uid); if (i < 0) fail('not_seated');
+      const s = room.seats[i]; if (s.stack <= 0) fail('busted');
+      s.sitOut = false; s.timeouts = 0; s.outSince = 0;
+      if (isPub(room) && room.waiting && !room.hand) startHand(room);
+      touch(room);
+    }
     function start(room, uid) {
-      if (room.host !== uid) fail('not_host');
+      noPub(room); if (room.host !== uid) fail('not_host');
       if (room.status !== 'lobby') fail('started');
       if (room.settings.bots) while (room.seats.some(s => !s)) addBot(room, uid);
       if (occupied(room).length < 2) fail('need_players');
@@ -422,7 +458,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     function startHand(room) {
       const st = room.settings;
       room.seats.forEach(s => { if (s && s.bot && s.stack < st.bb) s.stack = st.buyIn; });   // boti si dokoupí sami
-      room.seats.forEach(s => { if (s && !s.bot && s.stack <= 0) s.sitOut = true; });
+      room.seats.forEach(s => { if (s && !s.bot && s.stack <= 0 && !s.sitOut) { s.sitOut = true; s.outSince = now(); } });
       const elig = occupied(room).filter(i => !room.seats[i].sitOut && room.seats[i].stack > 0);
       room.nextAt = 0;
       if (elig.length < 2) { room.hand = null; room.waiting = true; touch(room); return false; }
@@ -475,7 +511,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       if (h.toAct !== i) fail('not_your_turn');
       return apply(room, i, a || {});
     }
-    function apply(room, i, a) {
+    function apply(room, i, a, auto) {
       const h = room.hand, p = P(h, i), s = room.seats[i], L = legal(room, i);
       let t = String(a.t || a.type || ''); if (t === 'bet') t = 'raise';
       let to = Math.floor(+a.to);
@@ -496,7 +532,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
         if (inc >= h.minRaise) { h.minRaise = inc; h.players.forEach(q => { if (q !== p && canAct(q)) q.acted = false; }); }
         h.curBet = to; log(h, i, p.allIn ? 'allin' : (L.raiseIsBet ? 'bet' : 'raise'), add, to);
       } else if (t !== 'fold') fail('bad_action');
-      p.acted = true; if (!s.bot) s.timeouts = 0;
+      p.acted = true; if (!s.bot && !auto) s.timeouts = 0;           // automatický tah po vypršení času počítadlo nenuluje
       advance(room); touch(room); return {};
     }
     function advance(room) {
@@ -580,8 +616,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       const h = room.hand; let ch = false;
       if (h && !h.done && h.deadline && now() >= h.deadline && h.toAct >= 0) {
         const i = h.toAct, s = room.seats[i], L = legal(room, i);
-        apply(room, i, { t: L.canCheck ? 'check' : 'fold' });
-        if (s && !s.bot && ++s.timeouts >= MAX_TIMEOUTS) s.sitOut = true;
+        apply(room, i, { t: L.canCheck ? 'check' : 'fold' }, true);
+        if (s && !s.bot && ++s.timeouts >= MAX_TIMEOUTS && !s.sitOut) { s.sitOut = true; s.outSince = now(); }
         ch = true;
       }
       if (room.status === 'playing' && (!room.hand || room.hand.done) && room.nextAt && now() >= room.nextAt) { startHand(room); ch = true; }
@@ -589,8 +625,28 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
       if (ch) { runBots(room); touch(room); }
       return ch;
     }
+    /* veřejné stoly: zvedne od stolu hráče, kteří stojí mimo hru déle než REAP_MS (odpojení / bez žetonů).
+       Vrací [{ uid, refund }] – server jim žetony vrátí do virtuálních bodů. */
+    function reap(room) {
+      if (!isPub(room) || room.status === 'closed') return [];
+      const out = [], t = now();
+      room.seats.forEach((s, i) => {
+        if (!s || s.bot || !s.sitOut) return;
+        if (!s.outSince) { s.outSince = t; return; }
+        if (t - s.outSince < REAP_MS) return;
+        if (room.hand && !room.hand.done && P(room.hand, i) && !P(room.hand, i).folded) return;
+        out.push({ uid: s.uid, refund: leave(room, s.uid).refund });
+      });
+      return out;
+    }
+    /* nahlášení hráče: kdo hlásí, musí sedět u stolu; cíl je jiný člověk u stolu */
+    function reportTarget(room, uid, seat) {
+      const me = seatOf(room, uid); if (me < 0) fail('not_seated');
+      const s = room.seats[Number(seat)]; if (!s || s.bot || s.uid === uid) fail('bad_seat');
+      return { uid: s.uid, name: s.name, seat: Number(seat), hand: room.handNo };
+    }
     function next(room, uid) {                 // hostitel může rozdat hned (nečekat na odpočet)
-      if (room.host !== uid) fail('not_host');
+      noPub(room); if (room.host !== uid) fail('not_host');
       if (room.hand && !room.hand.done) fail('in_hand');
       room.nextAt = now(); tick(room); return {};
     }
@@ -607,12 +663,13 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
         if (p) { if (i === me) cards = h.holes[i].slice(); else if (rev[i]) cards = rev[i].slice(); else if (!p.folded) cards = 2; }
         return { i, name: s.name, bot: s.bot, stack: s.stack, sitOut: !!s.sitOut, me: i === me, host: !s.bot && s.uid === room.host,
           inHand: !!p, bet: p ? p.bet : 0, total: p ? p.total : 0, folded: p ? p.folded : false, allIn: p ? p.allIn : false,
-          dealer: h ? h.dealer === i : room.dealer === i, sb: h ? h.sb === i : false, bb: h ? h.bb === i : false,
+          outSince: s.sitOut ? (s.outSince || 0) : 0, dealer: h ? h.dealer === i : room.dealer === i, sb: h ? h.sb === i : false, bb: h ? h.bb === i : false,
           turn: !!(h && !h.done && h.toAct === i), cards, last: lastAct[i] ? { t: lastAct[i].t, a: lastAct[i].a, to: lastAct[i].to } : null };
       });
       const hostSeat = room.seats.find(s => s && !s.bot && s.uid === room.host);
       const out = { code: room.code, status: room.status, ver: room.ver, isHost: !!uid && room.host === uid, hostName: hostSeat ? hostSeat.name : '',
-        settings: { max: room.settings.max, sb: room.settings.sb, bb: room.settings.bb, buyIn: room.settings.buyIn, buyInBB: room.settings.buyInBB, bots: room.settings.bots, turnMs: room.settings.turnMs },
+        settings: { max: room.settings.max, sb: room.settings.sb, bb: room.settings.bb, buyIn: room.settings.buyIn, buyInBB: room.settings.buyInBB, bots: room.settings.bots, turnMs: room.settings.turnMs, pub: !!room.settings.pub, tier: room.settings.tier || null },
+        reapMs: REAP_MS,
         me, seats, handNo: room.handNo, waiting: !!room.waiting, nextAt: room.nextAt || 0, serverNow: now(), hand: null, last: null };
       if (h) out.hand = { no: h.no, street: h.street, board: h.board.slice(), pot: h.players.reduce((s, p) => s + p.total, 0), toAct: h.toAct, deadline: h.deadline,
         done: h.done, legal: me >= 0 ? legal(room, me) : null, result: h.done ? h.result : null };
@@ -630,15 +687,15 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     }
     function chips(room) { return room.seats.reduce((s, x) => s + (x ? x.stack : 0), 0) + (room.hand && !room.hand.done ? room.hand.players.reduce((s, p) => s + p.total, 0) : 0); }
 
-    return { BLINDS, BUYIN_BB, CoreError, newCode, checkSettings, createRoom, join, leave, addBot, removeBot, rebuy, sitIn, start, next,
-      act, legal, tick, runBots, view, privateCards, chips, seatOf, startHand };
+    return { BLINDS, BUYIN_BB, TIERS, PUB_MAX, REAP_MS, CoreError, newCode, newPubCode, checkSettings, createRoom, createPublic, join, leave, addBot, removeBot, rebuy, sitIn, start, next,
+      act, legal, tick, runBots, view, privateCards, chips, seatOf, startHand, reap, reportTarget, badName, cleanName, isPub, humans };
   }
 
-  const api = { makeCore, CoreError, BLINDS, BUYIN_BB, cryptoRandInt };
+  const api = { makeCore, CoreError, BLINDS, BUYIN_BB, TIERS, PUB_MAX, REAP_MS, badName, cryptoRandInt };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.RRCore = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 // ===== server =====
-// Red River – Edge Function `table`: autoritativní server online soukromých stolů.
+// Red River – Edge Function `table`: autoritativní server online stolů (soukromé s kódem RED-1234 + veřejné PUB-XXXXXX).
 // Klient posílá jen záměr ({ op, code, action }); server ověří uživatele (JWT), načte úplný stav
 // z room_state (balíček + všechny karty), provede akci přes sdílené jádro (_shared/core.js – stejný kód
 // jako mock v testech), uloží s optimistickým zámkem (version) a zveřejní jen bezpečné projekce:
@@ -668,7 +725,16 @@ function cors(req: Request) {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
 }
 class HttpErr extends Error { constructor(public code: string, public status = 400) { super(code); } }
-const CODE_RE = /^RED-\d{4}$/;
+const CODE_RE = /^(RED-\d{4}|PUB-[A-Z0-9]{6})$/;
+
+// ---------- limity požadavků (tabulka rate_limits + funkce rr_hit z migrace public_tables) ----------
+const LIMITS: Record<string, [number, number]> = { all: [240, 60], quickseat: [12, 60], report: [5, 600] };
+async function limit(uid: string, bucket: string) {
+  const [max, win] = LIMITS[bucket];
+  const { data, error } = await admin.rpc('rr_hit', { uid, bucket, max_hits: max, window_secs: win });
+  if (error) { console.warn('rr_hit', error.message); return; }   // migrace ještě nespuštěná → nepřekážet soukromým stolům
+  if (data === false) throw new HttpErr('rate', 429);
+}
 
 // ---------- body (virtuální) ----------
 async function points(uid: string): Promise<number> {
@@ -691,7 +757,9 @@ async function credit(uid: string, n: number, why: string, room?: string) {
 // ---------- zveřejnění bezpečných projekcí ----------
 // deno-lint-ignore no-explicit-any
 async function publish(roomId: string, room: any) {
-  await admin.from('rooms').update({ status: room.status, host: room.host, public_state: core.view(room, null), version: room.ver, updated_at: new Date().toISOString() }).eq('id', roomId);
+  const base = { status: room.status, host: room.host, public_state: core.view(room, null), version: room.ver, updated_at: new Date().toISOString() };
+  const { error } = await admin.from('rooms').update({ ...base, is_public: core.isPub(room), tier: room.settings.tier ?? null, seated: core.humans(room).length }).eq('id', roomId);
+  if (error) await admin.from('rooms').update(base).eq('id', roomId);   // sloupce is_public/tier/seated chybí (stará databáze)
   await admin.from('seats').delete().eq('room_id', roomId);
   // deno-lint-ignore no-explicit-any
   const seats = room.seats.map((s: any, i: number) => s && { room_id: roomId, seat_no: i, user_id: s.bot ? null : s.uid, is_bot: !!s.bot, name: s.name, stack: s.stack, sit_out: !!s.sitOut }).filter(Boolean);
@@ -738,7 +806,10 @@ async function mutate(uid: string, op: string, body: any) {
     if (!st) throw new HttpErr('no_room', 404);
     const room = st.state;
     let debited = 0, debitWhy = '', refund = 0, changed = true;
+    // deno-lint-ignore no-explicit-any
+    let reaped: any[] = [];
     try {
+      if (core.isPub(room)) { reaped = core.reap(room); if (reaped.length && op === 'state') changed = true; }
       switch (op) {
         case 'join':
           if (core.seatOf(room, uid) < 0) {
@@ -759,7 +830,7 @@ async function mutate(uid: string, op: string, body: any) {
           const i = core.seatOf(room, uid); const need = i >= 0 ? room.settings.buyIn - room.seats[i].stack : 0;
           debitWhy = 'rebuy'; debited = need; await debit(uid, need, 'rebuy', r.id); core.rebuy(room, uid); break;
         }
-        case 'tick': case 'state': changed = core.tick(room); break;   // časovač posouvá kdokoli ze stolu
+        case 'tick': case 'state': changed = core.tick(room) || reaped.length > 0; break;   // časovač posouvá kdokoli ze stolu
         default: throw new HttpErr('bad_op');
       }
       if (op !== 'join' && op !== 'state' && core.seatOf(room, uid) < 0 && op !== 'leave') throw new HttpErr('not_seated', 403);
@@ -769,6 +840,7 @@ async function mutate(uid: string, op: string, body: any) {
         const { data: upd } = await admin.from('room_state').update({ state: room, version: st.version + 1 }).eq('room_id', r.id).eq('version', st.version).select('room_id');
         if (!upd?.length) { if (debited) await credit(uid, debited, 'refund', r.id); continue; }   // souběh → znovu
         if (refund) await credit(uid, refund, 'cashback', r.id);
+        for (const x of reaped) await credit(x.uid, x.refund, 'cashback', r.id);   // zvednutí od veřejného stolu (odpojení / nečinnost)
         await publish(r.id, room);
       }
       return { view: core.view(room, uid), roomId: r.id, points: await points(uid) };
@@ -782,12 +854,72 @@ async function mutate(uid: string, op: string, body: any) {
   throw new HttpErr('busy', 409);
 }
 
+// ---------- veřejné stoly ----------
+// rychlé usazení: hráč už sedí u veřejného stolu → vrátí ho tam; jinak najde otevřený stůl dané úrovně
+// (nejplnější, nedávno aktivní, < 6 lidí) nebo založí nový. Buy-in se odečte na serveru (debit_points).
+// deno-lint-ignore no-explicit-any
+async function quickseat(uid: string, body: any) {
+  await limit(uid, 'quickseat');
+  // deno-lint-ignore no-explicit-any
+  const T = core.TIERS.find((x: any) => x.id === String(body.tier ?? ''));
+  if (!T) throw new HttpErr('bad_tier');
+  if (core.badName(body.name)) throw new HttpErr('bad_name');
+  const { data: mine } = await admin.from('seats').select('room_id, rooms!inner(code, status, is_public)').eq('user_id', uid).eq('rooms.is_public', true).neq('rooms.status', 'closed').limit(1);
+  // deno-lint-ignore no-explicit-any
+  const have = (mine?.[0] as any)?.rooms?.code;
+  if (have) return await mutate(uid, 'state', { code: have });
+  if (await points(uid) < T.bb * T.buyInBB) throw new HttpErr('points');
+  const fresh = new Date(Date.now() - 10 * 60e3).toISOString();
+  const { data: open } = await admin.from('rooms').select('code, seated').eq('is_public', true).eq('tier', T.id).eq('status', 'playing')
+    .lt('seated', core.PUB_MAX).gt('updated_at', fresh).order('seated', { ascending: false }).order('updated_at', { ascending: false }).limit(5);
+  for (const r of open ?? []) {
+    try { return await mutate(uid, 'join', { code: r.code, name: body.name }); }
+    catch (e) { if (e instanceof HttpErr && ['full', 'closed', 'no_room', 'busy'].includes(e.code)) continue; throw e; }
+  }
+  for (let k = 0; k < 10; k++) {                                  // žádný volný → nový stůl
+    const room = core.createPublic({ tier: T.id });
+    const { data: r, error } = await admin.from('rooms').insert({ code: room.code, host: null, status: room.status, settings: room.settings,
+      public_state: core.view(room, null), version: room.ver, is_public: true, tier: T.id, seated: 0 }).select('id').single();
+    if (error) { if (error.code === '23505') continue; console.error(error); throw new HttpErr('server', 500); }
+    await admin.from('room_state').insert({ room_id: r.id, state: room, version: 0 });
+    return await mutate(uid, 'join', { code: room.code, name: body.name });
+  }
+  throw new HttpErr('no_code', 500);
+}
+async function lobby() {
+  const fresh = new Date(Date.now() - 10 * 60e3).toISOString();
+  const { data } = await admin.from('rooms').select('tier, seated').eq('is_public', true).eq('status', 'playing').gt('updated_at', fresh).limit(1000);
+  // deno-lint-ignore no-explicit-any
+  return { tiers: core.TIERS.map((T: any) => { const rs = (data ?? []).filter((r: any) => r.tier === T.id && r.seated > 0);
+    return { id: T.id, sb: T.sb, bb: T.bb, buyIn: T.bb * T.buyInBB, tables: rs.length, players: rs.reduce((s: number, r: { seated: number }) => s + r.seated, 0) }; }) };
+}
+const REASONS = ['abuse', 'name', 'cheat', 'spam', 'other'];
+// deno-lint-ignore no-explicit-any
+async function report(uid: string, body: any) {
+  await limit(uid, 'report');
+  const code = String(body.code ?? '').toUpperCase().trim();
+  if (!CODE_RE.test(code)) throw new HttpErr('no_room', 404);
+  const { data: r } = await admin.from('rooms').select('id').eq('code', code).maybeSingle();
+  if (!r) throw new HttpErr('no_room', 404);
+  const { data: st } = await admin.from('room_state').select('state').eq('room_id', r.id).single();
+  if (!st) throw new HttpErr('no_room', 404);
+  // deno-lint-ignore no-explicit-any
+  let tg: any; try { tg = core.reportTarget(st.state, uid, Number(body.seat)); } catch (e) { throw new HttpErr((e as any).code ?? 'bad_seat'); }
+  const reason = REASONS.includes(body.reason) ? body.reason : 'other';
+  const { error } = await admin.from('reports').insert({ reporter: uid, reported: tg.uid, reported_name: tg.name, room_id: r.id, room_code: code, hand_no: tg.hand, reason });
+  if (error) { console.error(error); throw new HttpErr('server', 500); }
+  return { ok: true };
+}
+
 // ---------- úklid opuštěných stolů (volá cron s tajným klíčem) ----------
+// soukromé stoly bez změny 6 h, veřejné bez změny 20 min → zavřít a žetony vrátit do bodů
 async function sweep() {
-  const old = new Date(Date.now() - 6 * 3600e3).toISOString();
-  const { data: rooms } = await admin.from('rooms').select('id').neq('status', 'closed').lt('updated_at', old).limit(50);
+  const old = new Date(Date.now() - 6 * 3600e3).toISOString(), oldPub = new Date(Date.now() - 20 * 60e3).toISOString();
+  const { data: a } = await admin.from('rooms').select('id').neq('status', 'closed').lt('updated_at', old).limit(50);
+  const { data: b } = await admin.from('rooms').select('id').eq('is_public', true).neq('status', 'closed').lt('updated_at', oldPub).limit(50);
+  const rooms = [...new Map([...(a ?? []), ...(b ?? [])].map((r) => [r.id, r])).values()];
   let n = 0;
-  for (const r of rooms ?? []) {
+  for (const r of rooms) {
     const { data: st } = await admin.from('room_state').select('state, version').eq('room_id', r.id).single();
     if (!st) continue;
     const room = st.state;
@@ -813,7 +945,11 @@ Deno.serve(async (req) => {
     const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
     const { data: { user } } = await admin.auth.getUser(jwt);
     if (!user) throw new HttpErr('auth', 401);
+    await limit(user.id, 'all');
     if (op === 'points') return json({ points: await points(user.id) });
+    if (op === 'lobby') return json(await lobby());
+    if (op === 'quickseat') return json(await quickseat(user.id, body));
+    if (op === 'report') return json(await report(user.id, body));
     if (op === 'create') return json(await create(user.id, body));
     return json(await mutate(user.id, op, body));
   } catch (e) {

@@ -1,4 +1,4 @@
-/* Red River – online soukromé stoly: obrazovky (Hrát s kamarády → Založit / Připojit → lobby → stůl).
+/* Red River – online stoly: obrazovky (Hrát s kamarády → Založit / Připojit → lobby → stůl; Hrát online → úroveň → rychlé usazení → stůl).
    Server je autoritativní (online/core.js v Edge Function nebo v lokálním mocku); klient jen zobrazuje svůj pohled a posílá akce.
    U online stolů NEJSOU rady, šance na výhru ani hodnocení tahů – jen rozbor ruky po jejím skončení. */
 (function () {
@@ -27,7 +27,16 @@
     'on.err.points': 'Nemáš dost online bodů.', 'on.err.full': 'Stůl je plný.', 'on.err.no_room': 'Stůl s tímto kódem neexistuje.', 'on.err.closed': 'Stůl je už zavřený.', 'on.err.started': 'Hra už běží.',
     'on.err.not_host': 'Tohle může jen hostitel.', 'on.err.need_players': 'Potřebuješ aspoň 2 hráče.', 'on.err.not_your_turn': 'Teď nejsi na tahu.', 'on.err.raise_too_small': 'Navýšení je moc malé.',
     'on.err.bad_code': 'Kód má tvar RED-1234.', 'on.err.offline': 'Server je nedostupný.', 'on.err.auth': 'Přihlášení selhalo.', 'on.err.in_hand': 'Ruka ještě běží.', 'on.err.any': 'Něco se nepovedlo ({c}).',
-    'on.a.fold': 'Fold', 'on.a.check': 'Check', 'on.a.call': 'Call', 'on.a.bet': 'Bet', 'on.a.raise': 'Raise', 'on.a.allin': 'All-in', 'on.a.sb': 'SB', 'on.a.bb': 'BB', 'on.a.timeout': 'čas vypršel'
+    'on.a.fold': 'Fold', 'on.a.check': 'Check', 'on.a.call': 'Call', 'on.a.bet': 'Bet', 'on.a.raise': 'Raise', 'on.a.allin': 'All-in', 'on.a.sb': 'SB', 'on.a.bb': 'BB', 'on.a.timeout': 'čas vypršel',
+    'pub.ptsSub': 'Jen virtuální body pro online hru – nedají se vybrat ani proměnit', 'pub.title': 'Hrát online', 'pub.tileSub': 'Veřejné stoly – hraj s kýmkoli, body bez hodnoty', 'pub.nick': 'Přezdívka u stolu', 'pub.nickSub': 'Uvidí ji všichni u stolu. Sprostá nebo urážlivá jména nejdou.',
+    'pub.tiers': 'Vyber sázky', 'pub.t.micro': 'Mikro', 'pub.t.mid': 'Střední', 'pub.t.high': 'Vysoké', 'pub.sit': 'Rychle si sednout', 'pub.buy': 'Vstup {n} bodů',
+    'pub.live': '{p} · {t}', 'pub.liveNone': 'Zatím nikdo – založíš nový stůl', 'pub.rules': 'Max 6 hráčů u stolu · 30 s na tah · kdo odejde nebo nestihne tah, složí karty · jen virtuální body, nic se nedá vybrat · u online stolů nejsou rady.',
+    'pub.demo': 'Ukázkový režim (offline) – stůl běží jen v tomto zařízení a doplní ho boti. Se skutečným serverem hraješ proti lidem.', 'pub.resume': 'Vrátit se ke stolu ({t})',
+    'pub.badge': 'Veřejný', 'pub.nextHand': 'Přisedl jsi během ruky – hraješ od další.', 'pub.reap': 'Bez návratu tě za {s} s zvedneme od stolu (žetony se vrátí).',
+    'pub.report': 'Nahlásit hráče', 'pub.reportQ': 'Koho chceš nahlásit?', 'pub.reportWhy': 'Důvod', 'pub.reportNone': 'U stolu není nikdo jiný.', 'pub.reported': 'Díky, nahlášení jsme přijali.',
+    'pub.r.abuse': 'Urážky / chování', 'pub.r.name': 'Nevhodné jméno', 'pub.r.cheat': 'Podvádění / spolupráce', 'pub.r.spam': 'Spam', 'pub.r.other': 'Jiné', 'pub.send': 'Nahlásit',
+    'on.err.bad_name': 'Tahle přezdívka u veřejných stolů nejde – zkus jinou.', 'on.err.rate': 'Moc požadavků najednou – chvilku počkej.', 'on.err.public': 'U veřejného stolu to nejde.', 'on.err.bad_tier': 'Neznámá úroveň sázek.',
+    'on.err.busted': 'Nejdřív si dokup žetony.', 'on.err.bad_seat': 'Tohoto hráče nejde nahlásit.'
   });
   Object.assign(I18N.DICT.en, {
     'on.title': 'Play with friends', 'on.tileSub': 'Private table with a code, points have no value', 'on.create': 'Create table', 'on.createSub': "You're the host – set players, buy-in and blinds",
@@ -48,7 +57,16 @@
     'on.err.points': "You don't have enough online points.", 'on.err.full': 'The table is full.', 'on.err.no_room': 'No table with this code.', 'on.err.closed': 'The table is closed.', 'on.err.started': 'The game is already running.',
     'on.err.not_host': 'Only the host can do that.', 'on.err.need_players': 'You need at least 2 players.', 'on.err.not_your_turn': "It's not your turn.", 'on.err.raise_too_small': 'Raise is too small.',
     'on.err.bad_code': 'The code looks like RED-1234.', 'on.err.offline': 'Server unavailable.', 'on.err.auth': 'Sign-in failed.', 'on.err.in_hand': 'The hand is still running.', 'on.err.any': 'Something went wrong ({c}).',
-    'on.a.fold': 'Fold', 'on.a.check': 'Check', 'on.a.call': 'Call', 'on.a.bet': 'Bet', 'on.a.raise': 'Raise', 'on.a.allin': 'All-in', 'on.a.sb': 'SB', 'on.a.bb': 'BB', 'on.a.timeout': 'timed out'
+    'on.a.fold': 'Fold', 'on.a.check': 'Check', 'on.a.call': 'Call', 'on.a.bet': 'Bet', 'on.a.raise': 'Raise', 'on.a.allin': 'All-in', 'on.a.sb': 'SB', 'on.a.bb': 'BB', 'on.a.timeout': 'timed out',
+    'pub.ptsSub': 'Virtual points for online play only – never withdrawable or exchangeable', 'pub.title': 'Play online', 'pub.tileSub': 'Public tables – play with anyone, points have no value', 'pub.nick': 'Nickname at the table', 'pub.nickSub': 'Everyone at the table sees it. Rude or offensive names are not allowed.',
+    'pub.tiers': 'Choose stakes', 'pub.t.micro': 'Micro', 'pub.t.mid': 'Medium', 'pub.t.high': 'High', 'pub.sit': 'Quick seat', 'pub.buy': 'Entry {n} points',
+    'pub.live': '{p} · {t}', 'pub.liveNone': 'Nobody yet – you will open a new table', 'pub.rules': 'Max 6 players per table · 30 s per move · leaving or timing out folds your hand · virtual points only, nothing can be withdrawn · no tips at online tables.',
+    'pub.demo': 'Demo mode (offline) – the table only runs on this device and is filled with bots. With the real server you play against people.', 'pub.resume': 'Back to your table ({t})',
+    'pub.badge': 'Public', 'pub.nextHand': 'You sat down mid-hand – you play from the next one.', 'pub.reap': "If you don't come back within {s} s you'll be removed from the table (chips are returned).",
+    'pub.report': 'Report player', 'pub.reportQ': 'Who do you want to report?', 'pub.reportWhy': 'Reason', 'pub.reportNone': 'Nobody else is at the table.', 'pub.reported': 'Thanks, your report was received.',
+    'pub.r.abuse': 'Abuse / behaviour', 'pub.r.name': 'Inappropriate name', 'pub.r.cheat': 'Cheating / collusion', 'pub.r.spam': 'Spam', 'pub.r.other': 'Other', 'pub.send': 'Report',
+    'on.err.bad_name': "That nickname isn't allowed at public tables – try another.", 'on.err.rate': 'Too many requests – wait a moment.', 'on.err.public': "That's not possible at a public table.", 'on.err.bad_tier': 'Unknown stakes.',
+    'on.err.busted': 'Rebuy chips first.', 'on.err.bad_seat': "This player can't be reported."
   });
   R.applyStatic();
 
@@ -96,7 +114,7 @@
     const prev = S.view; S.view = v; S.clock = (v.serverNow || Date.now()) - Date.now();
     if (v.status === 'closed' || v.me < 0) {
       store.set('rr_on_code', ''); S.view = null;
-      if (nav.cur === 'lobby' || nav.cur === 'ontable') { R.toast(t('on.closed')); nav.home(); nav.go('online'); }
+      if (nav.cur === 'lobby' || nav.cur === 'ontable') { R.toast(t('on.closed')); nav.home(); nav.go(prev && prev.settings && prev.settings.pub ? 'public' : 'online'); }
       return;
     }
     store.set('rr_on_code', v.code);
@@ -104,7 +122,7 @@
     if (v.hand && v.hand.toAct === v.me && !v.hand.done && !(prev && prev.hand && prev.hand.toAct === v.me && prev.hand.no === v.hand.no)) { SFX.turn(); vib(20); }
     if (v.hand && v.hand.done && !(prev && prev.hand && prev.hand.done && prev.hand.no === v.hand.no)) { const w = v.hand.result && v.hand.result.won && v.hand.result.won[v.me]; if (w) SFX.win(); }
     if (v.status === 'playing' && nav.cur === 'lobby') nav.go('ontable');
-    if (nav.cur === 'lobby') renderLobby(); else if (nav.cur === 'ontable') renderTable(); else if (nav.cur === 'online') renderHome();
+    if (nav.cur === 'lobby') renderLobby(); else if (nav.cur === 'ontable') renderTable(); else if (nav.cur === 'online') renderHome(); else if (nav.cur === 'public') renderPublic();
   }
   async function run(fn) {
     if (S.busy) return; S.busy = true;
@@ -164,6 +182,55 @@
     };
   }
 
+  /* ---------- Hrát online: veřejné stoly ---------- */
+  const isPubView = v => !!(v && v.settings && v.settings.pub);
+  const tierName = id => t('pub.t.' + id);
+  const plural = (n, cs, en) => I18N.lang === 'cs' ? `${n} ${n === 1 ? cs[0] : n >= 2 && n <= 4 ? cs[1] : cs[2]}` : `${n} ${n === 1 ? en[0] : en[1]}`;
+  const liveTxt = n => t('pub.live', { p: plural(n.players, ['hráč', 'hráči', 'hráčů'], ['player', 'players']), t: plural(n.tables, ['stůl', 'stoly', 'stolů'], ['table', 'tables']) });
+  const tableTitle = v => isPubView(v) ? `${t('pub.badge')} · ${tierName(v.settings.tier)} ${v.settings.sb}/${v.settings.bb}` : v.code;
+  let lobbyInfo = null;
+  function renderPublic() {
+    const b = $('pubBody'); if (!b) return;
+    if (!S.net) { b.innerHTML = '<div class="note">…</div>'; ensure().then(renderPublic, e => { b.innerHTML = `<div class="note">${esc(errText(e))}</div>`; }); return; }
+    const v = S.view, tiers = RRCore.TIERS;
+    const info = id => lobbyInfo && lobbyInfo.tiers && lobbyInfo.tiers.find(x => x.id === id);
+    b.innerHTML = `${S.demo ? `<div class="on-demo"><b>${t('on.demoBadge')}</b> ${esc(S.note || t('pub.demo'))}</div>` : ''}
+      <div class="pts-hero"><div class="lbl">${t('on.pts')}</div><div class="v">${fmtPts(S.points || 0)}</div><div class="sub">${t('pub.ptsSub')}</div></div>
+      ${v ? `<button class="btn primary wide on-resume" id="pubResume">${esc(isPubView(v) ? t('pub.resume', { t: tierName(v.settings.tier) }) : t('on.resume', { c: v.code }))}</button>` : ''}
+      <h3>${t('pub.nick')}</h3><div class="grp"><input class="on-input" id="pubName" maxlength="16" autocomplete="nickname" placeholder="${esc(t('on.namePh'))}" value="${esc(store.get('rr_on_name', ''))}"></div>
+      <div class="note">${t('pub.nickSub')}</div>
+      <h3>${t('pub.tiers')}</h3>
+      <div class="pub-tiers">${tiers.map(T => { const buy = T.bb * T.buyInBB, n = info(T.id), poor = (S.points || 0) < buy;
+        return `<div class="pub-tier${poor ? ' poor' : ''}" data-tier="${T.id}"><div class="pub-tl"><b>${tierName(T.id)}</b><span class="pub-bl">${T.sb}/${T.bb}</span></div>
+          <div class="pub-meta">${t('pub.buy', { n: fmtPts(buy) })} · ${n ? (n.players ? liveTxt(n) : t('pub.liveNone')) : '&nbsp;'}</div>
+          <button class="btn primary wide pub-sit" data-sit="${T.id}" ${poor ? 'disabled' : ''}>${t('pub.sit')}</button></div>`; }).join('')}</div>
+      <div class="note">${t('pub.rules')}</div>`;
+    if (v) $('pubResume').onclick = () => nav.go(v.status === 'playing' ? 'ontable' : 'lobby');
+    $('pubName').onchange = e => store.set('rr_on_name', e.target.value.trim().slice(0, 16));
+    b.querySelectorAll('[data-sit]').forEach(x => x.onclick = () => {
+      const nm = $('pubName').value.trim().slice(0, 16); store.set('rr_on_name', nm); SFX.tap();
+      if (nm && RRCore.badName(nm)) return fail({ code: 'bad_name' });
+      run(async () => { await ensure(); const v2 = await S.net.quickseat(x.dataset.sit, myName()); await refreshPoints(); history.replaceState({ s: 'public' }, ''); S.view = v2; nav.go('ontable'); return v2; });
+    });
+    if (!S.lobbyAt || Date.now() - S.lobbyAt > 5000) { S.lobbyAt = Date.now(); S.net.lobby().then(r => { lobbyInfo = r; if (nav.cur === 'public') renderPublic(); }).catch(() => {}); }
+  }
+  function openReport() {
+    const v = S.view; if (!v) return;
+    const others = v.seats.filter(s => s && !s.me && !s.bot);
+    if (!others.length) { R.openSheet(`<h2>${t('pub.report')}</h2><div class="txtblk">${t('pub.reportNone')}</div>`); return; }
+    let who = others[0].i, why = 'abuse';
+    const draw = () => {
+      R.openSheet(`<h2>${t('pub.reportQ')}</h2><div class="grp">${others.map(s => `<button class="row pub-who${s.i === who ? ' on' : ''}" data-who="${s.i}"><span>${esc(s.name)}</span><span>${s.i === who ? '●' : '○'}</span></button>`).join('')}</div>
+        <h3>${t('pub.reportWhy')}</h3>${seg('rpWhy', ['abuse', 'name', 'cheat', 'spam', 'other'].map(r => [r, t('pub.r.' + r)]), why)}
+        <div class="actions"><button class="btn" id="rpNo">${t('on.cancel')}</button><button class="btn primary" id="rpGo">${t('pub.send')}</button></div>`);
+      document.querySelectorAll('[data-who]').forEach(x => x.onclick = () => { who = +x.dataset.who; draw(); });
+      $('rpWhy').querySelectorAll('button').forEach(x => x.onclick = () => { why = x.dataset.v; draw(); });
+      $('rpNo').onclick = R.closeSheet;
+      $('rpGo').onclick = () => { R.closeSheet(); S.net.report(who, why).then(() => R.toast(t('pub.reported')), fail); };
+    };
+    draw();
+  }
+
   /* ---------- lobby ---------- */
   const link = code => location.origin + location.pathname + '?join=' + encodeURIComponent(code);
   function renderLobby() {
@@ -189,7 +256,7 @@
   function askLeave() {
     R.openSheet(`<h2>${t('on.leaveQ')}</h2><div class="txtblk">${t('on.leaveTxt')}</div><div class="actions"><button class="btn" id="lvNo">${t('on.cancel')}</button><button class="btn primary" id="lvYes">${t('on.leaveOk')}</button></div>`);
     $('lvNo').onclick = R.closeSheet;
-    $('lvYes').onclick = () => { R.closeSheet(); run(async () => { await S.net.leave(); store.set('rr_on_code', ''); S.view = null; await refreshPoints(); nav.home(); nav.go('online'); return null; }); };
+    $('lvYes').onclick = () => { R.closeSheet(); const pub = isPubView(S.view); run(async () => { await S.net.leave(); store.set('rr_on_code', ''); S.view = null; await refreshPoints(); nav.home(); nav.go(pub ? 'public' : 'online'); return null; }); };
   }
 
   /* ---------- stůl ---------- */
@@ -215,7 +282,7 @@
   function renderTable() {
     const v = S.view; if (!v || !$('otOpps')) return;
     const h = v.hand, me = v.seats[v.me] || {}, L = h && h.legal;
-    $('otCode').textContent = v.code + (S.demo ? ' · ' + t('on.demoBadge') : '');
+    $('otCode').textContent = tableTitle(v) + (S.demo ? ' · ' + t('on.demoBadge') : '');
     $('otHand').textContent = h ? '#' + h.no : '';
     // soupeři
     const opps = seatOrder(v), many = opps.length > 4;
@@ -243,9 +310,11 @@
     $('otMe').innerHTML = `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${me.last ? esc(actLabel(me.last)) : ''}</div>${myTurn ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`;
     // stav + akce
     const st = $('otStatus'); let stHTML = '';
-    if (me.sitOut && me.stack > 0) stHTML = `<div class="on-msg">${t('on.sitOut')}</div><button class="btn primary wide" id="otSitIn">${t('on.sitIn')}</button>`;
-    else if (me.stack < v.settings.bb && (!h || h.done || !me.inHand || me.folded)) stHTML = `<div class="on-msg">${t('on.busted')}</div><button class="btn primary wide" id="otRebuy">${t('on.rebuy', { n: fmtPts(v.settings.buyIn - (me.stack || 0)) })}</button>`;
-    else if (h && h.done) stHTML = `<div class="on-result">${esc(resultLine(v))}</div><div class="on-row"><span class="on-next" id="otNext"></span><button class="btn sm" id="otReview">${t('on.review')}</button>${v.isHost ? `<button class="btn sm primary" id="otDeal">${t('on.nextNow')}</button>` : ''}</div>`;
+    const reap = isPubView(v) && me.sitOut ? `<div class="note pub-reap" id="otReap"></div>` : '';
+    if (me.sitOut && me.stack > 0) stHTML = `<div class="on-msg">${t('on.sitOut')}</div>${reap}<button class="btn primary wide" id="otSitIn">${t('on.sitIn')}</button>`;
+    else if (me.stack < v.settings.bb && (!h || h.done || !me.inHand || me.folded)) stHTML = `<div class="on-msg">${t('on.busted')}</div>${reap}<button class="btn primary wide" id="otRebuy">${t('on.rebuy', { n: fmtPts(v.settings.buyIn - (me.stack || 0)) })}</button>`;
+    else if (h && !h.done && !me.inHand) stHTML = `<div class="on-msg">${t('pub.nextHand')}</div>`;
+    else if (h && h.done) stHTML = `<div class="on-result">${esc(resultLine(v))}</div><div class="on-row"><span class="on-next" id="otNext"></span><button class="btn sm" id="otReview">${t('on.review')}</button>${v.isHost && !isPubView(v) ? `<button class="btn sm primary" id="otDeal">${t('on.nextNow')}</button>` : ''}</div>`;
     else if (!h || v.waiting) stHTML = `<div class="on-msg">${t('on.waitPlayers')}</div>`;
     else if (!myTurn && h.toAct >= 0 && v.seats[h.toAct]) stHTML = `<div class="on-msg">${t('on.waitFor', { n: esc(v.seats[h.toAct].name) })} <span id="otLeft"></span></div>`;
     else if (myTurn) stHTML = `<div class="on-msg on-turn">${t('on.yourTurn')} <span id="otLeft"></span></div>`;
@@ -304,7 +373,10 @@
     if (nav.cur !== 'ontable' || !S.view) return;
     const step = () => {
       const v = S.view; if (!v || nav.cur !== 'ontable') return clearInterval(S.timer);
-      const h = v.hand, now = serverNow();
+      const h = v.hand, now = serverNow(), me = v.seats[v.me];
+      if ($('otReap') && me && me.outSince) $('otReap').textContent = t('pub.reap', { s: Math.max(0, Math.ceil((me.outSince + (v.reapMs || 90000) - now) / 1000)) });
+      // veřejný stůl: server nemá vlastní hodiny → klient ho každých ~5 s „pošťouchne“ (rozdání, zvednutí nečinných)
+      if (isPubView(v) && Date.now() - S.lastTick > 5000 && (!h || h.done || v.waiting || v.seats.some(s => s && s.sitOut))) poke();
       if (h && !h.done && h.deadline) {
         const left = Math.max(0, h.deadline - now), s = Math.ceil(left / 1000);
         if ($('otLeft')) $('otLeft').textContent = t('on.timeLeft', { s });
@@ -328,20 +400,24 @@
     onShow(id, prev) {
       if (prev === 'ontable' && id !== 'ontable') { clearInterval(S.timer); }
       if (id === 'online') renderHome();
+      if (id === 'public') renderPublic();
       if (id === 'oncreate') { ensure().then(renderCreate, fail); renderCreate(); }
       if (id === 'onjoin') renderJoin(OnlineUI._pre);
       if (id === 'lobby') { if (S.view && S.view.status === 'playing') return nav.go('ontable'); renderLobby(); }
       if (id === 'ontable') { if (!S.view) return nav.back(); renderTable(); }
     },
-    onLang() { if (nav.cur && /^(online|oncreate|onjoin|lobby|ontable)$/.test(nav.cur)) OnlineUI.onShow(nav.cur, nav.cur); },
+    onLang() { if (nav.cur && /^(online|public|oncreate|onjoin|lobby|ontable)$/.test(nav.cur)) OnlineUI.onShow(nav.cur, nav.cur); },
     state: S, ensure, setView, _pre: ''
   };
   window.OnlineUI = OnlineUI;
   $('homeOnline').onclick = () => { SFX.tap(); nav.go('online'); };
+  if ($('homePublic')) $('homePublic').onclick = () => { SFX.tap(); nav.go('public'); };
   $('otMenu').onclick = () => {
-    R.openSheet(`<h2>${esc(S.view ? S.view.code : '')}</h2><div class="menu-list"><button class="btn wide" id="omReview">${t('on.review')}</button><button class="btn wide" id="omCopy">${t('on.copy')}</button><button class="btn wide" id="omLeave">${t('on.leave')}</button></div><div class="note">${t('on.noHints')}</div>`);
+    const pub = isPubView(S.view);
+    R.openSheet(`<h2>${esc(S.view ? tableTitle(S.view) : '')}</h2><div class="menu-list"><button class="btn wide" id="omReview">${t('on.review')}</button>${pub ? `<button class="btn wide" id="omReport">${t('pub.report')}</button>` : `<button class="btn wide" id="omCopy">${t('on.copy')}</button>`}<button class="btn wide" id="omLeave">${t('on.leave')}</button></div><div class="note">${t('on.noHints')}</div>`);
     $('omReview').onclick = openReview;
-    $('omCopy').onclick = () => { R.closeSheet(); const l = link(S.view.code); (navigator.clipboard ? navigator.clipboard.writeText(l) : Promise.reject()).then(() => R.toast(t('on.copied')), () => R.toast(l)); };
+    if (pub) $('omReport').onclick = openReport;
+    if (!pub) $('omCopy').onclick = () => { R.closeSheet(); const l = link(S.view.code); (navigator.clipboard ? navigator.clipboard.writeText(l) : Promise.reject()).then(() => R.toast(t('on.copied')), () => R.toast(l)); };
     $('omLeave').onclick = askLeave;
   };
   // odkaz s pozvánkou: ?join=RED-1234
