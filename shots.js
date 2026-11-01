@@ -1,62 +1,45 @@
+/* Snímky skutečné aplikace (ne návrhu): node shots.js  → screenshots/app-*.png */
 const { chromium } = require(process.env.PW || 'playwright-core');
+const path = require('path'), DIR = path.join(__dirname, 'screenshots'), URL = 'file://' + path.join(__dirname, 'index.html');
 (async () => {
-  const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-  const errors = [];
-  async function open(opps, init) {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
-    page.on('pageerror', e => errors.push(e.message));
-    await page.addInitScript(([o, init]) => { window.__FAST = true; Object.assign(window, init); localStorage.setItem('pt_settings', JSON.stringify({ recs: true, odds: true, learn: true, opps: o, shortStacks: true, v: 2 })); }, [opps, init]);
-    await page.goto('file://' + __dirname + '/index.html');
-    return page;
-  }
-  const st = p => p.evaluate(() => ({ over: __G.over, turn: __G.turn, street: __G.street, fb: !!__G.feedback, rec: __G.rec && __G.rec.action }));
-  async function heroPreflop(p, ok) {   // najdi ruku, kde je hráč preflop na tahu a doporučení splňuje podmínku
-    for (let i = 0; i < 200; i++) {
-      let s = await st(p);
-      while (!s.over && s.turn !== 0) { await p.waitForTimeout(20); s = await st(p); }
-      if (!s.over && s.street === 0 && ok(s.rec)) return;
-      await p.evaluate(() => __poker.startHand());
+  const b = await chromium.launch({ executablePath: process.env.CHROME || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, locale: 'cs-CZ' });
+  const errs = [];
+  const open = async (init) => { const p = await ctx.newPage(); p.on('pageerror', e => errs.push(e.message)); await p.addInitScript(init || (() => {})); return p; };
+  const shot = (p, n) => p.screenshot({ path: path.join(DIR, `app-${n}.png`) });
+  // 1) úvodní logo uprostřed otočky + po usazení, 2) úvod
+  const ctx0 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, locale: 'cs-CZ' });
+  let p = await ctx0.newPage(); p.on('pageerror', e => errs.push(e.message));
+  await p.goto(URL); await p.waitForTimeout(380); await shot(p, '01-splash-otocka');
+  await p.waitForTimeout(800); await shot(p, '01b-splash');
+  await p.waitForTimeout(900); await shot(p, '02-uvod-1');
+  for (const n of [2, 3, 4]) { await p.click('#obNext'); await p.waitForTimeout(450); await shot(p, `02-uvod-${n}`); }
+  await ctx0.close();
+  // 3) domů, hra, nastavení…
+  p = await open(() => { window.__NOSPLASH = true; localStorage.setItem('pt_onboarded', '1'); localStorage.setItem('pt_settings', JSON.stringify({ sound: false, vibrate: false, lang: 'cs', opps: 5 })); });
+  await p.goto(URL); await p.waitForTimeout(400);
+  // pár odehraných rukou kvůli statistikám
+  await p.evaluate(() => { window.__FAST = true; __poker.settings.opps = 5; });
+  for (let i = 0; i < 30; i++) {
+    await p.evaluate(() => __poker.startHand());
+    for (let k = 0; k < 400; k++) {
+      const st = await p.evaluate(() => { if (__G.over) return 1; if (__G.turn === 0 && __G.rec) { const r = __G.rec.action, c = __G.ctx.toCall; __poker.heroAct(r === 'fold' ? (c ? 'fold' : 'check') : (c ? 'call' : 'check')); } return 0; });
+      if (st) break; await p.waitForTimeout(5);
     }
   }
-  const finishHand = async p => { for (let i = 0; i < 200; i++) { const s = await st(p); if (s.over) break; if (s.turn === 0) await p.evaluate(() => __poker.heroAct(__G.ctx.toCall ? 'call' : 'check')); else await p.waitForTimeout(20); } };
-
-  // --- 6-max (5 botů, výchozí) ---
-  let page = await open(5, { __DEEP: true });
-  await heroPreflop(page, r => r === 'raise' || r === 'call');
-  await page.waitForTimeout(500); await page.screenshot({ path: 'screenshots/01-preflop-doporuceni-6max.png' });
-  let got = false;
-  for (let i = 0; i < 300 && !got; i++) {
-    const s = await st(page);
-    if (s.over) { await page.evaluate(() => __poker.startHand()); continue; }
-    if (s.turn !== 0) { await page.waitForTimeout(20); continue; }
-    if (s.street >= 1 && s.fb) { got = true; break; }
-    await page.evaluate(() => { const G = __G; const a = G.rec.action === 'fold' && G.street === 0 ? (G.ctx.toCall ? 'call' : 'check') : G.rec.action; __poker.heroAct(a, G.rec.to); });
-  }
-  await page.waitForTimeout(500); await page.screenshot({ path: 'screenshots/02-flop-sance-a-zpetna-vazba.png' });
-  await finishHand(page);
-  await page.waitForTimeout(800); await page.screenshot({ path: 'screenshots/03-rozbor-ruky.png' });
-  await page.evaluate(() => document.getElementById('scrim').click()); await page.click('#statsBtn'); await page.waitForTimeout(400);
-  await page.screenshot({ path: 'screenshots/04-statistiky.png' });
-  await page.evaluate(() => document.getElementById('scrim').click()); await page.click('#settingsBtn'); await page.waitForTimeout(400);
-  await page.screenshot({ path: 'screenshots/09-nastaveni-pocet-souperu.png' });
-  await page.close();
-
-  // --- plný stůl (8 botů, 9 hráčů) ---
-  page = await open(8, { __DEEP: true });
-  await heroPreflop(page, r => r !== 'fold');
-  await page.waitForTimeout(500); await page.screenshot({ path: 'screenshots/06-9max-preflop.png' });
-  await finishHand(page); await page.waitForTimeout(800);
-  await page.evaluate(() => document.getElementById('scrim').click()); await page.waitForTimeout(300);
-  await page.screenshot({ path: 'screenshots/08-9max-showdown.png' });
-  await page.close();
-
-  // --- all-in doporučení: krátký stack 10 BB ---
-  page = await open(5, { __FORCE_SHORT: 10 });
-  await heroPreflop(page, r => r === 'allin');
-  await page.waitForTimeout(500); await page.screenshot({ path: 'screenshots/07-allin-doporuceni.png' });
-  await page.evaluate(() => __poker.heroAct('fold')); await page.waitForTimeout(300);
-  await page.screenshot({ path: 'screenshots/07b-allin-hodnoceni-foldu.png' });
-  await page.close();
-  console.log('errors', errors);
-  await browser.close();
+  await p.waitForTimeout(200);
+  await p.reload(); await p.waitForTimeout(500); await shot(p, '03-domu');
+  await p.click('#playBtn'); await p.waitForTimeout(650); await shot(p, '04-hra-rozdavani');
+  await p.waitForFunction(() => __G.turn === 0 && !__G.dealing, null, { timeout: 30000 }); await p.waitForTimeout(500); await shot(p, '04b-hra-doporuceni');
+  await p.evaluate(() => __poker.heroAct(__G.ctx.toCall ? 'call' : 'check')); await p.waitForTimeout(700); await shot(p, '04c-hra-hodnoceni');
+  await p.evaluate(() => { document.getElementById('scrim').click(); __nav.go('settings'); }); await p.waitForTimeout(500); await shot(p, '05-nastaveni');
+  await p.evaluate(() => document.querySelector('#scr-settings').scrollTo(0, 99999)); await p.waitForTimeout(200); await shot(p, '05b-nastaveni-jazyk');
+  await p.evaluate(() => __nav.go('stats')); await p.waitForTimeout(500); await shot(p, '06-statistiky');
+  await p.evaluate(() => __nav.go('drill')); await p.waitForTimeout(500);
+  await p.evaluate(() => [...document.querySelectorAll('#drActions button')].find(b => !b.disabled).click()); await p.waitForTimeout(500); await shot(p, '07-trenink-situaci');
+  await p.evaluate(() => __nav.go('learn')); await p.waitForTimeout(500); await shot(p, '08-uceni');
+  await p.evaluate(() => { __poker.setLang('en'); __nav.go('settings'); }); await p.waitForTimeout(500); await shot(p, '09-settings-en');
+  await p.evaluate(() => __nav.go('game')); await p.waitForTimeout(500); await shot(p, '09b-game-en');
+  await b.close();
+  console.log(errs.length ? 'ERRORS ' + JSON.stringify(errs) : 'shots OK');
 })();

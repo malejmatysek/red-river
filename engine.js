@@ -12,7 +12,11 @@
   const parseCards = s => (s.match(/[2-9TJQKA][shdc]/gi) || []).map(parseCard);
 
   /* ---------- 7karetní vyhodnocení: vyšší číslo = lepší ruka ---------- */
-  const HAND_NAMES = ['Vysoká karta','Pár','Dva páry','Trojice','Postupka','Barva','Full house','Poker','Čistá postupka'];
+  /* texty přes i18n (window.I18N v prohlížeči, ./i18n.js v Node) */
+  const I18 = root.I18N || (typeof require === 'function' ? require('./i18n.js') : null);
+  const T = (k, p) => I18 ? I18.t(k, p) : k;
+  const HAND_NAMES = { get length() { return 9; } };
+  for (let i = 0; i < 9; i++) Object.defineProperty(HAND_NAMES, i, { get: () => T('hand.' + i), enumerable: true });
   function straightHigh(m) {
     m = (m << 1) | ((m >> 12) & 1);           // eso i jako nejnižší
     for (let h = 13; h >= 4; h--) if (((m >> (h - 4)) & 31) === 31) return h - 1;
@@ -145,7 +149,7 @@
     // sázka, která by nechala méně než ~třetinu stacku, je prakticky all-in
     if ((r.action === 'raise' || r.action === 'bet') && r.to >= allInTo * 0.7) {
       r.to = allInTo; r.action = 'allin';
-      r.why += ' Velikost by stejně vzala skoro celý stack, takže rovnou all-in.';
+      r.why += ' ' + T('e.bigSize');
     }
     return r;
   }
@@ -161,11 +165,11 @@
   function recFacingAllIn(ctx) {
     const need = ctx.toCall / (ctx.pot + ctx.toCall), eq = ctx.eq;
     const lab = handLabel(ctx.hole[0], ctx.hole[1]);
-    const base = `Soupeř tě dává all-in: musíš dát ${fmt(ctx.toCall)} (celý stack) do potu ${fmt(ctx.pot + ctx.toCall)}, potřebuješ aspoň ${pct(need)}.`;
-    const eqTxt = `Tvoje šance proti jeho odhadovanému rozsahu je ${pct(eq)}${ctx.street === 0 ? ' (' + lab + ')' : ''}.`;
-    if (eq >= need + 0.02) return { action: 'call', alt: [], allinCall: true, why: `${base} ${eqTxt} To stačí → dorovnej all-in.` };
-    if (eq >= need - 0.03) return { action: 'call', alt: ['fold'], allinCall: true, why: `${base} ${eqTxt} Je to těsné – call i fold jsou zhruba stejné.` };
-    return { action: 'fold', alt: [], why: `${base} ${eqTxt} To nestačí → fold, i když to bolí.` };
+    const P = { call: fmt(ctx.toCall), pot: fmt(ctx.pot + ctx.toCall), need: pct(need), eq: pct(eq), lab: ctx.street === 0 ? ' (' + lab + ')' : '' };
+    const base = T('e.ai.base', P) + ' ' + T('e.ai.eq', P);
+    if (eq >= need + 0.02) return { action: 'call', alt: [], allinCall: true, why: base + ' ' + T('e.ai.call') };
+    if (eq >= need - 0.03) return { action: 'call', alt: ['fold'], allinCall: true, why: base + ' ' + T('e.close') };
+    return { action: 'fold', alt: [], why: base + ' ' + T('e.ai.fold') };
   }
 
   function recPreflop(ctx) {
@@ -173,106 +177,106 @@
     const pos = ctx.position, r = ctx.raisesThisStreet, bb = ctx.bb;
     const canCheck = ctx.toCall === 0, allInTo = ctx.stack + ctx.myBet;
     const effBB = effOf(ctx) / bb;
-    const tag = `${lab} (síla ${c}/20 podle Chena)`;
+    const tag = T('e.tag', { lab, c });
     const hu = ctx.numOpp === 1;
+    const P = { tag, pos };
 
     /* ---- krátký stack: push / fold (≤ 15 BB) ---- */
     if (effBB <= 15) {
       const adj = effBB <= 8 ? -2 : effBB <= 11 ? -1 : 0;
-      const sbb = `${bbs(effOf(ctx), ctx)} BB`;
+      P.sbb = `${bbs(effOf(ctx), ctx)} BB`;
       if (r === 0) {
-        const thr = (hu ? (pos === 'BB' ? 7 : 4) : PUSH_THR[pos] || 7) + adj;
-        if (c >= thr) return { action: 'allin', to: allInTo, alt: [],
-          why: `Krátký stack (${sbb}) = hraj push/fold. ${tag} je na pozici ${pos} nad hranicí ${thr} → all-in. Malé navýšení by tě stejně zavázalo a soupeř by viděl flop levně.` };
-        if (canCheck) return { action: 'check', alt: [], why: `Krátký stack (${sbb}). ${tag} není na all-in, na big blindu checkni zadarmo.` };
-        return { action: 'fold', alt: [], why: `Krátký stack (${sbb}) = push nebo fold. ${tag} je na pozici ${pos} pod hranicí ${thr} → fold a počkej na lepší ruku.` };
+        P.thr = (hu ? (pos === 'BB' ? 7 : 4) : PUSH_THR[pos] || 7) + adj;
+        if (c >= P.thr) return { action: 'allin', to: allInTo, alt: [], why: T('e.pf.push', P) };
+        if (canCheck) return { action: 'check', alt: [], why: T('e.pf.pushCheck', P) };
+        return { action: 'fold', alt: [], why: T('e.pf.pushFold', P) };
       }
       // proti navýšení s krátkým stackem: re-shove nebo fold
-      const thr = (pos === 'BB' ? 9 : 10) + adj + (r >= 2 ? 2 : 0);
-      if (c >= thr || (r === 1 && lab === 'AKo')) return { action: 'allin', to: allInTo, alt: ['call'],
-        why: `Krátký stack (${sbb}) proti navýšení: ${tag} je dost silná na re-shove all-in (hranice ${thr}). Dorovnat a hrát flop s takhle malým stackem nedává smysl.` };
-      return { action: 'fold', alt: [], why: `Krátký stack (${sbb}) proti navýšení: ${tag} je pod hranicí ${thr} pro all-in → fold.` };
+      P.thr = (pos === 'BB' ? 9 : 10) + adj + (r >= 2 ? 2 : 0);
+      if (c >= P.thr || (r === 1 && lab === 'AKo')) return { action: 'allin', to: allInTo, alt: ['call'], why: T('e.pf.reshove', P) };
+      return { action: 'fold', alt: [], why: T('e.pf.reshoveFold', P) };
     }
 
     if (r === 0) {
-      const openThr = hu ? (pos === 'BB' ? 9 : 5) : (OPEN_THR[pos] || 8);
-      if (c >= openThr) {
-        const to = clampTo(3 * bb + (ctx.limpers || 0) * bb, ctx);
-        return { action: canCheck ? 'bet' : 'raise', to, alt: [],
-          why: `${tag} je na pozici ${pos} dost silná na otevření (hranice ${openThr}). Navyš na ${to}, ať získáš iniciativu a vybereš blindy.` };
+      P.thr = hu ? (pos === 'BB' ? 9 : 5) : (OPEN_THR[pos] || 8);
+      if (c >= P.thr) {
+        P.to = clampTo(3 * bb + (ctx.limpers || 0) * bb, ctx);
+        return { action: canCheck ? 'bet' : 'raise', to: P.to, alt: [], why: T('e.pf.open', P) };
       }
-      if (canCheck) return { action: 'check', alt: [], why: `${tag} není na navýšení. Na big blindu můžeš zadarmo checknout a vidět flop.` };
-      if (pos === 'SB' && hu && c >= 4) return { action: 'call', alt: ['fold'], why: `${tag}: dorovnání malého blindu je levné, ale lepší je hrát agresivně nebo složit.` };
-      return { action: 'fold', alt: [], why: `${tag} je na pozici ${pos} moc slabá (hranice ${openThr}).${EARLY[pos] ? ' Z rané pozice hraj jen silné ruce – za tebou je ještě hodně hráčů.' : ''} Fold ušetří žetony.` };
+      if (canCheck) return { action: 'check', alt: [], why: T('e.pf.bbCheck', P) };
+      if (pos === 'SB' && hu && c >= 4) return { action: 'call', alt: ['fold'], why: T('e.pf.sbLimp', P) };
+      return { action: 'fold', alt: [], why: T('e.pf.openFold', P) + (EARLY[pos] ? ' ' + T('e.pf.early') : '') + ' ' + T('e.pf.saves') };
     }
     // proti navýšení
     if (r === 1) {
-      const callThr = pos === 'BB' ? 6 : EARLY[pos] ? 9 : 8;
+      P.thr = pos === 'BB' ? 6 : EARLY[pos] ? 9 : 8;
       if (c >= 11 || lab === 'AKo') {
-        const to = clampTo(ctx.currentBet * 3, ctx);
-        return { action: 'raise', to, alt: ['call', 'allin'], why: `${tag} patří mezi nejlepší ruce. Dej 3-bet na ${to} – vyděláš víc proti horším rukám.` };
+        P.to = clampTo(ctx.currentBet * 3, ctx);
+        return { action: 'raise', to: P.to, alt: ['call', 'allin'], why: T('e.pf.3bet', P) };
       }
-      if (c >= callThr) return { action: 'call', alt: ['fold'], why: `${tag} je dost dobrá na dorovnání ${fmt(ctx.toCall)}, ale ne na re-raise. Platíš ${pct(ctx.toCall / (ctx.pot + ctx.toCall))} výsledného potu.` };
-      return { action: 'fold', alt: [], why: `Proti navýšení potřebuješ silnější ruku. ${tag} je pod hranicí (${callThr}) – fold.` };
+      P.call = fmt(ctx.toCall); P.share = pct(ctx.toCall / (ctx.pot + ctx.toCall));
+      if (c >= P.thr) return { action: 'call', alt: ['fold'], why: T('e.pf.callRaise', P) };
+      return { action: 'fold', alt: [], why: T('e.pf.foldRaise', P) };
     }
     // proti 3-betu a víc
-    if (c >= 14) return { action: 'allin', to: allInTo, alt: ['raise', 'call'], why: `${tag} – prémiová ruka (QQ+). Proti 3-betu jdi all-in: soupeřovy horší ruce zaplatí a nemusíš řešit těžká rozhodnutí po flopu.` };
-    if (c >= 11) return { action: 'call', alt: ['fold'], why: `${tag} je dost silná na dorovnání 3-betu, ale all-in by byl risk proti úzkému rozsahu.` };
-    return { action: 'fold', alt: [], why: `Proti 3-betu soupeř ukazuje velmi silný rozsah. ${tag} tu prohrává – fold.` };
+    if (c >= 14) return { action: 'allin', to: allInTo, alt: ['raise', 'call'], why: T('e.pf.vs3allin', P) };
+    if (c >= 11) return { action: 'call', alt: ['fold'], why: T('e.pf.vs3call', P) };
+    return { action: 'fold', alt: [], why: T('e.pf.vs3fold', P) };
   }
   function recPostflop(ctx) {
     const eq = ctx.eq, n = Math.max(1, ctx.numOpp), fair = 1 / (n + 1);
     const strong = fair + (1 - fair) * 0.25, medium = fair + (1 - fair) * 0.05, raiseThr = fair + (1 - fair) * 0.42;
     const pot = ctx.pot, made = handName(ctx.hole.concat(ctx.board));
-    const eqTxt = `Tvoje šance ${pct(eq)} (${made.toLowerCase()})`;
+    const eqTxt = T('e.post.eq', { eq: pct(eq), made: made.toLowerCase() });
     const allInTo = ctx.stack + ctx.myBet;
     const spr = effOf(ctx) / Math.max(1, pot);
+    const P = { eqTxt, fair: pct(fair), spr: spr.toFixed(1) };
     if (ctx.toCall === 0) {
-      if (eq >= strong && spr <= 1.5) return { action: 'allin', to: allInTo, alt: ['bet'],
-        why: `${eqTxt} je silná a stack je proti potu malý (SPR ${spr.toFixed(1)}). Jdi rovnou all-in – každá menší sázka by tě stejně zavázala a soupeř by mohl levně dobrat.` };
+      if (eq >= strong && spr <= 1.5) return { action: 'allin', to: allInTo, alt: ['bet'], why: T('e.post.jam', P) };
       if (eq >= strong) {
-        const to = clampTo(pot * 0.66, ctx);
-        return { action: 'bet', to, alt: [], why: `${eqTxt} je nad férovým podílem ${pct(fair)}. Sázej pro hodnotu ~2/3 potu (${to}), ať ti horší ruce platí.` };
+        P.to = clampTo(pot * 0.66, ctx);
+        return { action: 'bet', to: P.to, alt: [], why: T('e.post.value', P) };
       }
       if (eq >= medium) {
-        const to = clampTo(pot * 0.4, ctx);
-        return { action: 'bet', to, alt: ['check'], why: `${eqTxt} je mírně nad férovým podílem ${pct(fair)}. Menší sázka (${to}) chrání ruku a bere hodnotu; check je taky v pořádku.` };
+        P.to = clampTo(pot * 0.4, ctx);
+        return { action: 'bet', to: P.to, alt: ['check'], why: T('e.post.thin', P) };
       }
-      return { action: 'check', alt: [], why: `${eqTxt} je pod férovým podílem ${pct(fair)}. Checkni a podívej se na další kartu zadarmo.` };
+      return { action: 'check', alt: [], why: T('e.post.check', P) };
     }
     const need = ctx.toCall / (pot + ctx.toCall);
-    const oddsTxt = `Musíš dát ${fmt(ctx.toCall)} do potu ${fmt(pot + ctx.toCall)}, takže potřebuješ aspoň ${pct(need)} šanci (pot odds).`;
+    P.odds = T('e.post.odds', { call: fmt(ctx.toCall), pot: fmt(pot + ctx.toCall), need: pct(need) });
     const leftAfterCall = ctx.stack - ctx.toCall;
+    P.left = fmt(leftAfterCall);
     // po callu by zbylo málo → buď all-in (re-shove), nebo fold
-    if (leftAfterCall <= (pot + 2 * ctx.toCall) * 0.5 && eq >= Math.max(need + 0.05, medium)) return { action: 'allin', to: allInTo, alt: ['call'],
-      why: `${eqTxt}. ${oddsTxt} Po callu by ti zbylo jen ${fmt(leftAfterCall)} – to už nic nezmění, takže je lepší re-shove all-in a dát soupeři šanci složit nebo zaplatit horší rukou.` };
+    if (leftAfterCall <= (pot + 2 * ctx.toCall) * 0.5 && eq >= Math.max(need + 0.05, medium)) return { action: 'allin', to: allInTo, alt: ['call'], why: T('e.post.reshove', P) };
     if (eq >= raiseThr && ctx.stack > ctx.toCall) {
-      const to = clampTo(ctx.currentBet * 3, ctx);
-      return { action: 'raise', to, alt: ['call', 'allin'], why: `${eqTxt} je velmi silná. ${oddsTxt} Navyš na ${to} pro hodnotu.` };
+      P.to = clampTo(ctx.currentBet * 3, ctx);
+      return { action: 'raise', to: P.to, alt: ['call', 'allin'], why: T('e.post.raise', P) };
     }
-    if (eq >= need + 0.03) return { action: 'call', alt: eq >= strong ? ['raise'] : [], why: `${eqTxt}. ${oddsTxt} Máš víc, než potřebuješ → call je ziskový.` };
-    if (eq >= need - 0.03) return { action: 'call', alt: ['fold'], why: `${eqTxt}. ${oddsTxt} Je to těsné – call i fold jsou zhruba stejné.` };
-    return { action: 'fold', alt: [], why: `${eqTxt}. ${oddsTxt} Šance nestačí → fold.` };
+    if (eq >= need + 0.03) return { action: 'call', alt: eq >= strong ? ['raise'] : [], why: T('e.post.call', P) };
+    if (eq >= need - 0.03) return { action: 'call', alt: ['fold'], why: `${eqTxt}. ${P.odds} ` + T('e.close') };
+    return { action: 'fold', alt: [], why: T('e.post.fold', P) };
   }
 
   /* Hodnocení rozhodnutí hráče. Třídy: fold / passive (check, call) / aggr (bet, raise) / allin */
   const cls = a => a === 'fold' ? 'fold' : (a === 'check' || a === 'call') ? 'passive' : a === 'allin' ? 'allin' : 'aggr';
   function grade(rec, action, ctx) {
     const ev = ctx.toCall > 0 && ctx.eq != null ? ctx.eq * (ctx.pot + ctx.toCall) - ctx.toCall : null;
-    const evTxt = ev != null && (ctx.street > 0 || ctx.toCall >= ctx.stack) ? ` Hrubé EV callu: ${ev >= 0 ? '+' : ''}${ev.toFixed(1)}.` : '';
+    const evTxt = ev != null && (ctx.street > 0 || ctx.toCall >= ctx.stack) ? ' ' + T('e.g.ev', { ev: (ev >= 0 ? '+' : '') + ev.toFixed(1) }) : '';
     const ca = cls(action), cr = cls(rec.action);
-    if (ca === cr) return { level: 'good', title: 'Správně', text: rec.why + evTxt };
-    if (rec.alt.some(a => cls(a) === ca)) return { level: 'ok', title: 'Dá se', text: `Doporučení bylo ${actName(rec.action)}. ${rec.why}${evTxt}` };
+    const P = { rec: actName(rec.action), size: rec.to ? ' (' + rec.to + ')' : '' };
+    if (ca === cr) return { level: 'good', title: T('g.good'), text: rec.why + evTxt };
+    if (rec.alt.some(a => cls(a) === ca)) return { level: 'ok', title: T('g.ok'), text: T('e.g.was', P) + ' ' + rec.why + evTxt };
     // all-in vs. raise jsou si blízko, pokud je ruka silná
     if ((ca === 'allin' && cr === 'aggr') || (ca === 'aggr' && cr === 'allin'))
-      return { level: 'ok', title: 'Dá se', text: `Agresivita je správně, ale doporučení bylo ${actName(rec.action)}${rec.to ? ' (' + rec.to + ')' : ''}. ${rec.why}` };
+      return { level: 'ok', title: T('g.ok'), text: T('e.g.aggr', P) + ' ' + rec.why };
     let big = false;
     const need = ctx.toCall > 0 ? ctx.toCall / (ctx.pot + ctx.toCall) : 0;
     if (ctx.eq != null && ctx.toCall > 0 && (ctx.street > 0 || ctx.toCall >= ctx.stack))
       big = action === 'fold' ? ctx.eq - need > 0.12 : ca !== 'fold' && need - ctx.eq > 0.12;
     if (ca === 'allin' && cr !== 'aggr') big = big || (ctx.eq != null && ctx.eq < 1 / (ctx.numOpp + 1));   // all-in se slabou rukou
     if (cr === 'allin' && ca === 'fold') big = true;                                                        // fold místo pushe
-    return { level: big ? 'bad' : 'meh', title: big ? 'Velká chyba' : 'Nepřesnost', text: `Lepší bylo ${actName(rec.action)}. ${rec.why}${evTxt}` };
+    return { level: big ? 'bad' : 'meh', title: T(big ? 'g.bad' : 'g.meh'), text: T('e.g.better', P) + ' ' + rec.why + evTxt };
   }
   const actName = a => ({ fold: 'fold', check: 'check', call: 'call', bet: 'bet', raise: 'raise', allin: 'all-in' })[a] || a;
 
@@ -281,9 +285,9 @@
     rng = rng || Math.random;
     style = style || { loose: 0, aggr: 0, bluff: 0.08 };
     const c2 = Object.assign({}, ctx);
-    if (ctx.street > 0) c2.eq = Math.max(0, Math.min(1, ctx.eq + (rng() - 0.5) * 0.12 + style.loose));
+    if (ctx.street > 0) c2.eq = Math.max(0, Math.min(1, ctx.eq + (rng() - 0.5) * (style.noise != null ? style.noise : 0.12) + style.loose));
     let rec = recommend(c2);
-    if (ctx.street === 0 && rec.action === 'fold' && rng() < 0.12 + style.loose) rec = { action: ctx.toCall ? 'call' : 'check' };
+    if (ctx.street === 0 && rec.action === 'fold' && rng() < (style.fish != null ? style.fish : 0.12) + style.loose) rec = { action: ctx.toCall ? 'call' : 'check' };
     if (ctx.street > 0 && ctx.toCall === 0 && rec.action === 'check' && rng() < style.bluff) rec = { action: 'bet', to: clampTo(ctx.pot * 0.5, ctx) };
     if ((rec.action === 'bet' || rec.action === 'raise') && rng() < 0.2 - style.aggr) rec = { action: ctx.toCall ? 'call' : 'check' };
     if (rec.action === 'allin' && ctx.street > 0 && rng() < 0.15) rec = { action: ctx.toCall ? 'call' : 'check' };

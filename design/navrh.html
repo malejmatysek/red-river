@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="cs"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Red River – návrh úvodu</title>
+<link rel="stylesheet" href="../style.css">
+<style>
+/* Návrh obrazovek (mockup) – stejné tokeny jako aplikace */
+body{display:block}
+.scr{width:390px;height:844px;margin:0 auto;position:relative;overflow:hidden;background:#000;display:none;flex-direction:column;padding:54px 20px 34px}
+.scr.on{display:flex}
+.status{position:absolute;top:0;left:0;right:0;height:47px;display:flex;justify-content:space-between;align-items:center;padding:0 30px 0 34px;font-size:15px;font-weight:600}
+.status i{font-style:normal;font-size:12px;letter-spacing:1px}
+.homebar{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:134px;height:5px;border-radius:9px;background:#fff}
+/* splash */
+.splash{align-items:center;justify-content:center;gap:6px}
+.splash img{width:220px;height:220px;animation:pop .6s cubic-bezier(.2,1.4,.4,1)}
+.splash .name{font-size:40px;font-weight:600;letter-spacing:-.04em;margin-top:-6px}
+.splash .tag{color:var(--muted);font-size:15px}
+.splash .dots{position:absolute;bottom:90px;display:flex;gap:7px}
+.splash .dots span{width:7px;height:7px;border-radius:50%;background:#3a3941}.splash .dots span:first-child{background:#FF2D4A}
+@keyframes pop{from{transform:scale(.6);opacity:0}}
+/* onboarding */
+.ob-top{display:flex;justify-content:space-between;align-items:center;height:38px}
+.ob-top .step{color:var(--muted);font-size:14px}
+.skip{color:var(--muted);font-size:15px;padding:8px 2px}
+.ob-art{flex:1;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;width:100%}
+.ob-text h1{font-size:32px;font-weight:600;letter-spacing:-.03em;margin:0 0 10px;line-height:1.1}
+.ob-text p{color:#bdbcc5;font-size:16px;line-height:1.5;margin:0}
+.ob-bottom{display:flex;align-items:center;gap:14px;margin-top:26px}
+.pdots{display:flex;gap:6px;flex:1}.pdots span{width:8px;height:8px;border-radius:9px;background:#3a3941}.pdots span.on{width:24px;background:#fff}
+.ob-bottom .btn{flex:none;padding:0 30px}
+.mock{width:100%}
+.pill-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.tagp{background:var(--panel2);border-radius:999px;padding:7px 12px;font-size:13px;color:#cfcfd6}
+.tagp b{color:#fff;font-weight:600}
+/* home */
+.h-top{display:flex;align-items:center;gap:10px;height:44px}
+.h-top img{width:40px;height:40px;border-radius:11px}
+.h-top .t{font-size:24px;font-weight:600;letter-spacing:-.03em;margin-right:auto}
+.bank{background:var(--panel2);border-radius:22px;padding:16px 18px;margin-top:14px;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}
+.bank .v{font-size:30px;letter-spacing:-.03em}.bank .v.g{color:var(--green)}
+.bank .s{grid-column:1/3;color:var(--muted);font-size:13px;margin-top:4px}
+.hero-art{flex:1;display:flex;align-items:center;justify-content:center;position:relative;margin:8px 0 14px}
+.hero-art .c1{transform:rotate(-12deg) translate(14px,6px)}.hero-art .c2{transform:rotate(8deg) translate(-14px,-4px)}
+.play{height:64px;border-radius:999px;background:#fff;color:#000;font-size:20px;font-weight:600;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%}
+.play small{font-size:12px;font-weight:500;color:#6b6a72;margin-top:1px}
+.menu{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.mi{background:var(--panel2);border-radius:20px;padding:14px;text-align:left;display:flex;flex-direction:column;gap:6px;min-height:92px}
+.mi.wide{grid-column:1/3;flex-direction:row;align-items:center;min-height:0;gap:12px}
+.mi .ic{width:34px;height:34px;border-radius:11px;background:#16151a;display:grid;place-items:center;font-size:17px}
+.mi b{font-size:16px;font-weight:600}.mi span{color:var(--muted);font-size:12.5px;line-height:1.35}
+.mi .new{margin-left:auto;font-size:11px;font-weight:700;color:#000;background:#FF2D4A;border-radius:999px;padding:3px 8px}
+/* settings */
+.nav{display:flex;align-items:center;gap:8px;height:44px;margin-bottom:6px}
+.back{width:38px;height:38px;border-radius:50%;background:var(--panel2);display:grid;place-items:center;font-size:20px}
+.nav .t{font-size:26px;font-weight:600;letter-spacing:-.03em}
+.set{overflow:hidden;flex:1}
+.set h3{margin:16px 2px 6px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.07em}
+.grp{background:var(--panel);border-radius:18px;padding:0 14px}
+.grp .row{padding:11px 0;font-size:15px}.grp .row:last-child{border-bottom:0}
+.grp .row.col{flex-direction:column;align-items:stretch;gap:8px}
+.val{color:var(--muted);font-size:15px}.val:after{content:" ›";color:#55545c}
+.seg.full{justify-content:space-between}.seg.full button{flex:1;padding:6px 0}
+.sw{display:inline-block;width:46px;height:28px;border-radius:999px;background:#3a3941;position:relative;flex:none}
+.sw:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff}
+.sw.on{background:var(--green)}.sw.on:after{left:21px}
+.set.long{overflow:visible}
+</style></head>
+<body>
+
+<!-- 1 SPLASH -->
+<section class="scr splash" id="splash">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <img src="../icons/icon.svg" alt="">
+  <div class="name">Red River</div>
+  <div class="tag">poker trenér</div>
+  <div class="dots"><span></span><span></span><span></span></div>
+  <div class="homebar"></div>
+</section>
+
+<!-- 2–5 ONBOARDING -->
+<section class="scr" id="ob1">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <div class="ob-top"><span class="step">1 / 4</span><button class="skip">Přeskočit</button></div>
+  <div class="ob-art">
+    <img src="../icons/icon.svg" style="width:230px;height:230px" alt="">
+    <div class="pill-row"><span class="tagp"><b>1–8</b> botů</span><span class="tagp"><b>∞</b> rozdání</span><span class="tagp">offline</span></div>
+  </div>
+  <div class="ob-text"><h1>Vítej u stolu</h1><p>Red River tě naučí Texas Hold'em. Hraješ proti botům, každá ruka je nově zamíchaná – kombinace se nikdy neopakují.</p></div>
+  <div class="ob-bottom"><div class="pdots"><span class="on"></span><span></span><span></span><span></span></div><button class="btn primary">Další</button></div>
+  <div class="homebar"></div>
+</section>
+
+<section class="scr" id="ob2">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <div class="ob-top"><span class="step">2 / 4</span><button class="skip">Přeskočit</button></div>
+  <div class="ob-art">
+    <div style="display:flex;gap:6px;margin-bottom:10px"><div class="card lg"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg red" style="margin-left:-26px"><span class="rk">K</span><span class="st">♥</span></div></div>
+    <div class="odds mock"><div class="odds-cell"><div class="lbl">Výhra</div><div class="big win">64 %</div></div><div class="odds-cell"><div class="lbl">Start. ruka</div><div class="mid">AKo · 12/20</div></div><div class="odds-sub">proti 2 soupeřům · náhodné ruce · remíza 2 %</div></div>
+  </div>
+  <div class="ob-text"><h1>Šance na výhru</h1><p>V každé chvíli vidíš, jak často tvoje ruka vyhraje. Počítá se z tisíců simulovaných rozdání podle toho, co soupeři hrají.</p></div>
+  <div class="ob-bottom"><div class="pdots"><span></span><span class="on"></span><span></span><span></span></div><button class="btn primary">Další</button></div>
+  <div class="homebar"></div>
+</section>
+
+<section class="scr" id="ob3">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <div class="ob-top"><span class="step">3 / 4</span><button class="skip">Přeskočit</button></div>
+  <div class="ob-art">
+    <label class="switch-pill" style="font-size:15px;padding:8px 8px 8px 16px"><span>Doporučené tahy</span><input type="checkbox" checked><i></i></label>
+    <div class="rec mock" style="margin-top:6px"><div class="rec-head"><span class="dot"></span><span>Doporučeno: <b>Raise na 6</b></span></div><div class="rec-why">AKo je na pozici BTN dost silná na otevření. Navyš na 3 BB, ať získáš iniciativu a vybereš blindy.</div></div>
+    <div class="actions mock" style="display:flex;gap:8px;width:100%"><button class="btn">Fold</button><button class="btn">Call 2</button><button class="btn hint">Raise 6</button></div>
+  </div>
+  <div class="ob-text"><h1>Doporučené tahy</h1><p>Nevíš si rady? Zapni doporučení – ukáže nejlepší akci a vysvětlí proč. Tlačítko s doporučeným tahem má zelený rámeček.</p></div>
+  <div class="ob-bottom"><div class="pdots"><span></span><span></span><span class="on"></span><span></span></div><button class="btn primary">Další</button></div>
+  <div class="homebar"></div>
+</section>
+
+<section class="scr" id="ob4">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <div class="ob-top"><span class="step">4 / 4</span><button class="skip">Přeskočit</button></div>
+  <div class="ob-art" style="gap:8px">
+    <div class="feedback good mock"><b>Správně</b>Raise s AKo z BTN – přesně tak.</div>
+    <div class="feedback meh mock"><b>Nepřesnost</b>Call s Q5o z CO je moc volný. Fold ušetří žetony.</div>
+    <div class="feedback bad mock"><b>Velká chyba</b>S 10 BB a A4o z CO patří all-in, ne fold.</div>
+  </div>
+  <div class="ob-text"><h1>Hodnocení rozhodnutí</h1><p>Po každém tahu dostaneš zpětnou vazbu a po ruce rozbor. Hodnotí se rozhodnutí, ne štěstí – tak se zlepšíš nejrychleji.</p></div>
+  <div class="ob-bottom"><div class="pdots"><span></span><span></span><span></span><span class="on"></span></div><button class="btn primary">Začít hrát</button></div>
+  <div class="homebar"></div>
+</section>
+
+<!-- 6 HOME -->
+<section class="scr" id="home">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <div class="h-top"><img src="../icons/icon-192.png" alt=""><span class="t">Red River</span><button class="icon-btn" aria-label="Nastavení"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></div>
+  <div class="bank"><div><div class="lbl">Bankroll</div><div class="v">1 248</div></div><div><div class="lbl">Přesnost</div><div class="v g">78 %</div></div><div class="s">Relace: 42 rukou · +62 BB · pokračuješ tam, kde jsi skončil</div></div>
+  <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><img src="lumi.svg" style="position:absolute;width:150px;height:150px;right:6px;top:-4px" alt=""></div>
+  <button class="play">Hrát<small>6 hráčů · blindy 1/2 · 100 BB · střední boti</small></button>
+  <div class="menu">
+    <button class="mi wide"><span class="ic">🎯</span><div style="display:flex;flex-direction:column;gap:2px"><b>Trénink situací</b><span>Push/fold, sázka na flopu, river… nekonečně</span></div><span class="new">NOVÉ</span></button>
+    <button class="mi"><span class="ic">📊</span><b>Statistiky</b><span>VPIP, PFR, přesnost, zisk</span></button>
+    <button class="mi"><span class="ic">📘</span><b>Učení</b><span>Úvod, pozice, síla rukou</span></button>
+  </div>
+  <div class="homebar"></div>
+</section>
+
+<!-- 7 SETTINGS -->
+<section class="scr" id="settings">
+  <div class="status"><span>9:41</span><i>●●● ▮</i></div>
+  <div class="nav"><button class="back">‹</button><span class="t">Nastavení</span></div>
+  <div class="set">
+    <h3>Stůl</h3>
+    <div class="grp">
+      <div class="row col"><div>Počet soupeřů<small>6 hráčů u stolu (6-max)</small></div><div class="seg full"><button>1</button><button>2</button><button>3</button><button>4</button><button class="on">5</button><button>6</button><button>7</button><button>8</button></div></div>
+      <div class="row col"><div>Obtížnost botů</div><div class="seg full"><button>Lehká</button><button class="on">Střední</button><button>Těžká</button></div></div>
+      <div class="row"><span>Blindy a stack</span><span class="val">1/2 · 100 BB</span></div>
+      <div class="row"><div>Krátké stacky<small>Občas push/fold situace</small></div><span class="sw on"></span></div>
+      <div class="row"><div>Trvalý bankroll<small>Stack se přenáší mezi rukama</small></div><span class="sw on"></span></div>
+    </div>
+    <h3>Nápověda</h3>
+    <div class="grp">
+      <div class="row"><span>Doporučené tahy</span><span class="sw on"></span></div>
+      <div class="row"><span>Šance na výhru</span><span class="sw on"></span></div>
+      <div class="row"><span>Režim učení</span><span class="sw on"></span></div>
+    </div>
+    <h3>Hra</h3>
+    <div class="grp">
+      <div class="row col"><div>Rychlost hry</div><div class="seg full"><button>Pomalá</button><button class="on">Normální</button><button>Rychlá</button></div></div>
+      <div class="row"><span>Zvuky</span><span class="sw on"></span></div>
+      <div class="row"><span>Vibrace</span><span class="sw"></span></div>
+    </div>
+    <h3>Ostatní</h3>
+    <div class="grp">
+      <div class="row"><span>Zobrazit úvod znovu</span><span class="val"></span></div>
+      <div class="row"><span style="color:var(--red)">Vynulovat statistiky</span></div>
+      <div class="row"><span>O aplikaci</span><span class="val">Red River 1.0</span></div>
+    </div>
+  </div>
+  <div class="homebar"></div>
+</section>
+
+<script>const s = (location.hash || '#splash').slice(1); document.getElementById(s).classList.add('on'); if (location.search.includes('long')) { const e = document.getElementById(s); e.style.height = 'auto'; e.querySelector('.set') && e.querySelector('.set').classList.add('long'); }</script>
+</body></html>

@@ -1,14 +1,19 @@
-/* Service worker – offline cache. Při změně souborů zvyš VERSION. */
-const VERSION = 'v6';
+/* Service worker – offline cache. Při změně souborů zvyš VERSION.
+   Nová verze se nainstaluje na pozadí (čerstvé soubory, ne z HTTP cache), převezme stránku
+   a aplikace ukáže oznámení „Nová verze je připravená – Obnovit“. */
+const VERSION = 'v7';
 const CACHE = 'poker-trener-' + VERSION;
 const FILES = [
-  './', './index.html', './style.css', './app.js', './engine.js', './manifest.webmanifest',
-  './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
+  './', './index.html', './style.css', './i18n.js', './engine.js', './app.js', './manifest.webmanifest',
+  './icons/icon.svg', './icons/lumi.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', './icons/favicon-32.png'
 ];
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE)
+    .then(c => Promise.all(FILES.map(f => fetch(new Request(f, { cache: 'reload' })).then(r => { if (!r.ok) throw new Error(f + ' ' + r.status); return c.put(f, r); }))))
+    .then(() => self.skipWaiting()));
 });
+self.addEventListener('message', e => { if (e.data === 'skipWaiting') self.skipWaiting(); });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
     .then(keys => Promise.all(keys.filter(k => k.startsWith('poker-trener-') && k !== CACHE).map(k => caches.delete(k))))

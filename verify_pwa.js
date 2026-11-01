@@ -1,6 +1,7 @@
 /* Ověření PWA: servíruje projekt pod podcestou /poker-trainer/, zkontroluje manifest, SW a offline načtení. */
 const { chromium } = require(process.env.PW || 'playwright-core');
 const http = require('http'), fs = require('fs'), path = require('path');
+let SW_BUMP = false;
 const ROOT = __dirname, BASE = '/poker-trainer/', PORT = 8765;
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
 const server = http.createServer((req, res) => {
@@ -9,6 +10,7 @@ const server = http.createServer((req, res) => {
   let f = path.join(ROOT, u.slice(BASE.length) || 'index.html');
   if (fs.existsSync(f) && fs.statSync(f).isDirectory()) f = path.join(f, 'index.html');
   if (!fs.existsSync(f)) { res.writeHead(404); return res.end(); }
+  if (SW_BUMP && f.endsWith('sw.js')) { res.writeHead(200, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-cache' }); return res.end(fs.readFileSync(f, 'utf8').replace(/const VERSION = '([^']+)'/, "const VERSION = '$1-test'")); }
   res.writeHead(200, { 'Content-Type': TYPES[path.extname(f)] || 'application/octet-stream' }); fs.createReadStream(f).pipe(res);
 });
 (async () => {
@@ -34,18 +36,26 @@ const server = http.createServer((req, res) => {
   await page.reload(); // stránka teď pod kontrolou SW
   out.controlled = await page.evaluate(() => !!navigator.serviceWorker.controller);
   out.caches = await page.evaluate(async () => { const ks = await caches.keys(); const r = {}; for (const k of ks) r[k] = (await (await caches.open(k)).keys()).length; return r; });
+  // aktualizace: nová verze sw.js → oznámení „Nová verze je připravená – Obnovit“
+  SW_BUMP = true;
+  await page.evaluate(async () => { const r = await navigator.serviceWorker.getRegistration(); await r.update(); });
+  await page.waitForFunction(() => { const t = document.getElementById('toast'); return t && !t.hidden && !document.getElementById('toastBtn').hidden; }, null, { timeout: 15000 }).catch(() => {});
+  out.updateToast = await page.evaluate(() => ({ visible: !document.getElementById('toast').hidden, text: document.getElementById('toastTxt').textContent, btn: document.getElementById('toastBtn').textContent }));
+  await page.screenshot({ path: path.join(ROOT, 'screenshots/pwa-update-toast.png') });
+  await page.click('#toastBtn'); await page.waitForLoadState('load'); await page.waitForTimeout(500);
+  out.cachesAfterUpdate = await page.evaluate(async () => caches.keys());
   // offline
   server.close();
   await ctx.setOffline(true);
   await page.goto(url, { waitUntil: 'load' });
   await page.waitForTimeout(800);
-  out.offline = await page.evaluate(() => ({ title: document.title, cards: document.querySelectorAll('#heroCards .card').length, engine: typeof PE, buttons: document.querySelectorAll('#actions button,#actions .waiting').length }));
-  await page.screenshot({ path: path.join(ROOT, 'screenshots/05-offline-pwa.png') });
+  out.offline = await page.evaluate(() => ({ title: document.title, cards: document.querySelectorAll('#heroCards .card').length, engine: typeof PE, buttons: document.querySelectorAll('#actions button,#actions .waiting').length, screen: __nav.cur }));
+  await page.screenshot({ path: path.join(ROOT, 'screenshots/pwa-offline.png') });
   // offline i přímo index.html
   const r2 = await page.goto(url + 'index.html'); out.offlineIndex = r2 && r2.status();
   out.errors = errors;
   console.log(JSON.stringify(out, null, 2));
   await browser.close();
-  const ok = !m.errors.length && Array.isArray(out.installabilityErrors) && !out.installabilityErrors.length && out.controlled && out.offline.cards === 2 && out.offline.engine === 'object' && !errors.length;
+  const ok = !m.errors.length && Array.isArray(out.installabilityErrors) && !out.installabilityErrors.length && out.controlled && out.offline.cards === 2 && out.updateToast.visible && out.cachesAfterUpdate.length === 1 && /-test$/.test(out.cachesAfterUpdate[0]) && out.offline.engine === 'object' && !errors.length;
   console.log(ok ? 'PWA OK' : 'PWA FAIL'); process.exit(ok ? 0 : 1);
 })();
