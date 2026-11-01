@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.4.0', BUILD = 'v12';
+  const APP_VERSION = '1.4.1', BUILD = 'v13';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -39,7 +39,7 @@
   const SETTINGS0 = { recs: true, odds: true, learn: true, opps: 5, shortStacks: true, v: 3, diff: 1, blinds: 0, depth: 100, randomDepth: false,
     bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true };
   const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 4,
-    br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [], histP: [] };
+    br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [], histP: [], playSec: 0, days: {} };
   const fresh = o => JSON.parse(JSON.stringify(o));
   /* úrovně hráče: předvolby (jednotlivá nastavení jde pak změnit) */
   const LEVELS = [
@@ -57,7 +57,7 @@
   let stats = load('pt_stats', fresh(STATS0));
   if (stats.v !== 3 && stats.v !== 4) { stats.netBB = (stats.net || 0) / 2; delete stats.net; stats.v = 3; }   // starší verze: zisk v žetonech při BB 2
   if (stats.v === 3) { stats = Object.assign(fresh(STATS0), stats, { v: 4 }); save('pt_stats', stats); }
-  stats.types = Object.assign({}, stats.types); stats.hist = (stats.hist || []).slice(); stats.bestCards = (stats.bestCards || []).slice();
+  stats.playSec = +stats.playSec || 0; stats.days = Object.assign({}, stats.days); stats.types = Object.assign({}, stats.types); stats.hist = (stats.hist || []).slice(); stats.bestCards = (stats.bestCards || []).slice();
   if (!Array.isArray(stats.histP)) stats.histP = stats.hands ? [0, stats.profit] : [];   // v1.3: zisk z rukou zvlášť od zůstatku
   /* body: virtuální měna (žádné skutečné platby, žádný výběr) */
   const PTS = { start: 1000, daily: 500, refillMin: 200, refillTo: 1000, good: 5, ok: 2, streak: 50, lesson: 100, diaRate: 500, login7: 3 };
@@ -136,15 +136,43 @@
     a.classList.remove('enter-f', 'enter-b', 'leaving'); a.classList.add('active');
     if (!noAnim() && prev) { void a.offsetWidth; a.classList.add(dir === 'back' ? 'enter-b' : 'enter-f'); }
     a.scrollTop = 0;
-    nav.cur = id; if ($('helpOv')) $('helpOv').hidden = true; onShow(id, prev);
+    nav.cur = id; if ($('helpOv')) $('helpOv').hidden = true; playClock(id === 'game'); updateTabs(id, prev); onShow(id, prev);
   }
   nav.go = id => { try { history.pushState({ s: id }, ''); } catch (e) {} show(id, 'fwd'); };
   nav.back = () => { if (history.state && history.state.s && history.state.s !== 'home') history.back(); else show('home', 'back'); };
   nav.home = () => { try { history.replaceState({ s: 'home' }, ''); } catch (e) {} show('home', 'back'); };
   window.addEventListener('popstate', e => { closeSheet(); show((e.state && e.state.s) || 'home', 'back'); });
   document.addEventListener('click', e => { if (e.target.closest('[data-back]')) { SFX.tap(); nav.back(); } });
+  /* v1.4.1: spodní lišta Obchod / Domů / Profil */
+  const TABS = ['shop', 'home', 'profile'];
+  function updateTabs(id, prev) {
+    const on = TABS.includes(id), bar = $('tabbar'); if (!bar) return;
+    bar.hidden = !on; document.body.classList.toggle('tabs', on);
+    bar.querySelectorAll('[data-tabgo]').forEach(b => { const a = b.dataset.tabgo === id; b.classList.toggle('on', a); if (a) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    if (on && id !== 'home') $('scr-' + id).classList.toggle('tabroot', !(prev === 'game' || prev === 'drill'));
+  }
+  $('tabbar').onclick = e => {
+    const b = e.target.closest('[data-tabgo]'); if (!b) return;
+    const id = b.dataset.tabgo; SFX.tap();
+    if (id === nav.cur) { const sc = $('scr-' + id); if (sc) sc.scrollTo({ top: 0, behavior: noAnim() ? 'auto' : 'smooth' }); return; }
+    if (id === 'home') return nav.home();
+    if (nav.cur === 'home' || !TABS.includes(nav.cur)) return nav.go(id);
+    try { history.replaceState({ s: id }, ''); } catch (err) {}
+    show(id, TABS.indexOf(id) > TABS.indexOf(nav.cur) ? 'fwd' : 'back');
+  };
+  /* čas strávený u stolu (pro Profil) */
+  let playT0 = 0;
+  function playClock(run) {
+    const now = Date.now();
+    if (playT0) { const sec = Math.min(4 * 3600, Math.round((now - playT0) / 1000)); playT0 = 0;
+      if (sec >= 5) { stats.playSec = (stats.playSec || 0) + sec; stats.days[today()] = 1;
+        const keep = Object.keys(stats.days).sort().slice(-14); stats.days = Object.fromEntries(keep.map(k => [k, 1])); save('pt_stats', stats); } }
+    if (run && !document.hidden) playT0 = now;
+  }
+  document.addEventListener('visibilitychange', () => playClock(nav.cur === 'game'));
   function onShow(id, prev) {
     if (id === 'home') renderHome();
+    if (id === 'profile') renderProfile();
     if (id === 'settings') renderSettings();
     if (id === 'stats') renderStats();
     if (id === 'learn') renderLearn();
@@ -739,10 +767,8 @@
     setText($('accV'), acc);
     setText($('bankS'), settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '−') + plain('[[bb:' + Math.abs(session.netBB) + ']]') }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh'));
     setText($('playLbl'), G.handNo ? t('h.continue') : t('h.play'));
-    setText($('playSub'), t('h.playSub', { n: settings.opps + 1, sb: SB, bb: BB, d: plain('[[bb:' + settings.depth + ']]'), diff: t('diff.' + settings.diff).toLowerCase() }));
     setText($('homeLvl'), t('lv.' + settings.level)); updatePts();
     setText($('homeAchSub'), t('ui.achSub', { n: Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length, m: ACH.length }));
-    setText($('homeBuyin'), settings.bankroll ? t('pts.buyin', { n: fmtPts(START) }) : '');
   }
   const fmtNum = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
   $('playBtn').onclick = () => { SFX.unlock(); nav.go('game'); };
@@ -752,7 +778,6 @@
   $('homeMenu').onclick = () => nav.go('settings');
   $('homeLvlBtn').onclick = () => nav.go('settings');
   $('homePtsBtn').onclick = () => nav.go('shop');
-  $('homeShop').onclick = () => nav.go('shop');
   $('homeDiaBtn').onclick = () => nav.go('ach');
   $('homeWheel').onclick = () => { SFX.unlock(); nav.go('wheel'); };
   $('homeAch').onclick = () => nav.go('ach');
@@ -823,6 +848,75 @@
     return tight ? (aggr ? 'tag' : 'rock') : (aggr ? 'lag' : 'station');
   }
   const TYPE_ICON = { tag: '🦈', rock: '🪨', lag: '🔥', station: '📞' };
+  /* v1.4.1: ikonky typů hráče (Lumi) + Profil s grafem stylu */
+  const LB = f => `<g fill="${f}"><circle cx="-40" cy="-10" r="44"/><circle cx="14" cy="-24" r="50"/><circle cx="50" cy="14" r="40"/><circle cx="-30" cy="28" r="38"/><circle cx="10" cy="30" r="42"/><circle cx="0" cy="4" r="48"/></g>`;
+  const LEYES = '<ellipse cx="12" cy="-20" rx="9" ry="16" transform="rotate(-14 12 -20)" fill="#fff"/><ellipse cx="40" cy="-13" rx="9" ry="16" transform="rotate(-14 40 -13)" fill="#fff"/>';
+  const LVB = 'viewBox="-100 -112 200 200" aria-hidden="true"';
+  const TYPE_LUMI = {
+    tag: `<svg ${LVB}>${LB('#FF2D4A')}<ellipse cx="12" cy="-14" rx="11" ry="6" fill="#fff"/><ellipse cx="42" cy="-8" rx="11" ry="6" fill="#fff"/><circle cx="15" cy="-13" r="3.5" fill="#111"/><circle cx="45" cy="-7" r="3.5" fill="#111"/><path d="M-2 -32 l26 9 M30 -20 l26 -2" stroke="#5a0b16" stroke-width="7" stroke-linecap="round"/></svg>`,
+    lag: `<svg ${LVB}>${LB('#FF2D4A')}${LEYES}<path d="M-26 -112 l-22 44 h22 l-14 40 l40 -54 h-22 l14 -30z" fill="#fff" stroke="#000" stroke-width="5" stroke-linejoin="round"/></svg>`,
+    rock: `<svg ${LVB}><defs><clipPath id="rkC"><circle cx="-40" cy="-10" r="44"/><circle cx="14" cy="-24" r="50"/><circle cx="50" cy="14" r="40"/><circle cx="-30" cy="28" r="38"/><circle cx="10" cy="30" r="42"/><circle cx="0" cy="4" r="48"/></clipPath></defs>${LB('#e8233f')}<g clip-path="url(#rkC)"><path d="M-100 -20 L-30 -60 L10 -100 L-100 -100Z" fill="#ff4a62"/><path d="M-30 -60 L40 -40 L100 -90 L10 -100Z" fill="#f73a54"/><path d="M40 -40 L100 20 L100 -90Z" fill="#c9182f"/><path d="M-100 -20 L-40 40 L-30 -60Z" fill="#d41c35"/><path d="M-40 40 L40 -40 L100 20 L60 100 L-60 100Z" fill="#b8142b"/><path d="M-30 -60 L40 -40 L-40 40Z" fill="#e02843"/><g fill="#6a0818" opacity=".7"><circle cx="-55" cy="10" r="4"/><circle cx="60" cy="40" r="5"/><circle cx="-10" cy="55" r="3.5"/><circle cx="30" cy="-60" r="3"/><circle cx="-60" cy="-35" r="3"/><circle cx="75" cy="-5" r="3"/></g><path d="M-30 -60 L40 -40 L100 20 M40 -40 L-40 40 M-100 -20 L-30 -60" stroke="#ff8a98" stroke-width="2.5" opacity=".5" fill="none"/></g><path d="M-14 -66 l10 20 l-14 14 l12 20 l-8 16" stroke="#4a0812" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M-10 -64 l10 20 l-14 14 l12 20" stroke="#ff8a98" stroke-width="2" fill="none" opacity=".5" transform="translate(4 0)"/><rect x="12" y="-20" width="16" height="7" rx="3.5" fill="#fff"/><rect x="38" y="-14" width="16" height="7" rx="3.5" fill="#fff"/></svg>`,
+    station: `<svg ${LVB}>${LB('#FF2D4A')}<path d="M-20 -24 Q-40 30 -10 52 M86 -12 Q96 40 70 54" stroke="#2a0a10" stroke-width="5" fill="none"/><g transform="translate(26 -18) scale(1.3) translate(-26 18) rotate(-10 26 -16)"><rect x="-8" y="-38" width="30" height="40" rx="10" fill="#1a1a1e"/><rect x="30" y="-38" width="30" height="40" rx="10" fill="#1a1a1e"/><rect x="18" y="-28" width="16" height="14" rx="4" fill="#2c2c32"/><circle cx="7" cy="-28" r="11" fill="#3b3b44" stroke="#55555f" stroke-width="3"/><circle cx="45" cy="-28" r="11" fill="#3b3b44" stroke="#55555f" stroke-width="3"/><circle cx="3" cy="-32" r="4" fill="#fff" opacity=".85"/><circle cx="41" cy="-32" r="4" fill="#fff" opacity=".85"/></g></svg>`
+  };
+  const pctTxt = v => Math.round(v * 100) + ' %';
+  const numTxt = v => I18N.lang === 'cs' ? v.toFixed(1).replace('.', ',') : v.toFixed(1);
+  function fmtDur(sec) { const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60; return h ? t('pr.hm', { h, m }) : t('pr.m', { m }); }
+  function radarHTML(s, ty) {
+    const W = 326, H = 282, cx = W / 2, cy = 146, R = 92, has = !!ty;
+    const vp = s.hands ? s.vpip / s.hands : 0, af = s.calls ? s.br / s.calls : s.br ? 3 : 0;
+    const loose = Math.min(1, vp / 0.6), aggr = Math.min(1, af / 4), cl = x => Math.max(0.12, Math.min(1, x));
+    const val = has ? { a: cl(aggr), v: cl(loose), p: cl(1 - aggr), o: cl(1 - loose) } : { a: .5, v: .5, p: .5, o: .5 };
+    const P = [[cx, cy - R * val.a], [cx + R * val.v, cy], [cx, cy + R * val.p], [cx - R * val.o, cy]];
+    const ring = k => `M${cx} ${cy - R * k} L${cx + R * k} ${cy} L${cx} ${cy + R * k} L${cx - R * k} ${cy}Z`;
+    const Q = { tag: [3, 0, 70, 40], lag: [0, 1, 256, 40], rock: [3, 2, 70, 250], station: [1, 2, 256, 250] };
+    let link = '';
+    if (has) { const [i, j, ax, ay] = Q[ty], mx = (P[i][0] + P[j][0]) / 2, my = (P[i][1] + P[j][1]) / 2;
+      link = `<path d="M${ax} ${ay} L${mx.toFixed(1)} ${my.toFixed(1)}" stroke="#FF2D4A" stroke-width="1" opacity=".9"/><circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4" fill="#000" stroke="#FF2D4A" stroke-width="1.6"/>`; }
+    const pc = (v, b) => (v / b * 100).toFixed(2) + '%';
+    const chip = (k, pos) => `<div class="pr-ty ${ty === k ? 'on' : ''}" style="${pos}">${TYPE_LUMI[k]}<span>${t('pt.' + k)}</span></div>`;
+    return `<div class="pr-ch"><svg class="pr-rad" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs>
+      <linearGradient id="prF" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF2D4A" stop-opacity=".75"/><stop offset=".6" stop-color="#9c1428" stop-opacity=".45"/><stop offset="1" stop-color="#3a3940" stop-opacity=".35"/></linearGradient>
+      <radialGradient id="prB" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2c2b33"/><stop offset="1" stop-color="#1f1e24"/></radialGradient></defs>
+      <path d="${ring(1)}" fill="url(#prB)" stroke="#3a3940"/><path d="${ring(.66)}" fill="none" stroke="#34333b"/><path d="${ring(.33)}" fill="none" stroke="#34333b"/>
+      <path d="M${cx} ${cy - R}V${cy + R}M${cx - R} ${cy}H${cx + R}" stroke="#3d3c44" stroke-dasharray="2 3"/>
+      <path d="M${P.map(q => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' L')}Z" fill="${has ? 'url(#prF)' : 'rgba(142,141,150,.12)'}" stroke="${has ? '#FF2D4A' : '#55545c'}" stroke-width="1.6" stroke-linejoin="round" ${has ? '' : 'stroke-dasharray="4 4"'}/>
+      ${has ? P.map(q => `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="2.6" fill="#fff"/>`).join('') : ''}${link}</svg>
+      <div class="pr-ax" style="left:0;right:0;top:${pc(cy - R - 34, H)}"><b>${t('pr.aggr')}</b><span>${t('pr.aggrSub')}</span></div>
+      <div class="pr-ax" style="left:0;right:0;top:${pc(cy + R + 5, H)}"><b>${t('pr.pass')}</b><span>${t('pr.passSub')}</span></div>
+      <div class="pr-ax" style="left:0;width:${pc(cx - R - 2, W)};top:${pc(cy - 15, H)}"><b>${t('pr.tight')}</b><span>${t('pr.tightSub')}</span></div>
+      <div class="pr-ax" style="right:0;width:${pc(cx - R - 2, W)};top:${pc(cy - 15, H)}"><b>${t('pr.loose')}</b><span>${t('pr.looseSub')}</span></div>
+      ${chip('tag', 'left:0;top:5%')}${chip('lag', 'right:0;top:5%')}${chip('rock', 'left:0;bottom:1%')}${chip('station', 'right:0;bottom:1%')}</div>`;
+  }
+  function renderProfile() {
+    const s = stats, ty = playerType(s), H = s.hands;
+    $('profLvl').textContent = '🎓 ' + t('lv.' + settings.level);
+    const vp = H ? s.vpip / H : 0, pf = H ? s.pfr / H : 0, af = s.calls ? s.br / s.calls : s.br ? 3 : 0;
+    const seg = (n, f) => `<div class="pr-seg">${Array.from({ length: n }, (_, i) => `<i class="${i < f ? 'f' : ''}"></i>`).join('')}</div>`;
+    const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - 6 + i); return s.days[dayStr(d)] ? 1 : 0; });
+    const nd = days.reduce((a, b) => a + b, 0);
+    const card = (k, lbl, val, unit, bar, hint) => `<button class="pr-sc" data-prq="${k}"><div class="l">${lbl}<span class="q" aria-hidden="true">?</span></div><div class="v">${val}${unit ? `<small>${unit}</small>` : ''}</div>${bar}<div class="h">${hint}</div></button>`;
+    const typeCard = ty ? `<div class="pr-type"><span class="ic">${TYPE_LUMI[ty]}</span><div><b>${t('pt.' + ty)}<small>${t('pt.' + ty + '.a')}</small></b><p>${t('pt.' + ty + '.d')}</p></div></div>`
+      : `<div class="pr-type more"><span class="ic">${lumiSVG(wallet.equip.lumi)}</span><div><b>${t('stx.more')}</b><p>${t('stx.moreTxt', { n: MIN_TYPE, k: MIN_TYPE - H })}</p><div class="prog"><i style="width:${Math.min(100, H / MIN_TYPE * 100)}%"></i></div></div></div>`;
+    const achN = Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length;
+    $('profBody').innerHTML = `<div class="pr-card"><div class="pr-hd"><b>${t('stx.type')}</b><span>${H ? t('pr.hands', { n: H }) : ''}</span></div>${radarHTML(s, ty)}${typeCard}</div>
+      <div class="pr-grid">
+        ${card('vpip', t('pr.vpip'), H ? pctTxt(vp) : '–', 'VPIP', seg(12, Math.round(Math.min(1, vp / 0.6) * 12)), t('pr.vpipH'))}
+        ${card('pfr', t('pr.pfr'), H ? pctTxt(pf) : '–', 'PFR', seg(12, Math.round(Math.min(1, pf / 0.6) * 12)), t('pr.pfrH'))}
+        ${card('af', t('pr.af'), s.calls || s.br ? numTxt(af) : '–', 'AF', seg(12, Math.round(Math.min(1, af / 4) * 12)), t('pr.afH'))}
+        ${card('time', t('pr.time'), fmtDur(s.playSec || 0), '', `<div class="pr-seg">${days.map(d => `<i class="${d ? 'f' : ''}"></i>`).join('')}</div>`, t('pr.timeH', { n: nd }))}
+      </div>
+      <div class="pr-list">
+        <button data-prgo="stats"><span class="li">📊</span>${t('ui.stats')}<span class="rt">${t('pr.statsSub')}</span><span class="ch">›</span></button>
+        <button data-prgo="ach"><span class="li"><span data-ic="dia" data-sz="16"></span></span>${t('ach.title')}<span class="rt">${t('ach.sub', { n: achN, m: ACH.length })}</span><span class="ch">›</span></button>
+        <button data-prgo="learn"><span class="li">📘</span>${t('ui.learn')}<span class="rt">${t('pr.learnSub')}</span><span class="ch">›</span></button>
+        <button data-prgo="settings"><span class="li">⚙️</span>${t('ui.settings')}<span class="rt">${t('pr.setSub')}</span><span class="ch">›</span></button>
+      </div>`;
+    $('profBody').querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ICON[e.dataset.ic](+e.dataset.sz || 16); });
+    $('profBody').querySelectorAll('[data-prgo]').forEach(b => b.onclick = () => { SFX.tap(); nav.go(b.dataset.prgo); });
+    $('profBody').querySelectorAll('[data-prq]').forEach(b => b.onclick = () => { const k = b.dataset.prq; SFX.tap();
+      openSheet(`<h2>${t('pr.' + k)}</h2><p class="sx-d">${t('pr.' + k + 'Q')}</p><button class="btn primary wide" id="prOk">${t('gl.ok')}</button>`); $('prOk').onclick = closeSheet; });
+  }
+  $('profLvl').onclick = () => nav.go('settings');
   function lineChart(pts, signed, cls) {
     if (pts.length < 2) return `<div class="sub">${t('stx.noData')}</div>`;
     const W = 320, H = 120, P = 6, mn = Math.min(...pts, signed ? 0 : Infinity), mx = Math.max(...pts, signed ? 0 : -Infinity), rg = mx - mn || 1;
@@ -850,7 +944,7 @@
       ['af', af], ['wtsd', pc(s.sd, s.sawFlop)], ['wsd', pc(s.sdWon, s.sd)], ['allin', s.allins], ['bigpot', s.bigPot ? fmtPts(s.bigPot) : '–'],
       ['profit', `<span class="${s.profit >= 0 ? 'g' : 'r'}">${s.profit > 0 ? '+' : ''}${fmtPts(s.profit)}</span>`], ['agree', pc(s.recAgree, s.recN)], ['acc', pc(s.good + s.ok, s.decisions)]];
     const ty = playerType(s), d = drillSt, dot = c => `<span class="gdot g ${c}"></span>`;
-    const typeHTML = ty ? `<div class="ptype"><div class="pt-ic">${lumiSVG(wallet.equip.lumi)}<span>${TYPE_ICON[ty]}</span></div><div><b>${t('pt.' + ty)}</b>${settings.adv ? ` <small>${t('pt.' + ty + '.a')}</small>` : ''}<p>${t('pt.' + ty + '.d')}</p></div></div>
+    const typeHTML = ty ? `<div class="ptype"><div class="pt-ic pt-lumi">${TYPE_LUMI[ty]}</div><div><b>${t('pt.' + ty)}</b>${settings.adv ? ` <small>${t('pt.' + ty + '.a')}</small>` : ''}<p>${t('pt.' + ty + '.d')}</p></div></div>
         <h3>${t('stx.tips')}</h3><div class="grp tips">${[1, 2, 3].map(i => `<div class="row"><span>${rich(t('tip.' + ty + '.' + i))}</span></div>`).join('')}</div>`
       : `<div class="ptype more"><div class="pt-ic">${lumiSVG(wallet.equip.lumi)}<span>🃏</span></div><div><b>${t('stx.more')}</b><p>${t('stx.moreTxt', { n: MIN_TYPE, k: MIN_TYPE - s.hands })}</p><div class="prog"><i style="width:${Math.min(100, s.hands / MIN_TYPE * 100)}%"></i></div></div></div>`;
     const best = s.best >= 0 && s.bestCards.length ? `<div class="row"><span>${PE.handName(s.bestCards)}</span><span class="ex">${s.bestCards.map(c => cardHTML(c, 'sm')).join('')}</span></div>` : `<div class="row"><span class="muted">${t('stx.noData')}</span></div>`;
@@ -1285,30 +1379,40 @@
   function refill() { if (wallet.points >= PTS.refillMin) return; addPts(PTS.refillTo - wallet.points, t('pts.got', { n: PTS.refillTo - wallet.points })); }
   function renderShop() {
     const wOk = wallet.wheelDay !== today(), refillOk = wallet.points < PTS.refillMin, exOk = wallet.diamonds > 0 && wallet.points < START;
-    const hero = `<div class="pts-hero two"><div><div class="lbl">${t('pts.bal')}</div><div class="v">${ICON.pts(26)} ${fmtPts(wallet.points)}</div>${settings.bankroll && session.hero > 0 && session.bank ? `<div class="sub">${t('pts.table')}: ${fmtPts(session.hero)}</div>` : ''}</div>
-      <div><div class="lbl">${t('dia.name')}</div><div class="v dia">${ICON.dia(26)} ${fmtPts(wallet.diamonds)}</div></div></div>
-      <div class="seg full shop-tabs"><button data-tab="pts" class="${shopTab === 'pts' ? 'on' : ''}">${t('pts.tabPts')}</button><button data-tab="look" class="${shopTab === 'look' ? 'on' : ''}">${t('pts.tabLook')}</button></div>`;
+    const hero = `<div class="sh-bal"><div><span>${t('pts.bal')}</span><b>${ICON.pts(24)}${fmtPts(wallet.points)}</b>${settings.bankroll && session.hero > 0 && session.bank ? `<small>${t('pts.table')}: ${fmtPts(session.hero)}</small>` : ''}</div>
+      <div><span>${t('dia.name')}</span><b class="d">${ICON.dia(24)}${fmtPts(wallet.diamonds)}</b></div></div>`;
+    const lookBtn = (k, id, price) => { const own = !!wallet.owned[k][id], on = wallet.equip[k] === id;
+      return `<button class="sh-it ${on ? 'on' : ''}" data-lk="${k}:${id}"><span class="pv">${lookPreview(k, id)}</span><b>${t(`lk.${k}.${id}`)}</b><small>${t('lk.' + k)}</small><span class="pr">${on ? '✓ ' + t('lk.using') : own ? t('lk.use') : `${ICON.dia(13)} ${price}`}</span></button>`; };
     let body;
     if (shopTab === 'look') {
-      body = `<div class="note">${t('lk.hint')}</div>` + ['back', 'felt', 'lumi'].map(k => `<h3>${t('lk.' + k)}</h3><div class="looks">${LOOKS[k].map(([id, price]) => {
+      body = `<div class="seg full shop-tabs"><button data-tab="pts">${t('pts.tabPts')}</button><button data-tab="look" class="on">${t('pts.tabLook')}</button></div>
+        <div class="note">${t('lk.hint')}</div>` + ['back', 'felt', 'lumi'].map(k => `<h3>${t('lk.' + k)}</h3><div class="looks">${LOOKS[k].map(([id, price]) => {
         const own = !!wallet.owned[k][id], on = wallet.equip[k] === id;
         return `<button class="look ${on ? 'on' : ''}" data-lk="${k}:${id}">${lookPreview(k, id)}<b>${t(`lk.${k}.${id}`)}</b><span class="lk-st">${on ? '✓ ' + t('lk.using') : own ? t('lk.use') : `${ICON.dia(13)} ${price}`}</span></button>`; }).join('')}</div>`).join('');
     } else {
-      body = `<div class="grp">
-        <div class="row"><div>${wheelMini(18)} ${t('wh.title')}<small>${wOk ? t('wh.sub') : t('wh.next', { t: untilMidnight(true) })}</small></div><button class="btn sm ${wOk ? 'primary' : ''}" id="shWheel">${wOk ? t('wh.free') : t('wh.used')}</button></div>
-        <div class="row"><div>${t('pts.refill')}<small>${t('pts.refillSub', { n: fmtPts(PTS.refillTo) })}</small></div><button class="btn sm ${refillOk ? 'primary' : ''}" id="shRefill" ${refillOk ? '' : 'disabled'}>${refillOk ? t('pts.refillBtn') : t('pts.refillNo', { n: PTS.refillMin })}</button></div>
-        <div class="row"><div>${t('dia.ex')}<small>${icx(t('dia.exSub', { n: fmtPts(PTS.diaRate), m: fmtPts(START) }))}</small></div><button class="btn sm ${exOk ? 'primary' : ''}" id="shEx" ${exOk ? '' : 'disabled'}>${exOk ? icx(t('dia.exBtn', { n: fmtPts(PTS.diaRate) })) : wallet.diamonds ? t('dia.exNo', { m: fmtPts(START) }) : t('dia.exNone')}</button></div>
-      </div>
-      <h3>${t('pts.learn')}</h3><div class="grp">${LESSONS.map(([k, ti]) => `<div class="row"><span>📘 ${t(ti)}</span><button class="btn sm ${wallet.lessons[k] ? '' : 'primary'}" data-les="${k}">${wallet.lessons[k] ? t('pts.lessonDone') : t('pts.lesson', { n: PTS.lesson })}</button></div>`).join('')}</div>
-      <h3>${t('pts.packs')}</h3><div class="packs">${[[1, 5000], [2, 20000], [3, 100000]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${ICON.pts(20).repeat(i)}</div><b>${fmtPts(v)}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
-      <h3>${t('pts.diaPacks')}</h3><div class="packs">${[[1, 10], [2, 50], [3, 120]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${ICON.dia(20).repeat(i)}</div><b>${v}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
-      <div class="note">${t('pts.soonNote')}</div>
-      <h3>${t('pts.earn')}</h3><div class="grp"><div class="txtblk">${t('pts.earnTxt', { g: PTS.good, s: PTS.streak })}<br><br>${t('dia.what')}</div></div>`;
+      const mini = wheelSVG().replace(' id="wheelRot"', '').replace(/ role="img" aria-label="[^"]*"/, ' aria-hidden="true"');
+      const strip = [['lumi', 'shades'], ['felt', 'bordeaux'], ['back', 'noir'], ['lumi', 'crown'], ['felt', 'midnight'], ['back', 'stripes'], ['lumi', 'ghost'], ['back', 'check']]
+        .map(([k, id]) => lookBtn(k, id, LOOKS[k].find(x => x[0] === id)[1])).join('');
+      body = `<button class="sh-feat" id="shWheelCard"><span class="sh-ft"><span class="k">${wOk ? t('sh.freeToday') : t('wh.used')}</span><b>${t('wh.title')}</b><span class="p">${wOk ? t('sh.wheelSub') : t('wh.next', { t: untilMidnight(true) })}</span>
+          <span class="sh-rbtn ${wOk ? '' : 'off'}" id="shWheel">${wOk ? t('sh.spin') : t('sh.look')}</span></span><span class="sh-wheel">${mini}</span></button>
+        <div class="sh-two">
+          <div class="sh-sm"><b>${t('pts.refill')}</b><span>${t('pts.refillSub', { n: fmtPts(PTS.refillTo) })}</span><button class="sh-pill ${refillOk ? 'r' : ''}" id="shRefill" ${refillOk ? '' : 'disabled'}>${refillOk ? t('pts.refillBtn') : t('pts.refillNo', { n: fmtPts(PTS.refillMin) })}</button></div>
+          <div class="sh-sm"><b>${t('dia.ex')}</b><span>${icx(t('dia.exSub', { n: fmtPts(PTS.diaRate), m: fmtPts(START) }))}</span><button class="sh-pill ${exOk ? 'r' : ''}" id="shEx" ${exOk ? '' : 'disabled'}>${exOk ? icx(t('dia.exBtn', { n: fmtPts(PTS.diaRate) })) : wallet.diamonds ? t('dia.exNo', { m: fmtPts(START) }) : t('dia.exNone')}</button></div>
+        </div>
+        <div class="sh-h"><b>${t('pts.tabLook')}</b><button data-tab="look">${t('sh.all')} ›</button></div>
+        <div class="sh-strip">${strip}</div>
+        <div class="sh-h"><b>${t('pts.learn')}</b></div>
+        <div class="sh-lst">${LESSONS.map(([k, ti]) => `<button data-les="${k}"><span>📘 ${t(ti)}</span><em class="${wallet.lessons[k] ? 'done' : ''}">${wallet.lessons[k] ? t('pts.lessonDone') : '+' + PTS.lesson}</em></button>`).join('')}</div>
+        <h3>${t('pts.packs')}</h3><div class="packs">${[[1, 5000], [2, 20000], [3, 100000]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${ICON.pts(20).repeat(i)}</div><b>${fmtPts(v)}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
+        <h3>${t('pts.diaPacks')}</h3><div class="packs">${[[1, 10], [2, 50], [3, 120]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${ICON.dia(20).repeat(i)}</div><b>${v}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
+        <div class="note">${t('pts.soonNote')}</div>
+        <h3>${t('pts.earn')}</h3><div class="grp"><div class="txtblk">${t('pts.earnTxt', { g: PTS.good, s: PTS.streak })}<br><br>${t('dia.what')}</div></div>`;
     }
-    $('shopBody').innerHTML = hero + body + `<div class="about">${t('pts.virtual')}</div>`;
-    $('shopBody').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = b.dataset.tab; SFX.tap(); renderShop(); });
-    if (shopTab === 'look') { $('shopBody').querySelectorAll('[data-lk]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.lk.split(':'); buyLook(k, id); }); return; }
-    $('shWheel').onclick = () => { SFX.unlock(); nav.go('wheel'); };
+    $('shopBody').innerHTML = `<div class="sh2">${hero}${body}</div><div class="about">${t('pts.virtual')}</div>`;
+    $('shopBody').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = b.dataset.tab; SFX.tap(); renderShop(); $('scr-shop').scrollTop = 0; });
+    $('shopBody').querySelectorAll('[data-lk]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.lk.split(':'); buyLook(k, id); });
+    if (shopTab === 'look') return;
+    $('shWheelCard').onclick = () => { SFX.unlock(); nav.go('wheel'); };
     $('shRefill').onclick = () => { refill(); renderShop(); };
     $('shEx').onclick = () => { exchangeDia(); renderShop(); };
     $('shopBody').querySelectorAll('[data-les]').forEach(b => b.onclick = () => { const L = LESSONS.find(x => x[0] === b.dataset.les);
@@ -1330,7 +1434,7 @@
     if (G.lastDec && G.feedback) G.feedback = Object.assign({ street: G.lastDec.street, act: G.lastDec.action }, gradeOf(G.lastDec));
     if (G.players.length) render();
     obRender(0); renderHome(); if (D.spot) renderDrill();
-    if (nav.cur === 'stats') renderStats(); if (nav.cur === 'learn') renderLearn(); if (nav.cur === 'shop') renderShop(); if (nav.cur === 'settings') renderSettings();
+    if (nav.cur === 'stats') renderStats(); if (nav.cur === 'learn') renderLearn(); if (nav.cur === 'shop') renderShop(); if (nav.cur === 'profile') renderProfile(); if (nav.cur === 'settings') renderSettings();
     if (nav.cur === 'wheel') renderWheel(); if (nav.cur === 'ach') renderAch();
     if (!$('sheet').hidden && G.over) showSummary(); else closeSheet();
     if (window.OnlineUI) window.OnlineUI.onLang();
