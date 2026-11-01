@@ -14,6 +14,7 @@
   const STATS0 = { hands: 0, won: 0, net: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0 };
   const settings = load('pt_settings', SETTINGS0);
   let stats = load('pt_stats', STATS0);
+  settings.odds = true; settings.learn = true;   // šance a učení jsou vždy zapnuté
 
   const G = { players: [], dealer: -1, board: [], deck: [], street: 0, currentBet: 0, minRaise: BB, raises: 0,
     turn: -1, over: false, decisions: [], heroVpip: false, heroPfr: false, eq: null, rec: null, ctx: null, feedback: null, handNo: 0 };
@@ -190,12 +191,13 @@
   }
   function render() {
     $('recToggle').checked = settings.recs;
+    $('recState').textContent = settings.recs ? 'zapnuto · nejlepší tah a proč' : 'vypnuto · rozbor až po tahu';
     // soupeři
     $('opps').innerHTML = G.players.slice(1).map((p, i) => {
       const seat = i + 1;
       const cards = p.show ? p.cards.map(c => cardHTML(c, 'sm')).join('') : '';
       return `<div class="opp ${p.folded ? 'folded' : ''} ${G.turn === seat ? 'turn' : ''}">
-        <div class="avatar" style="background:${p.color}">${p.name.slice(0, 2).toUpperCase()}${G.dealer === seat ? '<span class="dealer">D</span>' : ''}</div>
+        <div class="avatar">${p.name.slice(0, 2).toUpperCase()}${G.dealer === seat ? '<span class="dealer">D</span>' : ''}</div>
         <div class="name">${p.name} · ${posLabel(seat)}</div><div class="stk">${p.stack}</div>
         <div class="chip ${p.last ? '' : 'empty'}">${p.last || '-'}</div>
         <div class="mini">${cards}</div></div>`;
@@ -215,9 +217,12 @@
     $('odds').classList.toggle('off', !settings.odds);
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded) {
-      $('eqWin').textContent = Math.round(G.eq.equity * 100) + ' %';
+      const e = G.eq.equity, fair = 1 / (live + 1);
+      $('eqWin').textContent = Math.round(e * 100) + ' %';
+      $('eqWin').className = 'big ' + (e >= fair * 1.25 ? 'hi' : e < fair * 0.7 ? 'lo' : '');
+      $('eqBar').style.width = Math.round(e * 100) + '%';
       $('eqSub').textContent = live ? `proti ${live} ${live === 1 ? 'soupeři' : 'soupeřům'} · ${G.players.slice(1).some(q => !q.folded && rangeOf(q)) ? 'odhad rozsahu podle akcí' : 'náhodné ruce'} · remíza ${Math.round(G.eq.tie * 100)} %` : '';
-    } else { $('eqWin').textContent = '–'; $('eqSub').textContent = h.folded ? 'Složeno' : ''; }
+    } else { $('eqWin').textContent = '–'; $('eqWin').className = 'big'; $('eqBar').style.width = '0'; $('eqSub').textContent = h.folded ? 'Složeno' : ''; }
     $('madeLbl').textContent = G.street === 0 ? 'Start. ruka' : 'Ruka';
     $('made').textContent = G.street === 0 && G.board.length === 0 ? `${PE.handLabel(h.cards[0], h.cards[1])} · ${PE.chen(h.cards[0], h.cards[1])}/20` : PE.handName(h.cards.concat(G.board));
     // doporučení
@@ -278,7 +283,7 @@
   function showSummary() {
     if (!G.over) return;
     const net = G.heroNet, h = hero();
-    const title = net > 0 ? `Vyhrál jsi ${net}` : net < 0 ? `Prohrál jsi ${-net}` : 'Nula';
+    const title = net > 0 ? `Vyhrál jsi ${net}` : net < 0 ? `Prohrál jsi ${-net}` : (G.winners.length > 1 ? 'Dělený pot' : 'Vyrovnáno');
     const wn = G.winners.map(w => w.hero ? 'ty' : w.name).join(', ');
     const sd = alive().length > 1;
     let html = `<h2>${title}</h2><div class="sub">${sd ? `Showdown – vyhrává ${wn} (${G.winners[0].hand.toLowerCase()})` : `Ostatní složili – pot bere ${wn}`} · pot ${pot()}</div>`;
@@ -315,28 +320,35 @@
       <div class="row"><span><span class="g meh" style="display:inline-block;width:9px;height:9px;border-radius:50%"></span> Nepřesnost</span><span>${s.meh}</span></div>
       <div class="row"><span><span class="g bad" style="display:inline-block;width:9px;height:9px;border-radius:50%"></span> Velká chyba</span><span>${s.bad}</span></div>
       <div class="sub" style="margin-top:12px">VPIP = jak často dobrovolně dáš žetony do potu preflop. PFR = jak často preflop navyšuješ. Solidní hráč má PFR blízko VPIP.</div>
+      <h3>Soupeři</h3><div class="row"><div>Počet botů u stolu<small>Projeví se od další ruky</small></div>${oppSeg()}</div>
       <button class="btn wide" id="resetStats">Vynulovat statistiky</button>`);
+    bindSeg($('sheet'), showStats);
     $('resetStats').onclick = () => { stats = Object.assign({}, STATS0); save('pt_stats', stats); showStats(); };
   }
-  function toggleRow(key, title, sub) {
-    return `<div class="row"><div>${title}<small>${sub}</small></div><label class="switch-pill" style="padding:6px"><input type="checkbox" data-k="${key}" ${settings[key] ? 'checked' : ''}><i></i></label></div>`;
+  function oppSeg() {
+    return `<div class="seg">${[1, 2, 3].map(k => `<button data-o="${k}" class="${settings.opps === k ? 'on' : ''}">${k}</button>`).join('')}</div>`;
   }
-  function showSettings() {
-    openSheet(`<h2>Nastavení</h2><div class="sub">Trénink Texas Hold'em, blindy 1/2, stack 200 (100 BB) každou ruku.</div>
-      ${toggleRow('recs', 'Doporučené tahy', 'Ukáže nejlepší akci a proč')}
-      ${toggleRow('odds', 'Šance na výhru', 'Monte Carlo equity v procentech')}
-      ${toggleRow('learn', 'Režim učení', 'Zpětná vazba po každém rozhodnutí')}
-      <div class="row"><div>Počet soupeřů<small>Projeví se od další ruky</small></div><div class="seg">${[1, 2, 3].map(k => `<button data-o="${k}" class="${settings.opps === k ? 'on' : ''}">${k}</button>`).join('')}</div></div>
-      <button class="btn primary wide" id="closeSet">Hotovo</button>`);
-    $('sheet').querySelectorAll('[data-k]').forEach(i => i.onchange = () => { settings[i.dataset.k] = i.checked; save('pt_settings', settings); render(); });
-    $('sheet').querySelectorAll('[data-o]').forEach(b => b.onclick = () => { settings.opps = +b.dataset.o; save('pt_settings', settings); showSettings(); });
-    $('closeSet').onclick = () => { closeSheet(); render(); };
+  function bindSeg(root, after) {
+    root.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { settings.opps = +b.dataset.o; save('pt_settings', settings); after(); });
+  }
+  function showStart() {
+    const el = document.createElement('div'); el.className = 'start'; el.id = 'start';
+    const draw = () => {
+      el.innerHTML = `<div class="logo">${cardHTML(48)}${cardHTML(50)}</div>
+        <h1>Poker <span>trenér</span></h1>
+        <p>Hraj Texas Hold'em proti botům. Uvidíš šanci na výhru a po každém tahu se dozvíš, jestli byl dobrý.</p>
+        <div class="lbl">Počet soupeřů</div>${oppSeg()}
+        <button class="btn primary" id="playBtn">Začít hrát</button>`;
+      bindSeg(el, draw);
+      el.querySelector('#playBtn').onclick = () => { el.remove(); startHand(); };
+    };
+    draw(); document.body.appendChild(el);
   }
   $('recToggle').onchange = e => { settings.recs = e.target.checked; save('pt_settings', settings); render(); };
   $('statsBtn').onclick = showStats;
   document.addEventListener('click', e => { const t = e.target.closest('.rec-why,.feedback .txt'); if (t) t.classList.toggle('open'); });
-  $('settingsBtn').onclick = showSettings;
+  
 
   window.__poker = { startHand, heroAct, G, settings };
-  startHand();
+  if (window.__FAST && !window.__SHOWSTART) startHand(); else showStart();
 })();

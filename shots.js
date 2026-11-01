@@ -3,8 +3,10 @@ const { chromium } = require(process.env.PW || 'playwright-core');
   const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox'] });
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
-  await page.addInitScript(() => { window.__FAST = true; localStorage.setItem('pt_settings', JSON.stringify({ recs: true, odds: true, learn: true, opps: 2 })); });
+  await page.addInitScript(() => { window.__FAST = true; window.__SHOWSTART = true; localStorage.setItem('pt_settings', JSON.stringify({ recs: true, odds: true, learn: true, opps: 2 })); });
   await page.goto('file://' + __dirname + '/index.html');
+  await page.waitForTimeout(400); await page.screenshot({ path: 'screenshots/00-uvod.png' });
+  await page.click('#playBtn');
   const st = () => page.evaluate(() => ({ over: __G.over, turn: __G.turn, street: __G.street, fb: !!__G.feedback, rec: __G.rec && __G.rec.action }));
   // 1) preflop, hráč na tahu, doporučení zapnuté (hledáme hratelnou ruku)
   for (let i = 0; i < 80; i++) {

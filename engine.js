@@ -144,7 +144,7 @@
     const c = chen(ctx.hole[0], ctx.hole[1]), lab = handLabel(ctx.hole[0], ctx.hole[1]);
     const pos = ctx.position, r = ctx.raisesThisStreet, bb = ctx.bb;
     const canCheck = ctx.toCall === 0;
-    const openThr = { 'CO': 8, 'BTN': ctx.numOpp === 1 ? 5 : 6, 'SB': 7, 'BB': 9 }[pos] || 8;
+    const openThr = { 'CO': 8, 'BTN': ctx.numOpp === 1 ? 5 : 6, 'SB': ctx.numOpp === 1 ? 5 : 7, 'BB': 9 }[pos] || 8;
     const tag = `${lab} (síla ${c}/20 podle Chena)`;
     if (r === 0) {
       if (c >= openThr) {

@@ -1,9 +1,9 @@
-OK  AA vs KK: přesně 81.26 % (výhra 81.06, remíza 0.38, 1712304 boardů, 660 ms) | MC 20k: 81.42 % | očekáváno ~82 %
-OK  AKs vs QQ: přesně 46.21 % (výhra 46.02, remíza 0.39, 1712304 boardů, 673 ms) | MC 20k: 46.69 % | očekáváno ~46 %
-OK  AKo vs 22: přesně 46.96 % (výhra 46.67, remíza 0.58, 1712304 boardů, 650 ms) | MC 20k: 46.91 % | očekáváno ~47 %
-OK  JTs vs 22: přesně 53.98 % (výhra 53.28, remíza 1.41, 1712304 boardů, 634 ms) | MC 20k: 53.69 % | očekáváno ~54 %
-OK  AA vs 72o: přesně 87.42 % (výhra 87.24, remíza 0.36, 1712304 boardů, 653 ms) | MC 20k: 87.10 % | očekáváno ~88 %
-OK  flop: AhKh vs QsQd na Qh7h2c: přesně 25.56 % (výhra 25.56, remíza 0.00, 990 boardů, 10 ms) | MC 20k: 25.36 %
+OK  AA vs KK: přesně 81.26 % (výhra 81.06, remíza 0.38, 1712304 boardů, 636 ms) | MC 20k: 81.20 % | očekáváno ~82 %
+OK  AKs vs QQ: přesně 46.21 % (výhra 46.02, remíza 0.39, 1712304 boardů, 663 ms) | MC 20k: 46.55 % | očekáváno ~46 %
+OK  AKo vs 22: přesně 46.96 % (výhra 46.67, remíza 0.58, 1712304 boardů, 638 ms) | MC 20k: 46.54 % | očekáváno ~47 %
+OK  JTs vs 22: přesně 53.98 % (výhra 53.28, remíza 1.41, 1712304 boardů, 635 ms) | MC 20k: 53.18 % | očekáváno ~54 %
+OK  AA vs 72o: přesně 87.42 % (výhra 87.24, remíza 0.36, 1712304 boardů, 720 ms) | MC 20k: 87.42 % | očekáváno ~88 %
+OK  flop: AhKh vs QsQd na Qh7h2c: přesně 25.56 % (výhra 25.56, remíza 0.00, 990 boardů, 16 ms) | MC 20k: 25.50 %
 OK  AsKsQsJsTs2c3d → Čistá postupka
 OK  Ah2c3d4s5h9c9d → Postupka
 OK  AhAcAdAs2h3c4d → Poker
@@ -11,6 +11,6 @@ OK  KhKcKd2s2h3c4d → Full house
 OK  2h5h9hJhKh2c2d → Barva
 OK  AhKcQd2s3h7c8d → Vysoká karta
 OK  AhAcKdKs2h2c4d → Dva páry
-vs náhodná ruka AA: 85.2 % (očekáváno ~85 %)
-AA vs 2 náhodné: 73.9 % (očekáváno ~73 %)
-MC 4000 iter, 2 soupeři s rozsahem: 6 ms
+vs náhodná ruka AA: 85.1 % (očekáváno ~85 %)
+AA vs 2 náhodné: 73.5 % (očekáváno ~73 %)
+MC 4000 iter, 2 soupeři s rozsahem: 9 ms
