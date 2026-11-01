@@ -458,10 +458,10 @@ body{display:block}
 @keyframes pulse{50%{transform:scale(1.25)}}
 #homeWheelSub{font-variant-numeric:tabular-nums}
 /* plsť stolu */
-body[data-cfelt="bordeaux"] #scr-game{background:radial-gradient(ellipse 120% 70% at 50% 32%,#4a0f19 0%,#22060c 55%,#000 100%)}
-body[data-cfelt="graphite"] #scr-game{background:radial-gradient(ellipse 120% 70% at 50% 32%,#35353c 0%,#18181c 55%,#000 100%)}
-body[data-cfelt="forest"] #scr-game{background:radial-gradient(ellipse 120% 70% at 50% 32%,#0f3a27 0%,#06190f 55%,#000 100%)}
-body[data-cfelt="midnight"] #scr-game{background:radial-gradient(ellipse 120% 70% at 50% 32%,#16224a 0%,#080d22 55%,#000 100%)}
+body[data-cfelt="bordeaux"] #scr-game .table::before{content:"";background:radial-gradient(ellipse 90% 85% at 50% 45%,#4a0f19 0%,#22060c 70%,#000 100%)}
+body[data-cfelt="graphite"] #scr-game .table::before{content:"";background:radial-gradient(ellipse 90% 85% at 50% 45%,#35353c 0%,#18181c 70%,#000 100%)}
+body[data-cfelt="forest"] #scr-game .table::before{content:"";background:radial-gradient(ellipse 90% 85% at 50% 45%,#0f3a27 0%,#06190f 70%,#000 100%)}
+body[data-cfelt="midnight"] #scr-game .table::before{content:"";background:radial-gradient(ellipse 90% 85% at 50% 45%,#16224a 0%,#080d22 70%,#000 100%)}
 /* rub karet */
 body[data-cback="noir"] .card.back::before,.lk-card[data-back-prev="noir"]::before{background:repeating-linear-gradient(45deg,rgba(255,45,74,.55) 0 1.5px,transparent 1.5px 8px),repeating-linear-gradient(-45deg,rgba(255,45,74,.55) 0 1.5px,transparent 1.5px 8px),#111!important}
 body[data-cback="dots"] .card.back::before,.lk-card[data-back-prev="dots"]::before{background:radial-gradient(circle,rgba(255,255,255,.55) 1.6px,transparent 2.1px) 0 0/8px 8px,#d63a3a!important}
@@ -559,3 +559,8 @@ body[data-cback="check"] .card.back::before,.lk-card[data-back-prev="check"]::be
 .rk-c{display:flex;gap:2px;flex:none}.rk-c .card.sm{width:22px;height:31px;border-radius:5px}
 .help-list .row b{font-weight:600}.help-list .row small{line-height:1.45;font-size:13px}
 .hero-art .lumi{width:118px;height:112px;right:14px;top:14px}
+
+/* stůl: vzhled barví jen plochu stolu (karty na stole + pot), nikdy pozadí aplikace */
+#scr-game{background:#000}
+#scr-game .table{position:relative;isolation:isolate}
+#scr-game .table::before{position:absolute;inset:-8px -6px -4px;border-radius:20px;z-index:-1;pointer-events:none}
