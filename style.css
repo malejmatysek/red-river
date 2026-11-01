@@ -633,16 +633,16 @@ body{font-weight:500}
 .fr-ch{font-size:24px;color:#6d6c75;flex:none;line-height:1}
 #drillBtn{margin-top:0}
 /* spodní lišta */
-/* lišta: vždy přišpendlená dole; pozadí sahá až ke spodní hraně displeje (i přes iOS mezeru --vgap),
-   tlačítka zůstávají nad indikátorem Home a v dotykové oblasti */
-:root{--sab:env(safe-area-inset-bottom,0px);--sabfix:0px;--vgap:0px;--tabpad:calc(max(var(--sab),var(--sabfix)) + 4px);--tabh:calc(56px + var(--tabpad))}
-.tabbar{position:fixed;left:0;right:0;bottom:calc(-1 * var(--vgap));top:auto;z-index:5;display:flex;justify-content:space-around;align-items:flex-start;margin:0;transform:none;background:rgba(0,0,0,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid #1c1b21;padding:8px max(10px,env(safe-area-inset-right)) var(--tabpad) max(10px,env(safe-area-inset-left))}
+/* lišta: přišpendlená ke spodní hraně okna (bottom:0), safe-area jen jednou. Když iOS PWA hlásí okno kratší
+   o mezeru --vgap (pod oknem je pak černý proužek, kam nejde kreslit), část safe-area už leží v té mezeře → odečíst. */
+:root{--sab:env(safe-area-inset-bottom,0px);--vgap:0px;--tabpad:max(6px,calc(var(--sab) - var(--vgap)));--tabh:calc(56px + var(--tabpad))}
+.tabbar{position:fixed;left:0;right:0;bottom:0;top:auto;z-index:5;display:flex;justify-content:space-around;align-items:flex-start;margin:0;transform:none;background:rgba(0,0,0,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid #1c1b21;padding:8px max(10px,env(safe-area-inset-right)) var(--tabpad) max(10px,env(safe-area-inset-left))}
 .tabbar[hidden]{display:none}
 .tb{display:flex;flex-direction:column;align-items:center;gap:4px;color:#6d6c75;font-size:11px;font-weight:650;line-height:1;width:88px;background:none;border:0;padding:2px 0}
 .tb svg{width:24px;height:24px}
 .tb.on{color:#fff}.tb.on svg{color:#FF2D4A}
 body.tabs .tabscr .page{padding-bottom:calc(var(--tabh) + 24px)}
-body.tabs .toast{bottom:calc(var(--tabh) - var(--vgap) + 10px)}
+body.tabs .toast{bottom:calc(var(--tabh) + 10px)}
 .tabroot .nav .bk{display:none}
 .tabroot .nav .t{margin-left:4px}
 /* Profil */
@@ -720,3 +720,9 @@ body.tabs .toast{bottom:calc(var(--tabh) - var(--vgap) + 10px)}
 .sh-lst button:first-child{border-top:0}
 .sh-lst em{margin-left:auto;flex:none;font-style:normal;font-size:13px;font-weight:750;color:#fff;padding:6px 11px;border-radius:999px;box-shadow:inset 0 0 0 1.5px #FF2D4A}
 .sh-lst em.done{box-shadow:none;background:#16151a;color:#6d6c75}
+/* v1.4.3: černý „tahací“ pruh dole v iOS PWA = nedokované okno (WebKit hlásí okno kratší o výšku stavového řádku
+   a pod ním nechá prázdné místo mimo stránku). iOS okno „dokuje“ na celou výšku, jakmile dokument přeteče okno –
+   proto v iOS PWA má dokument výšku 100vh (= celý displej) v normálním toku. V prohlížeči se dokument nikdy neposouvá. */
+html,body{overscroll-behavior:none;background:#000}
+html:not(.ios-sa),html:not(.ios-sa) body{overflow:hidden;height:100%}
+html.ios-sa,html.ios-sa body{min-height:100vh}
