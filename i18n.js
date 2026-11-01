@@ -111,7 +111,7 @@
     'ob.4a': '<b>Správně</b>Raise s [[h:As,Kd]] [[p:BTN]] – přesně tak.', 'ob.4b': '<b>Nepřesnost</b>Call s [[h:Qc,5h]] [[p:CO]] je moc volný. Fold ušetří žetony.', 'ob.4c': '<b>Velká chyba</b>S žetony za [[bb:10]] a [[h:Ad,4s]] [[p:CO]] patří all-in, ne fold.',
     /* statické texty */
     'ui.tag': 'poker trenér', 'ui.recs': 'Doporučené tahy', 'ui.win': 'Výhra', 'ui.recommended': 'Doporučeno:', 'ui.accuracy': 'Přesnost',
-    'ui.drill': 'Trénink situací', 'ui.drillSub': 'Push/fold, sázka na flopu, river… nekonečně', 'ui.new': 'NOVÉ', 'ui.stats': 'Statistiky', 'ui.statsSub': 'Tvůj styl, grafy, přesnost',
+    'ui.train': 'Trénovat', 'ui.trainSub': 'Situace: push/fold, sázka na flopu, river…', 'ui.drill': 'Trénink situací', 'ui.drillSub': 'Push/fold, sázka na flopu, river… nekonečně', 'ui.new': 'NOVÉ', 'ui.stats': 'Statistiky', 'ui.statsSub': 'Tvůj styl, grafy, přesnost',
     'ui.learn': 'Učení', 'ui.learnSub': 'Úvod, pozice, síla rukou', 'ui.settings': 'Nastavení', 'ui.drillT': 'Trénink', 'ui.back': 'Zpět', 'ui.menu': 'Menu',
     'upd.msg': 'Nová verze je připravená', 'upd.btn': 'Obnovit'
   };
@@ -216,7 +216,7 @@
     'ob.4h': 'Decision grades', 'ob.4p': 'After every move you get feedback, and after each hand a review. Decisions are graded, not luck – the fastest way to improve.',
     'ob.4a': '<b>Correct</b>Raise with [[h:As,Kd]] [[p:BTN]] – exactly.', 'ob.4b': '<b>Inaccuracy</b>Calling with [[h:Qc,5h]] [[p:CO]] is too loose. Folding saves chips.', 'ob.4c': '<b>Big mistake</b>With chips worth [[bb:10]] and [[h:Ad,4s]] [[p:CO]], go all-in, don\'t fold.',
     'ui.tag': 'poker trainer', 'ui.recs': 'Recommended moves', 'ui.win': 'Win', 'ui.recommended': 'Recommended:', 'ui.accuracy': 'Accuracy',
-    'ui.drill': 'Spot training', 'ui.drillSub': 'Push/fold, flop bets, river… endless', 'ui.new': 'NEW', 'ui.stats': 'Statistics', 'ui.statsSub': 'Your style, charts, accuracy',
+    'ui.train': 'Train', 'ui.trainSub': 'Spots: push/fold, flop bets, river…', 'ui.drill': 'Spot training', 'ui.drillSub': 'Push/fold, flop bets, river… endless', 'ui.new': 'NEW', 'ui.stats': 'Statistics', 'ui.statsSub': 'Your style, charts, accuracy',
     'ui.learn': 'Learn', 'ui.learnSub': 'Intro, positions, hand rankings', 'ui.settings': 'Settings', 'ui.drillT': 'Training', 'ui.back': 'Back', 'ui.menu': 'Menu',
     'upd.msg': 'A new version is ready', 'upd.btn': 'Reload'
   };
