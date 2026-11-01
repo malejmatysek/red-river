@@ -1,147 +1,27 @@
+Red River v1.2.0 (sw v8) – výsledky testů 2026-11-01 18:20 (Europe/Prague)
+
 == test_equity
-OK  AA vs KK: přesně 81.26 % (výhra 81.06, remíza 0.38, 1712304 boardů, 779 ms) | MC 20k: 81.84 % | očekáváno ~82 %
-OK  AKs vs QQ: přesně 46.21 % (výhra 46.02, remíza 0.39, 1712304 boardů, 731 ms) | MC 20k: 46.14 % | očekáváno ~46 %
-OK  AKo vs 22: přesně 46.96 % (výhra 46.67, remíza 0.58, 1712304 boardů, 662 ms) | MC 20k: 46.92 % | očekáváno ~47 %
-OK  JTs vs 22: přesně 53.98 % (výhra 53.28, remíza 1.41, 1712304 boardů, 617 ms) | MC 20k: 54.45 % | očekáváno ~54 %
-OK  AA vs 72o: přesně 87.42 % (výhra 87.24, remíza 0.36, 1712304 boardů, 626 ms) | MC 20k: 87.18 % | očekáváno ~88 %
-OK  flop: AhKh vs QsQd na Qh7h2c: přesně 25.56 % (výhra 25.56, remíza 0.00, 990 boardů, 9 ms) | MC 20k: 25.55 %
-OK  AsKsQsJsTs2c3d → Čistá postupka
-OK  Ah2c3d4s5h9c9d → Postupka
-OK  AhAcAdAs2h3c4d → Poker
-OK  KhKcKd2s2h3c4d → Full house
-OK  2h5h9hJhKh2c2d → Barva
-OK  AhKcQd2s3h7c8d → Vysoká karta
-OK  AhAcKdKs2h2c4d → Dva páry
-vs náhodná ruka AA: 85.3 % (očekáváno ~85 %)
-AA vs 2 náhodné: 73.4 % (očekáváno ~73 %)
-MC 4000 iter, 2 soupeři s rozsahem: 6 ms
-AA proti 5 soupeřům (3500 iter): 46.1 %, 8 ms
-AA proti 8 soupeřům (2500 iter): 31.6 %, 9 ms
-OK  push 10 BB, SB, A5o: allin 20 – Krátký stack (10 BB) = hraj push/fold. A5o (síla 5/20 podle Chena) je na pozici SB nad hra…
-OK  fold 10 BB, UTG (9 hráčů), 85o: fold – Krátký stack (10 BB) = push nebo fold. 85o (síla 2/20 podle Chena) je na pozici UTG pod hr…
-OK  push 12 BB, CO, KJo: allin 24 – Krátký stack (12 BB) = hraj push/fold. KJo (síla 7/20 podle Chena) je na pozici CO nad hra…
-OK  100 BB, UTG, KJo → fold (těsná raná pozice): fold – KJo (síla 7/20 podle Chena) je na pozici UTG moc slabá (hranice 10). Z rané pozice hraj je…
-OK  100 BB, BTN, KJo → raise: raise 6 – KJo (síla 7/20 podle Chena) je na pozici BTN dost silná na otevření (hranice 6). Navyš na …
-OK  proti 3-betu s KK → all-in: allin 200 – KK (síla 16/20 podle Chena) – prémiová ruka (QQ+). Proti 3-betu jdi all-in: soupeřovy horš…
-OK  call all-in: dobrá equity: call – Soupeř tě dává all-in: musíš dát 38 (celý stack) do potu 81, potřebuješ aspoň 47 %. Tvoje …
-OK  fold proti all-in: slabá equity: fold – Soupeř tě dává all-in: musíš dát 38 (celý stack) do potu 81, potřebuješ aspoň 47 %. Tvoje …
-OK  nízké SPR + silná ruka postflop → all-in: allin 70 – Tvoje šance 90 % (trojice) je silná a stack je proti potu malý (SPR 1.2). Jdi rovnou all-i…
-OK  hluboký stack + silná ruka postflop → bet: bet 13 – Tvoje šance 90 % (trojice) je nad férovým podílem 50 %. Sázej pro hodnotu ~2/3 potu (13), …
-OK  hodnocení: fold místo pushe → Velká chyba
+24
 exit 0
-
-== test_play (150 rukou, 1/5/8 botů)
-session hands 50 table Ty,Jana,Hana,Tomáš,Pavel,Tereza,Jakub,Lucie,Monika
-{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":249,"showdowns":59,"handsWithAllin":41,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":43,\"netBB\":-503.5,\"vpip\":61,\"pfr\":36,\"decisions\":249,\"good\":173,\"ok\":6,\"meh\":58,\"bad\":12,\"v\":3}"}
-
-== test_flicker (3 přechody mezi rukama)
-{
- "transitions": [
-  {
-   "cardNodesRemoved": 0,
-   "cardNodesAdded": 0,
-   "dealReplays": 0,
-   "layoutShiftFrames": 0,
-   "maxShiftPx": 0,
-   "frames": 192,
-   "ms": 3186
-  },
-  {
-   "cardNodesRemoved": 0,
-   "cardNodesAdded": 0,
-   "dealReplays": 0,
-   "layoutShiftFrames": 0,
-   "maxShiftPx": 0,
-   "frames": 168,
-   "ms": 2780
-  },
-  {
-   "cardNodesRemoved": 0,
-   "cardNodesAdded": 0,
-   "dealReplays": 0,
-   "layoutShiftFrames": 0,
-   "maxShiftPx": 0,
-   "frames": 144,
-   "ms": 2381
-  }
- ],
- "errors": []
-}
+== test_play EN beginner 150
+{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":264,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":57,"handsWithAllin":31,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":58,\"netBB\":-126,\"vpip\":69,
+exit 0
+== test_play CS beginner 150
+{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":251,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":64,"handsWithAllin":36,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":56,\"netBB\":378.5,\"vpip\":58
+exit 0
+== test_play CS intermediate 60
+{"hands":60,"tables":{"2":20,"6":20,"9":20},"decisions":97,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":27,"handsWithAllin":21,"chipErr":0,"errors":[],"stats":"{\"hands\":60,\"won\":23,\"netBB\":515,\"vpip\":26,\"pf
+exit 0
+== test_play CS expert 60
+expert: help hidden OK
+session hands 20 table Ty,Eva,Hana,Adam,Martin,Zuzana,Jakub,Marek,Tomáš
+{"hands":60,"tables":{"2":20,"6":20,"9":20},"decisions":98,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":20,"handsWithAllin":17,"chipErr":0,"errors":[],"stats":"{\"hands\":60,\"won\":17,\"netBB\":23.5,\"vpip\":28,\"p
+exit 0
+== test_flicker
 FLICKER OK {"rem":0,"sh":0,"rep":0}
-
+exit 0
 == verify_pwa
-{
-  "manifestErrors": [],
-  "manifest": {
-    "name": "Red River",
-    "short_name": "Red River",
-    "display": "standalone",
-    "start_url": "./",
-    "scope": "./",
-    "theme": "#000000",
-    "bg": "#000000",
-    "icons": [
-      "192x192 any",
-      "512x512 any",
-      "512x512 maskable"
-    ]
-  },
-  "installabilityErrors": [],
-  "swScope": "http://localhost:8765/poker-trainer/",
-  "controlled": true,
-  "caches": {
-    "poker-trener-v7": 14
-  },
-  "updateToast": {
-    "visible": true,
-    "text": "A new version is ready",
-    "btn": "Reload"
-  },
-  "cachesAfterUpdate": [
-    "poker-trener-v7-test"
-  ],
-  "offline": {
-    "title": "Red River",
-    "cards": 2,
-    "engine": "object",
-    "buttons": 0,
-    "screen": "onboarding"
-  },
-  "offlineIndex": 200,
-  "errors": []
-}
 PWA OK
-== starý main (před opravou):
-{
- "transitions": [
-  {
-   "cardNodesRemoved": 25,
-   "cardNodesAdded": 21,
-   "dealReplays": 21,
-   "layoutShiftFrames": 3,
-   "maxShiftPx": 29,
-   "frames": 75,
-   "ms": 1231
-  },
-  {
-   "cardNodesRemoved": 14,
-   "cardNodesAdded": 14,
-   "dealReplays": 14,
-   "layoutShiftFrames": 0,
-   "maxShiftPx": 0,
-   "frames": 50,
-   "ms": 818
-  },
-  {
-   "cardNodesRemoved": 7,
-   "cardNodesAdded": 7,
-   "dealReplays": 7,
-   "layoutShiftFrames": 0,
-   "maxShiftPx": 0,
-   "frames": 26,
-   "ms": 414
-  }
- ],
- "errors": []
-}
-FLICKER FAIL {"rem":25,"sh":3,"rep":21}
+exit 0
+== shots
+shots OK

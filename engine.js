@@ -165,7 +165,7 @@
   function recFacingAllIn(ctx) {
     const need = ctx.toCall / (ctx.pot + ctx.toCall), eq = ctx.eq;
     const lab = handLabel(ctx.hole[0], ctx.hole[1]);
-    const P = { call: fmt(ctx.toCall), pot: fmt(ctx.pot + ctx.toCall), need: pct(need), eq: pct(eq), lab: ctx.street === 0 ? ' (' + lab + ')' : '' };
+    const P = { call: fmt(ctx.toCall), pot: fmt(ctx.pot + ctx.toCall), need: pct(need), eq: pct(eq), lab: ctx.street === 0 ? ' ([[h:' + ctx.hole[0] + ',' + ctx.hole[1] + ']])' : '' };
     const base = T('e.ai.base', P) + ' ' + T('e.ai.eq', P);
     if (eq >= need + 0.02) return { action: 'call', alt: [], allinCall: true, why: base + ' ' + T('e.ai.call') };
     if (eq >= need - 0.03) return { action: 'call', alt: ['fold'], allinCall: true, why: base + ' ' + T('e.close') };
@@ -177,14 +177,14 @@
     const pos = ctx.position, r = ctx.raisesThisStreet, bb = ctx.bb;
     const canCheck = ctx.toCall === 0, allInTo = ctx.stack + ctx.myBet;
     const effBB = effOf(ctx) / bb;
-    const tag = T('e.tag', { lab, c });
+    const tag = T('e.tag', { lab: '[[h:' + ctx.hole[0] + ',' + ctx.hole[1] + ']]', c });
     const hu = ctx.numOpp === 1;
-    const P = { tag, pos };
+    const P = { tag, pos: '[[p:' + pos + ']]' };
 
     /* ---- krátký stack: push / fold (≤ 15 BB) ---- */
     if (effBB <= 15) {
       const adj = effBB <= 8 ? -2 : effBB <= 11 ? -1 : 0;
-      P.sbb = `${bbs(effOf(ctx), ctx)} BB`;
+      P.sbb = `[[bb:${bbs(effOf(ctx), ctx)}]]`;
       if (r === 0) {
         P.thr = (hu ? (pos === 'BB' ? 7 : 4) : PUSH_THR[pos] || 7) + adj;
         if (c >= P.thr) return { action: 'allin', to: allInTo, alt: [], why: T('e.pf.push', P) };

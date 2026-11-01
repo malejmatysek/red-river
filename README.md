@@ -4,11 +4,20 @@
 
 Živě: https://malejmatysek.github.io/red-river/ · Podrobný návrh: [NAVRH.md](NAVRH.md)
 
-### Co umí (verze 1.1)
-- úvodní logo s otočkou Lumi, 4krokový úvod (přeskočitelný, jde otevřít znovu v Nastavení)
-- domovská obrazovka: **Hrát**, **Trénink situací** (nekonečné rozhodovací spoty), **Statistiky**, **Učení**
-- plynulé rozdávání bez blikání (karty dolétnou k hráčům, tvoje se otočí), nekonečné kombinace (kryptografické míchání, různí boti, náhodná místa a hloubky stacků)
-- Nastavení: doporučení / šance / učení, 1–8 soupeřů, obtížnost, blindy, velikost stacku, krátké stacky, trvalý bankroll, rychlost hry, zvuky, vibrace, **jazyk (čeština / English)**, vynulování statistik
+### Co umí (verze 1.2)
+- úvodní logo s otočkou Lumi, 5krokový úvod (poslední krok = výběr úrovně), jde otevřít znovu v Nastavení
+- **srozumitelně pro začátečníky**: karty jako malé kartičky místo zkratek (Q5o), pozice slovy („na dealerovi“, „první na tahu“), stack slovy („100 velkých blindů“), síla ruky „síla 5/20“
+- **Slovníček**: podtržené pojmy jdou ťuknout (vysvětlení v okně), celý slovníček je v Učení; volitelně **Pokročilá zkratková notace** (AKo, BTN, BB) v Nastavení
+- **úrovně Začátečník / Pokročilý / Expert** (vybírá se v úvodu, mění v Nastavení, zobrazená na domovské obrazovce):
+  - Začátečník – doporučení, šance i podrobné vysvětlení zapnuté
+  - Pokročilý – šance zapnuté, doporučení vypnutá (přepínač), krátká zpětná vazba
+  - Expert – bez nápověd, rozbor ruky jen na vyžádání
+- **body (jen virtuální, nedají se vyplatit)**: vstup ke stolu, body za výhry, dobrá rozhodnutí, denní bonus a série v tréninku; obrazovka **Body a obchod** (denní bonus, doplnění zdarma, body za lekce; balíčky jsou zatím jen ukázka „Platby brzy“ – žádné skutečné platby)
+- **Statistiky**: odehrané/vyhrané ruce, jak často hraješ a navyšuješ (VPIP/PFR), agresivita, showdown, all-iny, největší pot, zisk v bodech, shoda s doporučením, nejlepší kombinace; **herní styl** od 30 rukou (Opatrná skála, Tichý žralok, Divoký maniak, Volající stanice) s tipy; grafy bodů a kombinací; vynulování
+- pomalejší, čitelné otáčení karet a tahy botů (rychlost jde změnit)
+- domovská obrazovka: **Hrát**, **Trénink situací**, **Statistiky**, **Učení**, **Body a obchod**
+- plynulé rozdávání bez blikání, nekonečné kombinace (kryptografické míchání, různí boti, náhodná místa a hloubky stacků)
+- Nastavení: úroveň, nápovědy, notace, slovníček, 1–8 soupeřů, obtížnost, blindy, stack, trvalý bankroll, rychlost, zvuky, vibrace, **jazyk (čeština / English)**, vynulování statistik
 - oznámení „Nová verze je připravená – Obnovit“ po aktualizaci
 
 ## Instalace na telefon

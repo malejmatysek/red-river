@@ -28,7 +28,7 @@
 <!-- ÚVOD (onboarding) -->
 <section class="screen" id="scr-onboarding" data-title="Úvod">
   <div class="page ob">
-    <div class="ob-top"><span class="step" id="obStep">1 / 4</span><button class="skip" id="obSkip" data-i18n="ob.skip">Přeskočit</button></div>
+    <div class="ob-top"><span class="step" id="obStep">1 / 5</span><button class="skip" id="obSkip" data-i18n="ob.skip">Přeskočit</button></div>
     <div class="ob-slides" id="obSlides">
       <div class="ob-slide">
         <div class="ob-art">
@@ -40,14 +40,14 @@
       <div class="ob-slide">
         <div class="ob-art">
           <div class="ob-cards"><div class="card lg"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg red"><span class="rk">K</span><span class="st">♥</span></div></div>
-          <div class="odds mock"><div class="odds-cell"><div class="lbl">Výhra</div><div class="big win">64 %</div></div><div class="odds-cell"><div class="lbl">Start. ruka</div><div class="mid">AKo · 12/20</div></div><div class="odds-sub" data-i18n="ob.2s">proti 2 soupeřům · náhodné ruce · remíza 2 %</div></div>
+          <div class="odds mock"><div class="odds-cell"><div class="lbl">Výhra</div><div class="big win">64 %</div></div><div class="odds-cell"><div class="lbl">Start. ruka</div><div class="mid" data-i18n-html="ob.2m">síla 12/20</div></div><div class="odds-sub" data-i18n="ob.2s">proti 2 soupeřům · náhodné ruce · remíza 2 %</div></div>
         </div>
         <div class="ob-text"><h1 data-i18n="ob.2h">Šance na výhru</h1><p data-i18n="ob.2p">V každé chvíli vidíš, jak často tvoje ruka vyhraje. Počítá se z tisíců simulovaných rozdání podle toho, co soupeři hrají.</p></div>
       </div>
       <div class="ob-slide">
         <div class="ob-art">
           <div class="switch-pill demo"><span data-i18n="ui.recs">Doporučené tahy</span><span class="sw on"></span></div>
-          <div class="rec mock"><div class="rec-head"><span class="dot"></span><span data-i18n-html="ob.3d">Doporučeno: <b>Raise na 6</b></span></div><div class="rec-why" data-i18n="ob.3r">AKo je na pozici BTN dost silná na otevření. Navyš na 3 BB, ať získáš iniciativu a vybereš blindy.</div></div>
+          <div class="rec mock"><div class="rec-head"><span class="dot"></span><span data-i18n-html="ob.3d">Doporučeno: <b>Raise na 6</b></span></div><div class="rec-why" data-i18n-html="ob.3r">AKo je na pozici BTN dost silná na otevření. Navyš na 3 BB, ať získáš iniciativu a vybereš blindy.</div></div>
           <div class="actions mock"><span class="btn">Fold</span><span class="btn">Call 2</span><span class="btn hint">Raise 6</span></div>
         </div>
         <div class="ob-text"><h1 data-i18n="ob.3h">Doporučené tahy</h1><p data-i18n="ob.3p">Nevíš si rady? Zapni doporučení – ukáže nejlepší akci a vysvětlí proč. Tlačítko s doporučeným tahem má zelený rámeček.</p></div>
@@ -60,8 +60,12 @@
         </div>
         <div class="ob-text"><h1 data-i18n="ob.4h">Hodnocení rozhodnutí</h1><p data-i18n="ob.4p">Po každém tahu dostaneš zpětnou vazbu a po ruce rozbor. Hodnotí se rozhodnutí, ne štěstí – tak se zlepšíš nejrychleji.</p></div>
       </div>
+      <div class="ob-slide">
+        <div class="ob-art"><div class="ob-levels" id="obLevels"></div></div>
+        <div class="ob-text"><h1 data-i18n="ob.5h">Jakou máš zkušenost?</h1><p data-i18n="ob.5p">Podle toho nastavím tempo, soupeře a nápovědu.</p></div>
+      </div>
     </div>
-    <div class="ob-bottom"><div class="pdots" id="obDots"><span class="on"></span><span></span><span></span><span></span></div><button class="btn primary" id="obNext" data-i18n="ob.next">Další</button></div>
+    <div class="ob-bottom"><div class="pdots" id="obDots"><span class="on"></span><span></span><span></span><span></span><span></span></div><button class="btn primary" id="obNext" data-i18n="ob.next">Další</button></div>
   </div>
 </section>
 
@@ -70,12 +74,14 @@
   <div class="page home">
     <div class="h-top"><img src="icons/icon-192.png" alt=""><span class="t">Red River</span><button class="icon-btn" id="homeMenu" aria-label="Nastavení" data-i18n-aria="ui.settings"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></div>
     <div class="bank"><div><div class="lbl" id="bankLbl">Bankroll</div><div class="v" id="bankV">–</div></div><div><div class="lbl" data-i18n="ui.accuracy">Přesnost</div><div class="v g" id="accV">–</div></div><div class="s" id="bankS"></div></div>
+    <div class="h-chips"><button class="hchip" id="homeLvlBtn">🎓 <span data-i18n="lv.cur">Úroveň</span> <b id="homeLvl"></b></button><button class="hchip pts" id="homePtsBtn">🪙 <b id="homePts"></b> <span data-i18n="pts.name">Body</span></button></div>
     <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><img src="icons/lumi.svg" class="lumi" alt=""></div>
-    <button class="play" id="playBtn"><span id="playLbl">Hrát</span><small id="playSub"></small></button>
+    <button class="play" id="playBtn"><span id="playLbl">Hrát</span><small id="playSub"></small><small id="homeBuyin" class="buyin"></small></button>
     <div class="menu">
       <button class="mi wide" id="drillBtn"><span class="ic">🎯</span><div class="mi-t"><b data-i18n="ui.drill">Trénink situací</b><span data-i18n="ui.drillSub">Push/fold, sázka na flopu, river… nekonečně</span></div><span class="new" data-i18n="ui.new">NOVÉ</span></button>
       <button class="mi" id="homeStats"><span class="ic">📊</span><b data-i18n="ui.stats">Statistiky</b><span data-i18n="ui.statsSub">VPIP, PFR, přesnost, zisk</span></button>
       <button class="mi" id="homeLearn"><span class="ic">📘</span><b data-i18n="ui.learn">Učení</b><span data-i18n="ui.learnSub">Úvod, pozice, síla rukou</span></button>
+      <button class="mi wide" id="homeShop"><span class="ic">🪙</span><div class="mi-t"><b data-i18n="pts.shop">Body a obchod</b><span data-i18n="pts.shopSub">Dokup body, denní bonus</span></div></button>
     </div>
   </div>
 </section>
@@ -85,7 +91,8 @@
 <div class="app" id="app">
   <header class="top">
     <button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button>
-    <label class="switch-pill" title="Doporučené tahy">
+    <button class="pts-badge" id="ptsBadge" aria-label="Body"><span>🪙 <b id="ptsV">0</b></span><small id="ptsTable" hidden></small></button>
+    <label class="switch-pill" id="recPill" title="Doporučené tahy">
       <span data-i18n="ui.recs">Doporučené tahy</span>
       <input type="checkbox" id="recToggle"><i></i>
     </label>
@@ -143,11 +150,14 @@
 <!-- NASTAVENÍ / STATISTIKY / UČENÍ -->
 <section class="screen" id="scr-settings" data-title="Nastavení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.settings">Nastavení</span></div><div class="set" id="setBody"></div></div></section>
 <section class="screen" id="scr-stats" data-title="Statistiky"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.stats">Statistiky</span></div><div class="set" id="statsBody"></div></div></section>
+<section class="screen" id="scr-shop" data-title="Body"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="pts.shop">Body a obchod</span></div><div class="set" id="shopBody"></div></div></section>
 <section class="screen" id="scr-learn" data-title="Učení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.learn">Učení</span></div><div class="set" id="learnBody"></div></div></section>
 
 <!-- spodní panely + oznámení -->
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" hidden></div>
+<div class="scrim gloss-scrim" id="glossScrim" hidden></div>
+<div class="sheet gloss" id="gloss" hidden></div>
 <div class="toast" id="toast" hidden><span id="toastTxt"></span><button id="toastBtn"></button></div>
 
 <script src="i18n.js"></script>

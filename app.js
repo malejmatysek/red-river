@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.1.0', BUILD = 'v7';
+  const APP_VERSION = '1.2.0', BUILD = 'v8';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -27,9 +27,9 @@
     2: ['BTN', 'BB'], 3: ['BTN', 'SB', 'BB'], 4: ['BTN', 'SB', 'BB', 'CO'], 5: ['BTN', 'SB', 'BB', 'HJ', 'CO'],
     6: ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO'], 7: ['BTN', 'SB', 'BB', 'UTG', 'LJ', 'HJ', 'CO'],
     8: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'LJ', 'HJ', 'CO'], 9: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'MP', 'LJ', 'HJ', 'CO'] };
-  const SPEED = [1.6, 1, 0.5];
+  const SPEED = [2.2, 1, 0.5];
   const spd = () => SPEED[settings.speed] || 1;
-  const delay = () => (FAST() ? 0 : Math.max(300, 700 - 50 * (G.players.length || 3)) * spd());
+  const delay = () => (FAST() ? 0 : Math.max(380, 800 - 50 * (G.players.length || 3)) * spd());
   const streetName = i => t('st.' + i);
 
   /* ---------- úložiště ---------- */
@@ -37,16 +37,35 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const navLang = ((navigator.languages && navigator.languages[0]) || navigator.language || 'cs').toLowerCase();
   const SETTINGS0 = { recs: true, odds: true, learn: true, opps: 5, shortStacks: true, v: 3, diff: 1, blinds: 0, depth: 100, randomDepth: false,
-    bankroll: true, speed: 1, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs' };
-  const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 3 };
+    bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true };
+  const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 4,
+    br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [] };
+  const fresh = o => JSON.parse(JSON.stringify(o));
+  /* úrovně hráče: předvolby (jednotlivá nastavení jde pak změnit) */
+  const LEVELS = [
+    { speed: 0, diff: 0, recs: true, odds: true, learn: true, adv: false, gloss: true },
+    { speed: 1, diff: 1, recs: false, odds: true, learn: true, adv: false, gloss: true },
+    { speed: 2, diff: 2, recs: false, odds: false, learn: false, adv: true, gloss: false }];
+  const expert = () => settings.level === 2;
+  const helpOn = k => !expert() && !!settings[k];
   const DRILL0 = { n: 0, good: 0, ok: 0, meh: 0, bad: 0, streak: 0, best: 0 };
   const settings = load('pt_settings', SETTINGS0);
   if (settings.v !== 3) { if (settings.v !== 2) { settings.opps = 5; settings.shortStacks = true; } settings.v = 3; save('pt_settings', settings); }
   settings.opps = Math.max(1, Math.min(8, settings.opps | 0 || 5));
   if (!I18N.has(settings.lang)) settings.lang = 'cs';
   I18N.set(settings.lang);
-  let stats = load('pt_stats', STATS0);
-  if (stats.v !== 3) { stats.netBB = (stats.net || 0) / 2; delete stats.net; stats.v = 3; save('pt_stats', stats); }   // starší verze: zisk v žetonech při BB 2
+  let stats = load('pt_stats', fresh(STATS0));
+  if (stats.v !== 3 && stats.v !== 4) { stats.netBB = (stats.net || 0) / 2; delete stats.net; stats.v = 3; }   // starší verze: zisk v žetonech při BB 2
+  if (stats.v === 3) { stats = Object.assign(fresh(STATS0), stats, { v: 4 }); save('pt_stats', stats); }
+  stats.types = Object.assign({}, stats.types); stats.hist = (stats.hist || []).slice(); stats.bestCards = (stats.bestCards || []).slice();
+  /* body: virtuální měna (žádné skutečné platby, žádný výběr) */
+  const PTS = { start: 1000, daily: 500, refillMin: 200, refillTo: 1000, good: 5, ok: 2, streak: 50, lesson: 100 };
+  const wallet = load('pt_wallet', { points: PTS.start, lastDaily: '', lessons: {}, v: 1 });
+  wallet.lessons = Object.assign({}, wallet.lessons);
+  const saveW = () => { save('pt_wallet', wallet); updatePts(); };
+  const fmtPts = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  function updatePts() { const e = document.getElementById('ptsV'); if (e) e.textContent = fmtPts(wallet.points); const h = document.getElementById('homePts'); if (h) h.textContent = fmtPts(wallet.points); }
+  function addPts(n, msg) { if (!n) return; wallet.points = Math.max(0, Math.round(wallet.points + n)); saveW(); if (msg && !FAST()) toast(msg); }
   let drillSt = load('pt_drill', DRILL0);
   let session = load('pt_session', { key: '', hero: 0, bots: [], hands: 0, netBB: 0, dealer: -1 });
 
@@ -108,6 +127,7 @@
     if (id === 'settings') renderSettings();
     if (id === 'stats') renderStats();
     if (id === 'learn') renderLearn();
+    if (id === 'shop') renderShop();
     if (id === 'drill') { if (!D.spot) drillNew(); else renderDrill(); }
     if (id === 'game') {
       render();
@@ -115,6 +135,73 @@
       else if (G.paused) { const f = G.paused; G.paused = null; setTimeout(f, 250); }
     }
   }
+
+  /* ---------- srozumitelný text: karty jako čipy, pozice slovy, slovníček ---------- */
+  const cardOf = x => /^\d+$/.test(x) ? +x : PE.parseCards(x)[0];
+  function chip(c) { const s = PE.SUITS[PE.suitOf(c)]; return `<span class="cc${s === 'h' || s === 'd' ? ' r' : ''}">${PE.RANKS[PE.rankOf(c)]}<i>${PE.SUIT_SYM[s]}</i></span>`; }
+  function bbWords(x) {
+    const v = Math.round(x * 10) / 10, num = I18N.lang === 'cs' ? String(v).replace('.', ',') : String(v);
+    if (settings.adv) return num + ' BB';
+    const k = I18N.lang === 'cs' ? (v % 1 ? 'bb.frac' : v === 1 ? 'bb.1' : v >= 2 && v <= 4 ? 'bb.few' : 'bb.many') : v === 1 ? 'bb.1' : 'bb.many';
+    return num + ' ' + t(k);
+  }
+  const gl = (g, txt, extra) => `<span class="gl" data-g="${g}"${extra || ''}>${txt}</span>`;
+  const posShort = code => settings.adv ? code : t('ps.' + code);
+  function token(kind, arg) {
+    if (kind === 'h') { const cs = arg.split(',').map(cardOf);
+      return settings.adv ? gl('cards', PE.handLabel(cs[0], cs[1])) : `<span class="hand" data-g="cards">${cs.map(chip).join('\u2009')}</span>`; }
+    if (kind === 'p') return gl('pos.' + arg, settings.adv ? (I18N.lang === 'cs' ? 'na ' : 'on the ') + arg : t('pp.' + arg));
+    if (kind === 'pn') return gl('pos.' + arg, settings.adv ? arg : '„' + t('ps.' + arg) + '“');
+    if (kind === 'bb') return gl('bb', bbWords(+arg));
+    if (kind === 'st') { const cs = arg.split(',').map(cardOf), c = PE.chen(cs[0], cs[1]);
+      return settings.adv ? gl('strength', PE.handLabel(cs[0], cs[1]) + ' · ' + c + '/20') : gl('strength', t('st.str', { c })); }
+    return '';
+  }
+  const termRx = {};
+  function termsFor(l) {
+    if (termRx[l]) return termRx[l];
+    return (termRx[l] = (I18N.TERMS[l] || []).map(([k, src]) => [k, new RegExp('(?<![\\p{L}\\-])(' + src + ')(?![\\p{L}])', 'iu')]));
+  }
+  function autolink(txt, used, ph) {
+    for (const [k, rx] of termsFor(I18N.lang)) {
+      if (used.has(k)) continue;
+      const m = rx.exec(txt); if (!m) continue;
+      used.add(k); ph.push(gl(k, m[1]));
+      txt = txt.slice(0, m.index) + '\u0001' + (ph.length - 1) + '\u0002' + txt.slice(m.index + m[1].length);
+    }
+    return txt;
+  }
+  function rich(str, o) {
+    str = String(str == null ? '' : str);
+    const link = settings.gloss && !(o && o.nolink), used = new Set(), ph = [];
+    const out = str.split(/(<[^>]+>|\[\[[^\]]+\]\])/).map(part => {
+      if (!part) return '';
+      if (part[0] === '<') return part;
+      const m = /^\[\[(\w+):([^\]]*)\]\]$/.exec(part);
+      if (m) return token(m[1], m[2]);
+      return link ? autolink(part, used, ph) : part;
+    }).join('');
+    return out.replace(/\u0001(\d+)\u0002/g, (_, i) => ph[+i]);
+  }
+  const plain = s => rich(s, { nolink: true }).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  const setHTML = (e, h) => { if (e.__h !== h) { e.__h = h; e.innerHTML = h; } };
+  const shortTxt = s => String(s).split(/(?<=[.!?])\s+(?=[A-ZÁ-Ž\[])/u).slice(0, 2).join(' ');   // pokročilý: jen 2 věty
+  /* vysvětlení pojmu (nad ostatními panely) */
+  function glossInfo(k) {
+    if (k.startsWith('pos.')) { const c = k.slice(4); return { title: t('ps.' + c) + ' (' + c + ')', text: t('gp.' + c) }; }
+    return { title: t('gl.' + k + '.t'), text: t('gl.' + k + '.d') };
+  }
+  function openGloss(k) {
+    const g = glossInfo(k);
+    $('gloss').innerHTML = `<div class="grab"></div><div class="gl-k">${t('gl.title')}</div><h2>${g.title}</h2><p>${g.text}</p>
+      <div class="gl-btns"><button class="btn primary" id="glOk">${t('gl.ok')}</button><button class="btn ghostbtn" id="glAll">${t('gl.all')}</button></div>`;
+    $('gloss').hidden = false; $('glossScrim').hidden = false; SFX.tap();
+    $('glOk').onclick = closeGloss;
+    $('glAll').onclick = () => { closeGloss(); closeSheet(); if (nav.cur !== 'learn') nav.go('learn'); setTimeout(() => { const x = $('glossary'); if (x) x.scrollIntoView({ block: 'start' }); }, 60); };
+  }
+  function closeGloss() { $('gloss').hidden = true; $('glossScrim').hidden = true; }
+  $('glossScrim').onclick = closeGloss;
+  document.addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (!g || g.closest('#gloss')) return; e.stopPropagation(); e.preventDefault(); openGloss(g.dataset.g); }, true);
 
   /* ---------- pomocné ---------- */
   const n = () => G.players.length;
@@ -165,9 +252,16 @@
   }
   const tableKey = () => `${settings.opps}|${settings.blinds}|${settings.depth}|${settings.bankroll ? 1 : 0}`;
   function applyBlinds() { [SB, BB] = BLINDS[settings.blinds] || BLINDS[0]; START = (settings.depth || 100) * BB; }
+  /* žetony ze stolu zpět do bodů (změna stolu / nová session) */
+  function cashOut() {
+    if (session.key && session.hero > 0 && session.bank) { const v = session.hero; wallet.points += v; session.hero = 0; session.bank = false; save('pt_session', session); saveW(); if (!FAST()) toast(t('pts.cashout', { n: fmtPts(v) })); }
+  }
   function setupPlayers() {
     const key = tableKey();
-    if (G.tableKey === key && G.players.length === settings.opps + 1) return;
+    if (G.tableKey === key && G.players.length === settings.opps + 1) return true;
+    const skey0 = `${settings.blinds}|${settings.depth}`;
+    const resume0 = settings.bankroll && session.key === skey0 && session.hero > 0;
+    if (!resume0) { cashOut(); if (settings.bankroll && wallet.points < START) return false; }
     G.tableKey = key;
     G.players = [{ name: 'Ty', hero: true, stack: START }];
     const skey = `${settings.blinds}|${settings.depth}`;
@@ -177,9 +271,10 @@
       const sb = resume && session.bots[i];
       G.players.push(sb ? { name: sb.name, color: sb.color, style: sb.style, stack: sb.stack > 0 ? sb.stack : START } : newBot());
     }
-    if (!resume) session = { key: skey, hero: START, bots: [], hands: 0, netBB: 0, dealer: -1 };
+    if (!resume) { session = { key: skey, hero: START, bots: [], hands: 0, netBB: 0, dealer: -1, bank: settings.bankroll }; if (settings.bankroll) { wallet.points -= START; saveW(); } save('pt_session', session); }
     G.dealer = resume && session.dealer >= 0 && session.dealer < n() ? session.dealer : randInt(n()) - 1;
     buildOpps();
+    return true;
   }
   /* Stacky: trvalý bankroll (přenáší se, dokupuje se) nebo nová hloubka každou ruku */
   function assignStacks() {
@@ -188,7 +283,7 @@
     if (settings.bankroll) {
       G.players.forEach((p, i) => {
         if (p.stack < BB) {
-          if (p.hero) { p.stack = START; G.rebuy = true; G.scenario = t('sc.rebuy'); session.rebuys = (session.rebuys || 0) + 1; }
+          if (p.hero) { p.stack = START; wallet.points -= START; saveW(); G.rebuy = true; G.scenario = t('sc.rebuy'); session.rebuys = (session.rebuys || 0) + 1; }
           else { const nb = newBot(settings.shortStacks && rnd() < 0.3 ? r(8, 40) : START); G.scenario = t('sc.swap', { a: p.name, b: nb.name }); Object.assign(p, nb); updateOppStatic(i); }
         }
       });
@@ -199,10 +294,10 @@
       if (rnd() < 0.06 && n() > 2) { const i = 1 + randInt(n() - 1), old = G.players[i].name, nb = newBot(); G.scenario = t('sc.swap', { a: old, b: nb.name }); Object.assign(G.players[i], nb); updateOppStatic(i); }
       if (settings.shortStacks && !window.__DEEP) {
         const x = rnd();
-        if (x < 0.22) { hero().start = r(6, 15); G.scenario = t('sc.short', { n: hero().start / BB }); G.players.slice(1).forEach(p => p.start = Math.max(p.start, r(20, 100))); }
+        if (x < 0.22) { hero().start = r(6, 15); G.scenario = t('sc.short', { n: '[[bb:' + hero().start / BB + ']]' }); G.players.slice(1).forEach(p => p.start = Math.max(p.start, r(20, 100))); }
         else if (x < 0.36) { const b = 1 + randInt(n() - 1); G.players[b].start = r(5, 14); G.scenario = t('sc.botShort', { a: G.players[b].name }); }
       }
-      if (window.__FORCE_SHORT) { hero().start = window.__FORCE_SHORT * BB; G.scenario = t('sc.short', { n: window.__FORCE_SHORT }); }
+      if (window.__FORCE_SHORT) { hero().start = window.__FORCE_SHORT * BB; G.scenario = t('sc.short', { n: '[[bb:' + window.__FORCE_SHORT + ']]' }); }
       G.players.forEach(p => p.stack = p.start);
     }
   }
@@ -211,12 +306,15 @@
   function startHand() {
     closeSheet();
     if (G.dealing) return;
-    applyBlinds(); setupPlayers();
+    applyBlinds();
+    if (!setupPlayers()) return needPoints(START);
+    if (settings.bankroll && hero().stack < BB && wallet.points < START) return needPoints(START);
+    if (!settings.bankroll && wallet.points < START) return needPoints(START);
     const prevShown = G.players.map(p => p.cards && !p.folded ? 2 : 0);
     G.handNo++;
     G.dealer = (G.dealer + 1) % n();
     G.deck = newDeck(); G.board = []; G.street = 0; G.over = false; G.decisions = []; G.feedback = null; G.lastDec = null;
-    G.heroVpip = G.heroPfr = false; G.winners = null; G.eq = null; G.eqStreet = -1; G.ctx = null; G.rec = null;
+    G.heroVpip = G.heroPfr = G.heroFlop = false; G.winners = null; G.eq = null; G.eqStreet = -1; G.ctx = null; G.rec = null;
     assignStacks();
     G.players.forEach((p, i) => Object.assign(p, { bet: 0, total: 0, folded: false, allIn: false, acted: false, last: '', pf: '', cards: [G.deck.pop(), G.deck.pop()], show: false, seen: noAnim() ? 2 : prevShown[i] }));
     const sbSeat = n() === 2 ? G.dealer : (G.dealer + 1) % n(), bbSeat = (sbSeat + 1) % n();
@@ -313,10 +411,13 @@
     const dec = { street: G.street, action, to, ctx, grade: gr, eq: ctx.eq };
     G.decisions.push(dec);
     stats.decisions++; stats[gr.level]++;
+    if (helpOn('recs')) { stats.recN++; if (gr.level === 'good') stats.recAgree++; }
+    if (G.street > 0) { if (action === 'bet' || action === 'raise' || (action === 'allin' && ctx.toCall < h.stack)) stats.br++; else if (action === 'call' || action === 'allin') stats.calls++; }
+    if (gr.level === 'good') addPts(PTS.good); else if (gr.level === 'ok') addPts(PTS.ok);
     if (G.street === 0 && action !== 'fold' && !(action === 'check')) G.heroVpip = true;
     if (G.street === 0 && (action === 'raise' || action === 'bet' || action === 'allin')) G.heroPfr = true;
     G.lastDec = dec;
-    G.feedback = settings.learn ? Object.assign({ street: G.street, act: action }, gr) : null;
+    G.feedback = helpOn('learn') ? Object.assign({ street: G.street, act: action }, gr) : null;
     act(0, action, to);
   }
   function nextStreet() {
@@ -324,7 +425,7 @@
     G.currentBet = 0; G.minRaise = BB; G.raises = 0;
     if (G.street === 3) return finish();
     G.street++;
-    if (G.street === 1) G.board.push(G.deck.pop(), G.deck.pop(), G.deck.pop()); else G.board.push(G.deck.pop());
+    if (G.street === 1) { G.board.push(G.deck.pop(), G.deck.pop(), G.deck.pop()); if (!hero().folded) G.heroFlop = true; } else G.board.push(G.deck.pop());
     const canAct = G.players.filter(p => !p.folded && !p.allIn).length;
     if (canAct <= 1) {                            // všichni (kromě max. jednoho) all-in → dorozdat
       G.turn = -1; render();
@@ -354,18 +455,32 @@
         ws.forEach((w, i) => { w.stack += share + (i === 0 ? part - share * ws.length : 0); if (!G.winners.includes(w)) G.winners.push(w); });
       }
     }
-    const net = hero().stack - hero().start;
+    const net = hero().stack - hero().start, h0 = hero(), heroWon = G.winners.includes(h0), sdHand = live.length > 1;
     G.heroNet = net;
-    stats.hands++; stats.netBB = Math.round((stats.netBB + net / BB) * 10) / 10; if (net > 0) stats.won++;
+    stats.hands++; stats.netBB = Math.round((stats.netBB + net / BB) * 10) / 10; if (heroWon) stats.won++;
     if (G.heroVpip) stats.vpip++; if (G.heroPfr) stats.pfr++;
+    if (G.heroFlop) stats.sawFlop++;
+    if (sdHand && !h0.folded) { stats.sd++; if (heroWon) stats.sdWon++; }
+    if (h0.allIn) stats.allins++;
+    if (heroWon) stats.bigPot = Math.max(stats.bigPot, pot());
+    stats.profit += net;
+    if (!h0.folded && G.board.length >= 3) {
+      const sc = PE.evaluate(h0.cards.concat(G.board)), cat = PE.handCategory(sc);
+      stats.types[cat] = (stats.types[cat] || 0) + 1;
+      if (sc > stats.best) { stats.best = sc; stats.bestCards = h0.cards.concat(G.board); }
+    }
+    if (!settings.bankroll) { wallet.points += net; saveW(); }
+    stats.hist.push(Math.round(wallet.points + (settings.bankroll ? h0.stack : 0)));
+    if (stats.hist.length > 400) stats.hist = stats.hist.filter((_, i) => i % 2 === 0);
     save('pt_stats', stats);
     session.hands++; session.netBB = Math.round((session.netBB + net / BB) * 10) / 10;
-    session.hero = hero().stack; session.dealer = G.dealer;
+    session.hero = hero().stack; session.dealer = G.dealer; session.bank = settings.bankroll;
     session.bots = G.players.slice(1).map(p => ({ name: p.name, color: p.color, style: p.style, stack: p.stack }));
     save('pt_session', session);
     if (net > 0) { SFX.win(); vib([20, 40, 30]); }
     render();
-    setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : 1000 * spd());
+    const shown = G.players.filter(p => p.show && !p.hero).length;
+    if (!expert()) setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : (1000 + shown * 450) * spd());
   }
 
   /* ---------- vykreslení: trvalé DOM prvky, mění se jen obsah (žádné blikání) ---------- */
@@ -389,7 +504,7 @@
     if (!o || !o.flip || noAnim() || !e.dataset.k || !e.animate) return paint(e, size);
     const go = () => {
       if (e.dataset.k === e.dataset.want) return;
-      const d = 120 * spd();
+      const d = 150 * spd();
       const a1 = e.animate([{ transform: 'scaleX(1)' }, { transform: 'scaleX(0)' }], { duration: d, easing: 'ease-in', fill: 'forwards' });
       a1.onfinish = () => { paint(e, size); e.animate([{ transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }], { duration: d * 1.15, easing: 'ease-out' }); a1.cancel(); };
     };
@@ -432,43 +547,47 @@
       const e = oppEls[i], seat = i + 1;
       e.o.classList.toggle('folded', p.folded); e.o.classList.toggle('turn', G.turn === seat && !G.dealing);
       e.dl.style.visibility = G.dealer === seat ? '' : 'hidden';
-      setText(e.ps, posLabel(seat)); setText(e.stkT, p.stack);
+      const pc = posLabel(seat); if (e.ps.dataset.g !== 'pos.' + pc || e.ps.title !== t('ps.' + pc)) { e.ps.dataset.g = 'pos.' + pc; e.ps.title = t('ps.' + pc); } setText(e.ps, pc); setText(e.stkT, p.stack);
       e.ai.style.display = p.allIn && !G.over ? '' : 'none';
       setText(e.chip, p.last || '-'); e.chip.classList.toggle('empty', !p.last);
       e.mini.classList.toggle('gone', p.folded && !p.show);
-      e.m.forEach((m, k) => { setCard(m, p.show ? p.cards[k] : null, 'sm', { flip: true, delay: k * 80 }); m.style.visibility = p.seen > k ? '' : 'hidden'; });
+      const ord = G.players.slice(1, seat).filter(q => q.show).length;   // showdown: soupeři se otáčí postupně
+      e.m.forEach((m, k) => { setCard(m, p.show ? p.cards[k] : null, 'sm', { flip: true, delay: p.show ? (ord * 420 + k * 140) * spd() : k * 80 }); m.style.visibility = p.seen > k ? '' : 'hidden'; });
       e.mini.classList.toggle('open', !!p.show);
     });
     // board
-    boardSlots.forEach((s, i) => setCard(s, i < G.board.length ? G.board[i] : null, '', { flip: true, delay: G.street === 1 && i < 3 ? i * 90 : 0 }));
+    boardSlots.forEach((s, i) => setCard(s, i < G.board.length ? G.board[i] : null, '', { flip: true, delay: G.street === 1 && i < 3 ? i * 170 * spd() : 0 }));
     setText($('pot'), pot());
-    setText($('street'), (G.over ? t('g.handOver') : G.dealing ? t('g.dealing') : streetName(G.street)) + (G.scenario ? ' · ' + G.scenario : ''));
+    setText($('street'), (G.over ? t('g.handOver') : G.dealing ? t('g.dealing') : streetName(G.street)) + (G.scenario ? ' · ' + plain(G.scenario) : ''));
     // hráč
     const h = hero();
     heroSlots.forEach((s, i) => { setCard(s, G.revealed ? h.cards[i] : null, 'lg', { flip: true, delay: i * 130 }); s.style.visibility = h.seen > i ? '' : 'hidden'; });
     $('heroPanel').classList.toggle('turn', G.turn === 0 && !G.over && !G.dealing);
     setText($('heroStack'), h.stack);
-    setText($('heroPos'), posLabel(0) + (G.dealer === 0 ? ' · D' : '') + ' · ' + Math.round((h.stack + h.bet) / BB * 10) / 10 + ' BB');
+    const hp = posLabel(0), hbb = Math.round((h.stack + h.bet) / BB * 10) / 10;
+    setHTML($('heroPos'), settings.adv ? `${gl('pos.' + hp, hp)}${G.dealer === 0 ? ' · D' : ''} · ${gl('bb', hbb + ' BB')}` : `${gl('pos.' + hp, t('ps.' + hp))} <small>${hp}</small><br>${gl('bb', bbWords(hbb))}`);
     setText($('heroLast'), h.last || '');
     // šance
-    $('odds').classList.toggle('off', !settings.odds);
+    $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() ? 'none' : '';
+    $('recPill').style.display = expert() ? 'none' : ''; updatePts();
+    const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll; setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded && G.revealed) {
       setText($('eqWin'), Math.round(G.eq.equity * 100) + ' %');
       setText($('eqSub'), live ? t('g.eqSub', { n: live, vs: t(live === 1 ? 'g.opp1' : 'g.oppN'), r: t(G.players.slice(1).some(q => !q.folded && rangeOf(q)) ? 'g.rangeEst' : 'g.rangeRnd'), tie: Math.round(G.eq.tie * 100) }) : '\u00a0');
     } else { setText($('eqWin'), '–'); setText($('eqSub'), h.folded ? t('g.folded') : '\u00a0'); }
     setText($('madeLbl'), G.street === 0 ? t('g.startHand') : t('g.hand'));
-    setText($('made'), !G.revealed ? '–' : G.street === 0 && G.board.length === 0 ? `${PE.handLabel(h.cards[0], h.cards[1])} · ${PE.chen(h.cards[0], h.cards[1])}/20` : PE.handName(h.cards.concat(G.board)));
+    setHTML($('made'), !G.revealed ? '–' : G.street === 0 && G.board.length === 0 ? rich(`[[st:${h.cards[0]},${h.cards[1]}]]`) : PE.handName(h.cards.concat(G.board)));
     // doporučení (místo zůstává rezervované → nic neposkakuje)
-    $('rec').style.display = settings.recs ? '' : 'none';
-    const showRec = settings.recs && G.turn === 0 && G.rec && G.ctx && !G.over && !G.dealing;
+    $('rec').style.display = helpOn('recs') ? '' : 'none';
+    const showRec = helpOn('recs') && G.turn === 0 && G.rec && G.ctx && !G.over && !G.dealing;
     $('rec').classList.toggle('idle', !showRec);
-    if (showRec) { setText($('recAct'), recLabel(G.rec)); setText($('recWhy'), G.rec.why); }
+    if (showRec) { setText($('recAct'), recLabel(G.rec)); setHTML($('recWhy'), rich(G.rec.why)); }
     // zpětná vazba
     const fb = G.feedback;
-    $('feedback').style.display = settings.learn ? '' : 'none';
+    $('feedback').style.display = helpOn('learn') ? '' : 'none';
     $('feedback').className = 'feedback ' + (fb ? fb.level : '') + (!fb || G.over ? ' idle' : '');
-    if (fb) { $('fbTitle').innerHTML = `${fb.title} <span class="fb-sub">· ${t('g.yourAct', { a: fb.act, s: streetName(fb.street).toLowerCase() })}</span>`; setText($('fbTxt'), fb.text); }
+    if (fb) { $('fbTitle').innerHTML = `${fb.title} <span class="fb-sub">· ${t('g.yourAct', { a: fb.act, s: streetName(fb.street).toLowerCase() })}</span>`; setHTML($('fbTxt'), rich(settings.level === 1 ? shortTxt(fb.text) : fb.text)); }
     renderActions();
   }
   function recLabel(r) {
@@ -477,17 +596,17 @@
   }
   function defaultSize() {
     const c = G.ctx;
-    if (settings.recs && G.rec && G.rec.to && (G.rec.action === 'bet' || G.rec.action === 'raise' || G.rec.action === 'allin')) return G.rec.to;
+    if (helpOn('recs') && G.rec && G.rec.to && (G.rec.action === 'bet' || G.rec.action === 'raise' || G.rec.action === 'allin')) return G.rec.to;
     if (G.street === 0) return Math.max(c.minRaiseTo, Math.min(c.stack + c.myBet, G.raises ? G.currentBet * 3 : 3 * BB));
     return Math.max(c.minRaiseTo, Math.min(c.stack + c.myBet, c.toCall ? G.currentBet * 3 : Math.round(c.pot * 0.66)));
   }
   let lastActions = '';
   function renderActions() {
     const el2 = $('actions'); let html;
-    if (G.over) html = `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
+    if (G.over) html = (expert() ? `<button class="btn" id="revBtn">${t('m.review')}</button>` : '') + `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
     else if (G.turn !== 0 || G.dealing || !G.ctx || !G.rec) html = `<div class="waiting">${G.dealing ? t('g.dealing') + '…' : hero().folded ? t('g.foldedWait') : G.turn > 0 ? t('g.thinking', { a: G.players[G.turn].name }) : t('g.dealing') + '…'}</div>`;
     else {
-      const c = G.ctx, h = hero(), r = settings.recs ? G.rec.action : '';
+      const c = G.ctx, h = hero(), r = helpOn('recs') ? G.rec.action : '';
       const canRaise = h.stack > c.toCall, size = defaultSize(), allin = size >= h.stack + h.bet;
       html = `<button class="btn ${r === 'fold' ? 'hint' : ''}" data-a="fold" ${c.toCall === 0 ? 'disabled' : ''}>Fold</button>
       <button class="btn ${r === 'check' || r === 'call' ? 'hint' : ''} ${c.toCall >= h.stack ? 'allin' : ''}" data-a="${c.toCall ? 'call' : 'check'}">${c.toCall ? (c.toCall >= h.stack ? 'All-in ' + c.toCall : 'Call ' + c.toCall) : 'Check'}</button>
@@ -497,6 +616,7 @@
     if (html === lastActions) return;
     lastActions = html; el2.innerHTML = html;
     if ($('nextBtn')) $('nextBtn').onclick = () => { SFX.unlock(); startHand(); };
+    if ($('revBtn')) $('revBtn').onclick = showSummary;
     el2.querySelectorAll('[data-a]').forEach(b => b.onclick = () => heroAct(b.dataset.a, +b.dataset.to || undefined));
     if ($('sizeBtn')) $('sizeBtn').onclick = showSizes;
   }
@@ -508,10 +628,10 @@
   function showSizes() {
     const c = G.ctx, h = hero(), max = h.stack + h.bet;
     let opts;
-    if (G.street === 0) opts = G.raises === 0 ? [[2.5 * BB, '2,5 BB'], [3 * BB, '3 BB'], [4 * BB, '4 BB']] : [[G.currentBet * 2.5, '2,5×'], [G.currentBet * 3, '3×'], [G.currentBet * 4, '4×']];
+    if (G.street === 0) opts = G.raises === 0 ? [[2.5 * BB, bbWords(2.5)], [3 * BB, bbWords(3)], [4 * BB, bbWords(4)]] : [[G.currentBet * 2.5, '2,5×'], [G.currentBet * 3, '3×'], [G.currentBet * 4, '4×']];
     else opts = c.toCall ? [[G.currentBet * 2.5, '2,5×'], [G.currentBet * 3, '3×'], [G.currentBet + c.pot + c.toCall, 'pot']] : [[c.pot / 3, t('sz.third')], [c.pot / 2, t('sz.half')], [c.pot * 0.66, t('sz.twoThirds')], [c.pot, 'pot']];
     opts = opts.map(([v, l]) => [Math.min(max, Math.max(c.minRaiseTo, Math.round(v))), l]).concat([[max, 'all-in']]);
-    const recTo = settings.recs && G.rec && G.rec.to;
+    const recTo = helpOn('recs') && G.rec && G.rec.to;
     const verb = c.toCall ? t('a.raiseToV') : 'Bet';
     openSheet(`<h2>${t('sz.title')}</h2><div class="sub">${t('sz.sub', { min: c.minRaiseTo, pot: c.pot })}${recTo ? ' · ' + t('sz.rec', { n: recTo }) : ''}</div>
       <div class="sizes">${opts.map(([v, l]) => `<button class="btn ${v === recTo ? 'rec-size' : ''} ${v === max ? 'allin' : ''}" data-to="${v}">${v === max ? 'All-in' : verb} ${v}<small>${l}</small></button>`).join('')}</div>`);
@@ -529,10 +649,10 @@
       html += `<h3>${t('s.cards')}</h3><div class="sum-board">${G.board.map(c => cardHTML(c, 'sm')).join('')}</div>` + G.players.filter(p => p.show).map(p =>
         `<div class="showline ${G.winners.includes(p) ? 'winner' : ''}"><span class="who">${pname(p)}</span>${p.cards.map(c => cardHTML(c, 'sm')).join('')}<span class="hn">${PE.handName(p.cards.concat(G.board))}</span></div>`).join('');
     }
-    if (settings.learn) {
+    if (helpOn('learn') || expert()) {
       html += `<h3>${t('s.review')}</h3>`;
       const gs = G.decisions.map(gradeOf);
-      html += G.decisions.length ? G.decisions.map((d, i) => `<div class="dec"><span class="g ${gs[i].level}"></span><div><b>${streetName(d.street)}: ${d.action}${d.to ? ' ' + d.to : ''}</b> · ${gs[i].title}${d.street ? ` · ${t('s.eq', { n: Math.round(d.eq * 100) })}` : ''}<div class="t">${gs[i].text}</div></div></div>`).join('')
+      html += G.decisions.length ? G.decisions.map((d, i) => `<div class="dec"><span class="g ${gs[i].level}"></span><div><b>${streetName(d.street)}: ${d.action}${d.to ? ' ' + d.to : ''}</b> · ${gs[i].title}${d.street ? ` · ${t('s.eq', { n: Math.round(d.eq * 100) })}` : ''}<div class="t">${rich(gs[i].text)}</div></div></div>`).join('')
         : `<div class="sub">${t('s.noDec')}</div>`;
       const good = gs.filter(g => g.level === 'good' || g.level === 'ok').length;
       if (G.decisions.length) html += `<div class="sub" style="margin-top:10px">${t('s.tally', { a: good, b: G.decisions.length })}</div>`;
@@ -545,12 +665,21 @@
     openSheet(`<h2>Red River</h2><div class="menu-list">
       <button class="mrow" data-m="settings">⚙️<span>${t('m.settings')}</span></button>
       <button class="mrow" data-m="stats">📊<span>${t('m.stats')}</span></button>
+      <button class="mrow" data-m="shop">🪙<span>${t('pts.shop')}</span></button>
       ${G.over && G.handNo ? `<button class="mrow" data-m="summary">🧾<span>${t('m.summary')}</span></button>` : ''}
       <button class="mrow" data-m="learn">📘<span>${t('m.learn')}</span></button>
       <button class="mrow" data-m="home">🏠<span>${t('m.home')}</span></button></div>`);
     $('sheet').querySelectorAll('[data-m]').forEach(b => b.onclick = () => { const m = b.dataset.m; closeSheet();
       if (m === 'summary') showSummary(); else if (m === 'home') nav.back(); else nav.go(m); });
   }
+  /* málo bodů → nabídka, jak je získat */
+  function needPoints(need) {
+    G.dealing = false; render();
+    openSheet(`<h2>${t('pts.need')}</h2><div class="sub">${t('pts.needTxt', { n: fmtPts(need), h: fmtPts(wallet.points) })}</div>
+      <button class="btn primary wide" id="npShop">${t('pts.toShop')}</button>`);
+    $('npShop').onclick = () => { closeSheet(); nav.go('shop'); };
+  }
+  $('ptsBadge').onclick = () => nav.go('shop');
   $('recToggle').onchange = e => { settings.recs = e.target.checked; save('pt_settings', settings); lastActions = ''; render(); };
   $('gameMenu').onclick = showGameMenu;
   document.addEventListener('click', e => { const x = e.target.closest('.rec-why,.feedback .txt'); if (x) x.classList.toggle('open'); });
@@ -561,11 +690,13 @@
     applyBlinds();
     const bank = settings.bankroll ? (G.players.length && G.tableKey === tableKey() ? hero().stack : session.key === `${settings.blinds}|${settings.depth}` && session.hero ? session.hero : START) : null;
     setText($('bankLbl'), settings.bankroll ? t('h.bankroll') : t('h.profit'));
-    setText($('bankV'), bank != null ? fmtNum(bank) : (stats.netBB >= 0 ? '+' : '') + stats.netBB + ' BB');
+    setText($('bankV'), bank != null ? fmtNum(bank) : (stats.profit >= 0 ? '+' : '') + fmtNum(stats.profit));
     setText($('accV'), acc);
-    setText($('bankS'), settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '') + session.netBB }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh'));
+    setText($('bankS'), settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '−') + plain('[[bb:' + Math.abs(session.netBB) + ']]') }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh'));
     setText($('playLbl'), G.handNo ? t('h.continue') : t('h.play'));
-    setText($('playSub'), t('h.playSub', { n: settings.opps + 1, sb: SB, bb: BB, d: settings.depth, diff: t('diff.' + settings.diff).toLowerCase() }));
+    setText($('playSub'), t('h.playSub', { n: settings.opps + 1, sb: SB, bb: BB, d: plain('[[bb:' + settings.depth + ']]'), diff: t('diff.' + settings.diff).toLowerCase() }));
+    setText($('homeLvl'), t('lv.' + settings.level)); updatePts();
+    setText($('homeBuyin'), settings.bankroll ? t('pts.buyin', { n: fmtPts(START) }) : '');
   }
   const fmtNum = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
   $('playBtn').onclick = () => { SFX.unlock(); nav.go('game'); };
@@ -573,6 +704,9 @@
   $('homeStats').onclick = () => nav.go('stats');
   $('homeLearn').onclick = () => nav.go('learn');
   $('homeMenu').onclick = () => nav.go('settings');
+  $('homeLvlBtn').onclick = () => nav.go('settings');
+  $('homePtsBtn').onclick = () => nav.go('shop');
+  $('homeShop').onclick = () => nav.go('shop');
 
   /* ---------- nastavení ---------- */
   const tg = (k, title, sub) => `<div class="row"><div>${title}${sub ? `<small>${sub}</small>` : ''}</div><label class="tg"><input type="checkbox" data-k="${k}" ${settings[k] ? 'checked' : ''}><i></i></label></div>`;
@@ -581,6 +715,9 @@
   function renderSettings() {
     const nOpp = settings.opps;
     $('setBody').innerHTML = `
+      <h3>${t('set.level')}</h3><div class="grp">
+        <div class="row col"><div><small>${t('set.levelSub')}</small></div><div class="seg full">${[0, 1, 2].map(l => `<button data-lv="${l}" class="${settings.level === l ? 'on' : ''}">${t('lv.' + l)}</button>`).join('')}</div><small class="lvd">${t('lv.' + settings.level + 'd')}</small></div>
+      </div>
       <h3>${t('set.table')}</h3><div class="grp">
         ${seg('opps', t('set.opps'), [1, 2, 3, 4, 5, 6, 7, 8].map(k => [k, k]), t('set.oppsSub', { n: nOpp + 1, x: nOpp === 5 ? ' (6-max)' : nOpp === 8 ? ' ' + t('set.full') : '' }))}
         ${seg('diff', t('set.diff'), [[0, t('diff.0')], [1, t('diff.1')], [2, t('diff.2')]], t('set.diffSub.' + settings.diff))}
@@ -592,7 +729,8 @@
         <div class="note">${t('set.nextHand')}</div>
       </div>
       <h3>${t('set.help')}</h3><div class="grp">
-        ${tg('recs', t('set.recs'), t('set.recsSub'))}${tg('odds', t('set.odds'), t('set.oddsSub'))}${tg('learn', t('set.learn'), t('set.learnSub'))}
+        ${expert() ? `<div class="note">${t('set.expertOff')}</div>` : tg('recs', t('set.recs'), t('set.recsSub')) + tg('odds', t('set.odds'), t('set.oddsSub')) + tg('learn', t('set.learn'), t('set.learnSub'))}
+        ${tg('adv', t('set.adv'), t('set.advSub'))}${tg('gloss', t('set.gloss'), t('set.glossSub'))}
       </div>
       <h3>${t('set.game')}</h3><div class="grp">
         ${seg('lang', t('set.lang'), [['cs', 'Čeština'], ['en', 'English']])}
@@ -607,7 +745,8 @@
       </div>
       <div class="about">${t('set.aboutTxt')}</div>`;
     const B = $('setBody');
-    B.querySelectorAll('[data-k]').forEach(i => i.onchange = () => { settings[i.dataset.k] = i.checked; save('pt_settings', settings); SFX.tap(); if (i.dataset.k === 'bankroll') renderSettings(); lastActions = ''; if (G.players.length) render(); });
+    B.querySelectorAll('[data-k]').forEach(i => i.onchange = () => { settings[i.dataset.k] = i.checked; save('pt_settings', settings); SFX.tap(); if (i.dataset.k === 'bankroll') renderSettings(); lastActions = ''; if (i.dataset.k === 'adv' || i.dataset.k === 'gloss') setLang(I18N.lang); else if (G.players.length) render(); });
+    B.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { applyLevel(+b.dataset.lv); SFX.tap(); setLang(I18N.lang); renderSettings(); });
     B.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
       const k = b.dataset.s, v = k === 'lang' ? b.dataset.v : +b.dataset.v;
       settings[k] = v; save('pt_settings', settings); SFX.tap();
@@ -616,37 +755,75 @@
       renderSettings();
     });
     $('setIntro').onclick = () => openOnboarding(true);
-    $('setSession').onclick = () => { session = { key: '', hero: 0, bots: [], hands: 0, netBB: 0, dealer: -1 }; save('pt_session', session); G.tableKey = ''; toast(t('set.sessionDone')); };
+    $('setSession').onclick = () => { cashOut(); session = { key: '', hero: 0, bots: [], hands: 0, netBB: 0, dealer: -1 }; save('pt_session', session); G.tableKey = ''; toast(t('set.sessionDone')); };
     $('setReset').onclick = () => { if (!confirmReset) { confirmReset = true; renderSettings(); setTimeout(() => { confirmReset = false; if (nav.cur === 'settings') renderSettings(); }, 4000); return; }
-      confirmReset = false; stats = Object.assign({}, STATS0); drillSt = Object.assign({}, DRILL0); save('pt_stats', stats); save('pt_drill', drillSt); renderSettings(); toast(t('set.resetDone')); };
+      confirmReset = false; stats = fresh(STATS0); drillSt = Object.assign({}, DRILL0); save('pt_stats', stats); save('pt_drill', drillSt); renderSettings(); toast(t('set.resetDone')); };
   }
 
-  /* ---------- statistiky ---------- */
+  function applyLevel(l) {
+    settings.level = l; Object.assign(settings, LEVELS[l]); save('pt_settings', settings);
+    G.players.slice(1).forEach(p => p.style = makeStyle()); lastActions = '';
+  }
+
+  /* ---------- statistiky v2: metriky s vysvětlením, styl hráče, grafy ---------- */
+  const MIN_TYPE = 30;
+  function playerType(s) {
+    if (s.hands < MIN_TYPE) return null;
+    const vpip = s.vpip / s.hands, pfr = s.pfr / s.hands, af = s.calls ? s.br / s.calls : s.br ? 3 : 1;
+    const tight = vpip <= 0.28, aggr = af >= 1.5 || (vpip > 0 && pfr / vpip >= 0.6 && af >= 1);
+    return tight ? (aggr ? 'tag' : 'rock') : (aggr ? 'lag' : 'station');
+  }
+  const TYPE_ICON = { tag: '🦈', rock: '🪨', lag: '🔥', station: '📞' };
+  function lineChart(pts) {
+    if (pts.length < 2) return `<div class="sub">${t('stx.noData')}</div>`;
+    const W = 320, H = 120, P = 6, mn = Math.min(...pts), mx = Math.max(...pts), rg = mx - mn || 1;
+    const xy = pts.map((v, i) => [P + i / (pts.length - 1) * (W - 2 * P), H - P - (v - mn) / rg * (H - 2 * P)]);
+    const d = xy.map(([x, y], i) => (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1)).join(' ');
+    const last = xy[xy.length - 1];
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"><path d="${d} L${last[0].toFixed(1)} ${H} L${P} ${H} Z" class="area"/><path d="${d}" class="ln"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" class="pt"/></svg>
+      <div class="chart-ax"><span>${fmtPts(mn)}</span><span>${fmtPts(pts[pts.length - 1])}</span><span>${fmtPts(mx)}</span></div>`;
+  }
+  function barChart(types) {
+    const tot = Object.values(types).reduce((a, b) => a + b, 0);
+    if (!tot) return `<div class="sub">${t('stx.noData')}</div>`;
+    const mx = Math.max(...Object.values(types));
+    return `<div class="bars">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => { const v = types[i] || 0;
+      return `<div class="bar"><span class="bl">${t('hand.' + i)}</span><span class="bt"><i style="width:${v ? Math.max(3, v / mx * 100) : 0}%"></i></span><span class="bv">${v}</span></div>`; }).join('')}</div>`;
+  }
+  let confirmStats = false;
   function renderStats() {
-    const s = stats, pctv = (a, b) => b ? Math.round(a / b * 100) + ' %' : '–';
-    const acc = s.decisions ? Math.round((s.good + s.ok) / s.decisions * 100) + ' %' : '–';
-    const dot = c => `<span class="gdot g ${c}"></span>`;
-    const d = drillSt;
-    $('statsBody').innerHTML = `<div class="sub">${t('stat.sub', { n: s.hands })}</div>
-      <div class="grid">
-        <div class="tile"><div class="lbl">${t('stat.acc')}</div><div class="v g">${acc}</div></div>
-        <div class="tile"><div class="lbl">${t('stat.profit')}</div><div class="v ${s.netBB >= 0 ? 'g' : 'r'}">${s.netBB.toFixed(1)} BB</div></div>
-        <div class="tile"><div class="lbl">VPIP</div><div class="v">${pctv(s.vpip, s.hands)}</div></div>
-        <div class="tile"><div class="lbl">PFR</div><div class="v">${pctv(s.pfr, s.hands)}</div></div>
-        <div class="tile"><div class="lbl">${t('stat.won')}</div><div class="v">${pctv(s.won, s.hands)}</div></div>
-        <div class="tile"><div class="lbl">${t('stat.bb100')}</div><div class="v">${s.hands ? (s.netBB / s.hands * 100).toFixed(1) : '–'}</div></div>
-      </div>
+    const s = stats, pc = (a, b) => b ? Math.round(a / b * 100) + ' %' : '–';
+    const af = s.calls ? (s.br / s.calls).toFixed(1) : s.br ? '∞' : '–';
+    const M = [
+      ['hands', s.hands], ['won', s.hands ? `${s.won} <small>(${pc(s.won, s.hands)})</small>` : '–'], ['vpip', pc(s.vpip, s.hands)], ['pfr', pc(s.pfr, s.hands)],
+      ['af', af], ['wtsd', pc(s.sd, s.sawFlop)], ['wsd', pc(s.sdWon, s.sd)], ['allin', s.allins], ['bigpot', s.bigPot ? fmtPts(s.bigPot) : '–'],
+      ['profit', `<span class="${s.profit >= 0 ? 'g' : 'r'}">${s.profit > 0 ? '+' : ''}${fmtPts(s.profit)}</span>`], ['agree', pc(s.recAgree, s.recN)], ['acc', pc(s.good + s.ok, s.decisions)]];
+    const ty = playerType(s), d = drillSt, dot = c => `<span class="gdot g ${c}"></span>`;
+    const typeHTML = ty ? `<div class="ptype"><div class="pt-ic"><img src="icons/lumi.svg" alt=""><span>${TYPE_ICON[ty]}</span></div><div><b>${t('pt.' + ty)}</b>${settings.adv ? ` <small>${t('pt.' + ty + '.a')}</small>` : ''}<p>${t('pt.' + ty + '.d')}</p></div></div>
+        <h3>${t('stx.tips')}</h3><div class="grp tips">${[1, 2, 3].map(i => `<div class="row"><span>${rich(t('tip.' + ty + '.' + i))}</span></div>`).join('')}</div>`
+      : `<div class="ptype more"><div class="pt-ic"><img src="icons/lumi.svg" alt=""><span>🃏</span></div><div><b>${t('stx.more')}</b><p>${t('stx.moreTxt', { n: MIN_TYPE, k: MIN_TYPE - s.hands })}</p><div class="prog"><i style="width:${Math.min(100, s.hands / MIN_TYPE * 100)}%"></i></div></div></div>`;
+    const best = s.best >= 0 && s.bestCards.length ? `<div class="row"><span>${PE.handName(s.bestCards)}</span><span class="ex">${s.bestCards.map(c => cardHTML(c, 'sm')).join('')}</span></div>` : `<div class="row"><span class="muted">${t('stx.noData')}</span></div>`;
+    $('statsBody').innerHTML = `<h3>${t('stx.type')}</h3>${typeHTML}
+      <h3>${t('stx.overview')}</h3><div class="sub">${t('stx.tap')}</div>
+      <div class="grid stx">${M.map(([k, v]) => `<button class="tile" data-sx="${k}"><div class="lbl">${settings.adv ? t('sx.' + k + '.a') : t('sx.' + k)}</div><div class="v">${v}</div></button>`).join('')}</div>
+      <h3>${t('stx.best')}</h3><div class="grp">${best}</div>
+      <h3>${t('stx.chartPts')}</h3><div class="grp chartbox">${lineChart(s.hist)}</div>
+      <h3>${t('stx.chartHands')}</h3><div class="grp chartbox">${barChart(s.types)}</div>
       <h3>${t('stat.decisions', { n: s.decisions })}</h3><div class="grp">
         <div class="row"><span>${dot('good')} ${t('g.good')}</span><span>${s.good}</span></div>
         <div class="row"><span>${dot('ok')} ${t('g.ok')}</span><span>${s.ok}</span></div>
         <div class="row"><span>${dot('meh')} ${t('g.meh')}</span><span>${s.meh}</span></div>
         <div class="row"><span>${dot('bad')} ${t('g.bad')}</span><span>${s.bad}</span></div></div>
-      <h3>${t('stat.drill')}</h3><div class="grp">
+      <h3>${t('stx.drill')}</h3><div class="grp">
         <div class="row"><span>${t('stat.drillN')}</span><span>${d.n}</span></div>
-        <div class="row"><span>${t('stat.drillAcc')}</span><span>${pctv(d.good + d.ok, d.n)}</span></div>
+        <div class="row"><span>${t('stat.drillAcc')}</span><span>${pc(d.good + d.ok, d.n)}</span></div>
         <div class="row"><span>${t('stat.best')}</span><span>${d.best}</span></div></div>
-      ${settings.bankroll ? `<h3>${t('stat.session')}</h3><div class="grp"><div class="row"><span>${t('stat.sessHands')}</span><span>${session.hands}</span></div><div class="row"><span>${t('stat.sessNet')}</span><span>${(session.netBB >= 0 ? '+' : '') + session.netBB} BB</span></div><div class="row"><span>${t('stat.rebuys')}</span><span>${session.rebuys || 0}</span></div></div>` : ''}
-      <div class="about">${t('stat.explain')}</div>`;
+      <div class="grp" style="margin-top:14px"><button class="row link" id="stReset"><span class="danger">${confirmStats ? t('stx.resetConfirm') : t('stx.reset')}</span></button></div>`;
+    $('statsBody').querySelectorAll('[data-sx]').forEach(b => b.onclick = () => { const k = b.dataset.sx; SFX.tap();
+      openSheet(`<h2>${t('sx.' + k)}${settings.adv ? '' : ` <small class="muted">${t('sx.' + k + '.a')}</small>`}</h2><p class="sx-d">${t('sx.' + k + '.d')}</p><button class="btn primary wide" id="sxOk">${t('gl.ok')}</button>`);
+      $('sxOk').onclick = closeSheet; });
+    $('stReset').onclick = () => { if (!confirmStats) { confirmStats = true; renderStats(); setTimeout(() => { confirmStats = false; if (nav.cur === 'stats') renderStats(); }, 4000); return; }
+      confirmStats = false; stats = fresh(STATS0); save('pt_stats', stats); renderStats(); toast(t('stx.resetDone')); };
   }
 
   /* ---------- učení ---------- */
@@ -659,7 +836,9 @@
       <h3>${t('l.pos')}</h3><div class="grp"><div class="txtblk">${t('l.posTxt')}</div></div>
       <h3>${t('l.odds')}</h3><div class="grp"><div class="txtblk">${t('l.oddsTxt')}</div></div>
       <h3>${t('l.push')}</h3><div class="grp"><div class="txtblk">${t('l.pushTxt')}</div></div>
-      <h3>${t('l.chen')}</h3><div class="grp"><div class="txtblk">${t('l.chenTxt')}</div></div>`;
+      <h3>${t('l.chen')}</h3><div class="grp"><div class="txtblk">${t('l.chenTxt')}</div></div>
+      <h3 id="glossary">${t('gl.title')}</h3><div class="sub">${t('gl.hint')}</div><div class="grp gloss-list">${I18N.GLOSS.map(k => `<button class="row link" data-g="${k}"><span>${t('gl.' + k + '.t')}</span><span class="val"></span></button>`).join('')}
+        ${['BTN', 'CO', 'HJ', 'UTG', 'SB', 'BB'].map(c => `<button class="row link" data-g="pos.${c}"><span>${t('ps.' + c)} <small>${c}</small></span><span class="val"></span></button>`).join('')}</div>`;
     $('learnIntro').onclick = () => openOnboarding(true);
   }
 
@@ -682,7 +861,7 @@
       s.pos = pos; s.eff = eff;
       s.opps = Array.from({ length: o.length - 1 - i }, () => ({ minChen: 0 }));
       c = { street: 0, pot: 3, toCall: DBB - my, currentBet: DBB, myBet: my, stack: eff * DBB - my, raisesThisStreet: 0, numOpp: s.opps.length, eff: eff * DBB };
-      s.desc = t('dr.push', { n: N, pos, eff });
+      s.desc = t('dr.push', { n: N, pos: `[[p:${pos}]]`, eff: `[[bb:${eff}]]` });
     } else if (type === 'vsOpen' || type === 'vsShove') {
       if (N < 3) N = s.N = 3 + randInt(7);
       const o = ord(), vi = randInt(Math.max(1, o.length - 3)), hi = vi + 1 + randInt(o.length - vi - 1);
@@ -692,12 +871,12 @@
         const open = pick([5, 6, 6, 7]);
         s.opps = [{ minChen: 8 }];
         c = { street: 0, pot: 3 + open - (blindOf(vpos)), toCall: open - my, currentBet: open, myBet: my, stack: 200 - my, raisesThisStreet: 1, numOpp: 1, eff: 200 };
-        s.desc = t('dr.open', { v: vpos, x: open / DBB, pos });
+        s.desc = t('dr.open', { v: `[[pn:${vpos}]]`, x: `[[bb:${open / DBB}]]`, pos: `[[p:${pos}]]` });
       } else {
         const sh = 6 + randInt(10), heff = 4 + randInt(Math.max(1, sh - 4));
         s.opps = [{ minChen: 6 }];
         c = { street: 0, pot: 3 + sh * DBB - blindOf(vpos), toCall: sh * DBB - my, currentBet: sh * DBB, myBet: my, stack: heff * DBB - my, raisesThisStreet: 1, numOpp: 1, eff: heff * DBB };
-        s.desc = t('dr.shove', { v: vpos, x: sh, pos, h: heff });
+        s.desc = t('dr.shove', { v: `[[pn:${vpos}]]`, x: `[[bb:${sh}]]`, pos: `[[p:${pos}]]`, h: `[[bb:${heff}]]` });
       }
     } else {
       // postflop: preflop navýšení + dorovnání, soupeř(i) s odhadnutým rozsahem
@@ -735,22 +914,22 @@
     const c = s.ctx, rec = PE.recommend(c), A = D.answered;
     setText($('drScore'), `${drillSt.good + drillSt.ok} / ${drillSt.n}` + (drillSt.streak > 1 ? ` · 🔥${drillSt.streak}` : ''));
     setText($('drKind'), t('drk.' + s.type) + ' · ' + t('dr.players', { n: s.N }));
-    setText($('drDesc'), s.desc);
+    setHTML($('drDesc'), rich(s.desc));
     $('drBoard').innerHTML = [0, 1, 2, 3, 4].map(i => i < s.board.length ? cardHTML(s.board[i]) : `<div class="card ghost"></div>`).join('');
-    setText($('drStreet'), streetName(c.street) + ' · ' + s.pos);
+    setText($('drStreet'), streetName(c.street) + ' · ' + posShort(s.pos));
     setText($('drPot'), c.pot);
     $('drHero').innerHTML = s.hole.map(x => cardHTML(x, 'lg')).join('');
     const bb = x => Math.round(x / DBB * 10) / 10;
-    $('drInfo').innerHTML = `<div><span class="lbl">${t('dr.stack')}</span><b>${c.stack}</b> <small>${bb(c.stack + c.myBet)} BB</small></div>
+    $('drInfo').innerHTML = `<div><span class="lbl">${t('dr.stack')}</span><b>${c.stack}</b> <small>${plain('[[bb:' + bb(c.stack + c.myBet) + ']]')}</small></div>
       <div><span class="lbl">${t('dr.toCall')}</span><b>${c.toCall || '–'}</b>${c.toCall ? ` <small>${t('dr.need', { n: Math.round(c.toCall / (c.pot + c.toCall) * 100) })}</small>` : ''}</div>
-      <div><span class="lbl">${t('g.hand')}</span><b>${c.street === 0 ? PE.handLabel(s.hole[0], s.hole[1]) + ' · ' + PE.chen(s.hole[0], s.hole[1]) + '/20' : PE.handName(s.hole.concat(s.board))}</b></div>`;
+      <div><span class="lbl">${t('g.hand')}</span><b>${c.street === 0 ? rich(`[[st:${s.hole[0]},${s.hole[1]}]]`) : PE.handName(s.hole.concat(s.board))}</b></div>`;
     // výsledek
     $('drResult').classList.toggle('idle', !A);
     if (A) {
       const g = PE.grade(rec, A.action, c);
       $('drFb').className = 'feedback ' + g.level;
       $('drFbT').innerHTML = `${g.title} <span class="fb-sub">· ${t('dr.best', { a: recName(rec, c) })}</span>`;
-      setText($('drFbX'), g.text);
+      setHTML($('drFbX'), rich(g.text));
       setText($('drEq'), t('dr.eqLine', { eq: Math.round(c.eq * 100), po: c.toCall ? Math.round(c.toCall / (c.pot + c.toCall) * 100) + ' %' : '–' }));
     }
     // akce
@@ -777,7 +956,8 @@
     D.answered = { action, to };
     const g = PE.grade(PE.recommend(c), action, c);
     drillSt.n++; drillSt[g.level]++;
-    if (g.level === 'good' || g.level === 'ok') { drillSt.streak++; drillSt.best = Math.max(drillSt.best, drillSt.streak); SFX.chip(); vib(10); }
+    if (g.level === 'good' || g.level === 'ok') { drillSt.streak++; drillSt.best = Math.max(drillSt.best, drillSt.streak); SFX.chip(); vib(10);
+      if (drillSt.streak % 5 === 0) addPts(PTS.streak, t('pts.streak', { n: drillSt.streak, p: PTS.streak })); }
     else { drillSt.streak = 0; SFX.fold(); vib([30, 40, 30]); }
     save('pt_drill', drillSt);
     renderDrill();
@@ -785,31 +965,58 @@
 
   /* ---------- úvod (onboarding) ---------- */
   let obStep = 0, obReturn = false;
+  const OB_N = 5;
+  $('obLevels').innerHTML = '';
+  [0, 1, 2].forEach(l => { const b = el('button', 'lvl'); b.dataset.ol = l; b.innerHTML = `<b data-i18n="lv.${l}">${t('lv.' + l)}</b><span data-i18n="lv.${l}d">${t('lv.' + l + 'd')}</span>`; $('obLevels').appendChild(b); });
+  $('obLevels').onclick = e => { const b = e.target.closest('[data-ol]'); if (!b) return; SFX.tap(); applyLevel(+b.dataset.ol); setLang(I18N.lang); };
   function obRender(dir) {
     const sl = $('obSlides').children;
     [...sl].forEach((x, i) => { x.classList.toggle('on', i === obStep); x.classList.remove('in-f', 'in-b'); if (i === obStep && dir && !noAnim()) { void x.offsetWidth; x.classList.add(dir > 0 ? 'in-f' : 'in-b'); } });
-    setText($('obStep'), `${obStep + 1} / 4`);
+    setText($('obStep'), `${obStep + 1} / ${OB_N}`);
+    [...$('obLevels').children].forEach(b => b.classList.toggle('on', +b.dataset.ol === settings.level));
     [...$('obDots').children].forEach((d, i) => d.classList.toggle('on', i === obStep));
-    setText($('obNext'), obStep === 3 ? t('ob.start') : t('ob.next'));
+    setText($('obNext'), obStep === OB_N - 1 ? t('ob.start') : t('ob.next'));
   }
   function openOnboarding(fromSettings) { obStep = 0; obReturn = !!fromSettings; obRender(0); if (fromSettings) nav.go('onboarding'); else show('onboarding'); }
   function obDone() {
     try { localStorage.setItem('pt_onboarded', '1'); } catch (e) {}
     if (obReturn) nav.back(); else { try { history.replaceState({ s: 'home' }, ''); } catch (e) {} show('home', 'fwd'); }
   }
-  $('obNext').onclick = () => { SFX.unlock(); SFX.tap(); if (obStep < 3) { obStep++; obRender(1); } else obDone(); };
+  $('obNext').onclick = () => { SFX.unlock(); SFX.tap(); if (obStep < OB_N - 1) { obStep++; obRender(1); } else obDone(); };
   $('obSkip').onclick = obDone;
   // swipe v úvodu
   (() => { let x0 = null; const z = $('obSlides');
     z.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
     z.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
-      if (dx < -50 && obStep < 3) { obStep++; obRender(1); } else if (dx > 50 && obStep > 0) { obStep--; obRender(-1); } }); })();
+      if (dx < -50 && obStep < OB_N - 1) { obStep++; obRender(1); } else if (dx > 50 && obStep > 0) { obStep--; obRender(-1); } }); })();
+
+  /* ---------- body a obchod (bez skutečných plateb) ---------- */
+  const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  const LESSONS = [['pos', 'l.pos', 'l.posTxt'], ['odds', 'l.odds', 'l.oddsTxt'], ['push', 'l.push', 'l.pushTxt'], ['chen', 'l.chen', 'l.chenTxt']];
+  function renderShop() {
+    const dailyOk = wallet.lastDaily !== today(), refillOk = wallet.points < PTS.refillMin;
+    $('shopBody').innerHTML = `<div class="pts-hero"><div class="lbl">${t('pts.bal')}</div><div class="v">🪙 ${fmtPts(wallet.points)}</div>${settings.bankroll && session.hero > 0 && session.bank ? `<div class="sub">${t('pts.table')}: ${fmtPts(session.hero)}</div>` : ''}</div>
+      <div class="grp">
+        <div class="row"><div>${t('pts.daily')}<small>${t('pts.dailySub', { n: PTS.daily })}</small></div><button class="btn sm ${dailyOk ? 'primary' : ''}" id="shDaily" ${dailyOk ? '' : 'disabled'}>${dailyOk ? t('pts.claim') : t('pts.claimed')}</button></div>
+        <div class="row"><div>${t('pts.refill')}<small>${t('pts.refillSub', { n: fmtPts(PTS.refillTo) })}</small></div><button class="btn sm ${refillOk ? 'primary' : ''}" id="shRefill" ${refillOk ? '' : 'disabled'}>${refillOk ? t('pts.refillBtn') : t('pts.refillNo', { n: PTS.refillMin })}</button></div>
+      </div>
+      <h3>${t('pts.learn')}</h3><div class="grp">${LESSONS.map(([k, ti]) => `<div class="row"><span>📘 ${t(ti)}</span><button class="btn sm ${wallet.lessons[k] ? '' : 'primary'}" data-les="${k}">${wallet.lessons[k] ? t('pts.lessonDone') : t('pts.lesson', { n: PTS.lesson })}</button></div>`).join('')}</div>
+      <h3>${t('pts.packs')}</h3><div class="packs">${[[1, 5000], [2, 20000], [3, 100000]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${'🪙'.repeat(i)}</div><b>${fmtPts(v)}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
+      <div class="note">${t('pts.soonNote')}</div>
+      <h3>${t('pts.earn')}</h3><div class="grp"><div class="txtblk">${t('pts.earnTxt', { g: PTS.good, s: PTS.streak })}</div></div>
+      <div class="about">${t('pts.virtual')}</div>`;
+    $('shDaily').onclick = () => { if (wallet.lastDaily === today()) return; wallet.lastDaily = today(); addPts(PTS.daily, t('pts.got', { n: PTS.daily })); SFX.win(); renderShop(); };
+    $('shRefill').onclick = () => { if (wallet.points >= PTS.refillMin) return; addPts(PTS.refillTo - wallet.points, t('pts.got', { n: PTS.refillTo - wallet.points })); renderShop(); };
+    $('shopBody').querySelectorAll('[data-les]').forEach(b => b.onclick = () => { const L = LESSONS.find(x => x[0] === b.dataset.les);
+      openSheet(`<h2>${t(L[1])}</h2><div class="txtblk">${rich(t(L[2]))}</div><button class="btn primary wide" id="lesOk">${wallet.lessons[L[0]] ? t('gl.ok') : t('pts.lesson', { n: PTS.lesson })}</button>`);
+      $('lesOk').onclick = () => { closeSheet(); if (!wallet.lessons[L[0]]) { wallet.lessons[L[0]] = 1; addPts(PTS.lesson, t('pts.got', { n: PTS.lesson })); } renderShop(); }; });
+  }
 
   /* ---------- jazyk ---------- */
   function applyStatic() {
     document.documentElement.lang = I18N.lang;
     document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
-    document.querySelectorAll('[data-i18n-html]').forEach(e => { e.innerHTML = t(e.dataset.i18nHtml); });
+    document.querySelectorAll('[data-i18n-html]').forEach(e => { e.innerHTML = rich(t(e.dataset.i18nHtml)); });
     document.querySelectorAll('[data-i18n-aria]').forEach(e => e.setAttribute('aria-label', t(e.dataset.i18nAria)));
   }
   function setLang(l) {
@@ -818,7 +1025,7 @@
     if (G.lastDec && G.feedback) G.feedback = Object.assign({ street: G.lastDec.street, act: G.lastDec.action }, gradeOf(G.lastDec));
     if (G.players.length) render();
     obRender(0); renderHome(); if (D.spot) renderDrill();
-    if (nav.cur === 'stats') renderStats(); if (nav.cur === 'learn') renderLearn();
+    if (nav.cur === 'stats') renderStats(); if (nav.cur === 'learn') renderLearn(); if (nav.cur === 'shop') renderShop(); if (nav.cur === 'settings') renderSettings();
     if (!$('sheet').hidden && G.over) showSummary(); else closeSheet();
   }
 
@@ -840,5 +1047,6 @@
   if (window.__NOSPLASH || FAST()) sp.remove();
   else setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 420); }, reduced() ? 700 : 1500);
 
-  window.__poker = { startHand, heroAct, G, settings, drillNew, drillAnswer, D, nav, setLang, render };
+  updatePts();
+  window.__poker = { startHand, heroAct, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss };
 })();
