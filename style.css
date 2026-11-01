@@ -156,3 +156,35 @@ body{overscroll-behavior:none;-webkit-user-select:none;user-select:none;-webkit-
 /* rub karet: červený (stejný tvar karty, bílý rámeček) */
 .card.back::before{background:repeating-linear-gradient(45deg,rgba(255,255,255,.13) 0 1.5px,transparent 1.5px 8px),repeating-linear-gradient(-45deg,rgba(255,255,255,.13) 0 1.5px,transparent 1.5px 8px),#d63a3a;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35)}
 .card.sm.back::before{background:repeating-linear-gradient(45deg,rgba(255,255,255,.13) 0 1px,transparent 1px 5px),#d63a3a;box-shadow:none}
+
+/* 6–9 hráčů: kompaktní soupeři ve dvou řadách po 4 */
+.opps.compact{display:grid;grid-template-columns:repeat(4,1fr);gap:6px 4px;padding-top:0}
+.opps.compact .opp{min-width:0;gap:1px}
+.opps.compact .avatar{width:34px;height:34px;font-size:12px}
+.opps.compact .dealer{width:16px;height:16px;font-size:9px;right:-5px;bottom:-3px}
+.opps.compact .name{font-size:11px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.opps.compact .stk{font-size:12px}
+.opps.compact .chip{font-size:10px;padding:1px 6px;min-height:15px}
+.opps.compact .opp.turn .avatar{box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--green)}
+.opps.compact .card.sm{width:20px;height:28px;border-radius:4px}
+.opps.compact .card.sm .rk{font-size:10px;left:3px;top:2px}.opps.compact .card.sm .st{font-size:9px;left:3px;bottom:2px}
+.opp .pos{color:var(--muted)}
+.opp.turn .pos{color:var(--green);font-weight:600}
+.opp .stk em{font-style:normal;font-size:10px;font-weight:700;color:#000;background:var(--red);border-radius:6px;padding:1px 4px;margin-left:2px;vertical-align:1px}
+/* all-in */
+.btn.allin{color:#fff;background:#3a1717;box-shadow:inset 0 0 0 1.5px rgba(242,85,77,.6)}
+.btn.allin.hint{box-shadow:inset 0 0 0 2px var(--green)}
+.sizes .btn.allin{background:#3a1717}
+.row.col{flex-direction:column;align-items:stretch}
+.seg8{justify-content:space-between}
+.seg8 button{padding:6px 0;flex:1}
+.street{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:75%}
+/* víc hráčů = o něco těsnější rozvržení, ať se vše vejde na 390×844 */
+body.many .app{gap:6px}
+body.many .opps.compact{gap:3px 4px}
+body.many .opps.compact .opp .card.sm{margin-top:1px}
+.opps.compact .opp{flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;column-gap:4px;row-gap:1px}
+.opps.compact .avatar{width:30px;height:30px;font-size:11px;margin:0 calc(50% - 15px)}
+.opps.compact .name{flex-basis:100%;text-align:center}
+.opps.compact .mini{flex-basis:100%;justify-content:center;margin-top:1px}
+.opps.compact .stk{white-space:nowrap}

@@ -1,5 +1,5 @@
 /* Service worker – offline cache. Při změně souborů zvyš VERSION. */
-const VERSION = 'v3';
+const VERSION = 'v4';
 const CACHE = 'poker-trener-' + VERSION;
 const FILES = [
   './', './index.html', './style.css', './app.js', './engine.js', './manifest.webmanifest',

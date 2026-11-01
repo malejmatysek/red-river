@@ -3,17 +3,25 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const BB = 2, SB = 1, START = 200;
-  const BOT_NAMES = [['Jana', '#ffd3b5'], ['Petr', '#bfe3ff'], ['Eva', '#d9c8ff']];
-  const STYLES = [{ loose: 0.03, aggr: 0.05, bluff: 0.10 }, { loose: -0.02, aggr: -0.05, bluff: 0.05 }, { loose: 0.06, aggr: 0.1, bluff: 0.14 }];
+  const BOT_NAMES = [['Jana', '#ffd3b5'], ['Petr', '#bfe3ff'], ['Eva', '#d9c8ff'], ['Tomáš', '#c8f0d4'], ['Lucie', '#ffc9d9'], ['Martin', '#fde9a9'], ['Kateřina', '#c9e6f0'], ['Ondřej', '#e3d5c8']];
+  const STYLES = [{ loose: 0.03, aggr: 0.05, bluff: 0.10 }, { loose: -0.02, aggr: -0.05, bluff: 0.05 }, { loose: 0.06, aggr: 0.1, bluff: 0.14 },
+    { loose: 0.0, aggr: 0.0, bluff: 0.08 }, { loose: 0.04, aggr: -0.03, bluff: 0.06 }, { loose: -0.03, aggr: 0.08, bluff: 0.12 },
+    { loose: 0.02, aggr: 0.02, bluff: 0.09 }, { loose: 0.07, aggr: -0.05, bluff: 0.04 }];
+  const POSITIONS = {   // od dealera (offset 0 = BTN)
+    2: ['BTN', 'BB'], 3: ['BTN', 'SB', 'BB'], 4: ['BTN', 'SB', 'BB', 'CO'], 5: ['BTN', 'SB', 'BB', 'HJ', 'CO'],
+    6: ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO'], 7: ['BTN', 'SB', 'BB', 'UTG', 'LJ', 'HJ', 'CO'],
+    8: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'LJ', 'HJ', 'CO'], 9: ['BTN', 'SB', 'BB', 'UTG', 'UTG+1', 'MP', 'LJ', 'HJ', 'CO'] };
   const STREETS = ['Preflop', 'Flop', 'Turn', 'River'];
-  const delay = () => (window.__FAST ? 0 : 650);
+  const delay = () => (window.__FAST ? 0 : Math.max(300, 700 - 50 * (G.players.length || 3)));
 
   const load = (k, d) => { try { return Object.assign({}, d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return d; } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-  const SETTINGS0 = { recs: true, odds: true, learn: true, opps: 2 };
+  const SETTINGS0 = { recs: true, odds: true, learn: true, opps: 5, shortStacks: true, v: 2 };
   const STATS0 = { hands: 0, won: 0, net: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0 };
   const settings = load('pt_settings', SETTINGS0);
   let stats = load('pt_stats', STATS0);
+  if (settings.v !== 2) { settings.opps = 5; settings.shortStacks = true; settings.v = 2; save('pt_settings', settings); }   // nová verze: 6-max výchozí
+  settings.opps = Math.max(1, Math.min(8, settings.opps | 0 || 5));
 
   const G = { players: [], dealer: -1, board: [], deck: [], street: 0, currentBet: 0, minRaise: BB, raises: 0,
     turn: -1, over: false, decisions: [], heroVpip: false, heroPfr: false, eq: null, rec: null, ctx: null, feedback: null, handNo: 0 };
@@ -26,7 +34,7 @@
   const alive = () => G.players.filter(p => !p.folded);
   function posLabel(seat) {
     const off = (seat - G.dealer + n()) % n();
-    return ({ 2: ['BTN', 'BB'], 3: ['BTN', 'SB', 'BB'], 4: ['BTN', 'SB', 'BB', 'CO'] })[n()][off];
+    return POSITIONS[n()][off];
   }
   function shuffle() {
     const d = []; for (let i = 0; i < 52; i++) d.push(i);
@@ -42,16 +50,19 @@
     }
     return -1;
   }
-  function rangeOf(p) { return p.pf === 'raise3' ? 11 : p.pf === 'raise' ? 8 : p.pf === 'call' ? 5 : 0; }
+  function rangeOf(p) { return p.pf === 'raise3' ? 11 : p.pf === 'raise' ? 8 : p.pf === 'shove' ? 6 : p.pf === 'call' ? 5 : 0; }
+  // iterace simulace podle počtu soupeřů – UI zůstane svižné i proti 8 botům
+  const heroIters = k => k <= 2 ? 5000 : k <= 5 ? 3500 : 2500;
   function ctxFor(seat, iters) {
     const p = G.players[seat];
     const opps = G.players.filter((q, i) => i !== seat && !q.folded);
     const toCall = Math.min(G.currentBet - p.bet, p.stack);
     const limpers = G.street === 0 && G.raises === 0 ? G.players.filter((q, i) => i !== seat && q.pf === 'limp').length : 0;
     const eqr = PE.equity(p.cards, G.board, opps.map(q => ({ minChen: rangeOf(q) })), iters);
+    const eff = Math.min(p.stack + p.bet, Math.max(0, ...opps.map(q => q.stack + q.bet)));
     return { street: G.street, hole: p.cards, board: G.board.slice(), pot: pot(), toCall, currentBet: G.currentBet, myBet: p.bet,
       stack: p.stack, minRaiseTo: Math.min(G.currentBet + G.minRaise, p.bet + p.stack), bb: BB, position: posLabel(seat),
-      numOpp: opps.length, raisesThisStreet: G.raises, limpers, eq: eqr.equity, eqr };
+      numOpp: opps.length, raisesThisStreet: G.raises, limpers, eq: eqr.equity, eqr, eff };
   }
 
   /* ---------- průběh ruky ---------- */
@@ -62,6 +73,16 @@
     for (let i = 0; i < settings.opps; i++) G.players.push({ name: BOT_NAMES[i][0], color: BOT_NAMES[i][1], style: STYLES[i] });
     G.dealer = -1;
   }
+  /* Stacky: většinou 100 BB, občas krátký stack (push/fold trénink) */
+  function assignStacks() {
+    G.players.forEach(p => p.start = START);
+    G.scenario = '';
+    if (!settings.shortStacks || window.__DEEP) return;
+    const rnd = Math.random(), r = (a, b) => (a + Math.floor(Math.random() * (b - a + 1))) * BB;
+    if (rnd < 0.25) { hero().start = r(6, 15); G.scenario = 'Krátký stack: ' + hero().start / BB + ' BB'; G.players.slice(1).forEach(p => p.start = r(20, 100)); }
+    else if (rnd < 0.4) { const b = 1 + Math.floor(Math.random() * (n() - 1)); G.players[b].start = r(5, 14); G.scenario = G.players[b].name + ' má krátký stack'; }
+    if (window.__FORCE_SHORT) { hero().start = window.__FORCE_SHORT * BB; G.scenario = 'Krátký stack: ' + window.__FORCE_SHORT + ' BB'; }
+  }
   function startHand() {
     closeSheet();
     setupPlayers();
@@ -69,7 +90,8 @@
     G.dealer = (G.dealer + 1) % n();
     G.deck = shuffle(); G.board = []; G.street = 0; G.over = false; G.decisions = []; G.feedback = null;
     G.heroVpip = G.heroPfr = false; G.winners = null; G.eq = null; G.eqStreet = -1;
-    G.players.forEach(p => Object.assign(p, { stack: START, bet: 0, total: 0, folded: false, allIn: false, acted: false, last: '', pf: '', cards: [G.deck.pop(), G.deck.pop()], show: false }));
+    assignStacks();
+    G.players.forEach(p => Object.assign(p, { stack: p.start, bet: 0, total: 0, folded: false, allIn: false, acted: false, last: '', pf: '', cards: [G.deck.pop(), G.deck.pop()], show: false }));
     const sbSeat = n() === 2 ? G.dealer : (G.dealer + 1) % n(), bbSeat = (sbSeat + 1) % n();
     put(G.players[sbSeat], SB); G.players[sbSeat].last = 'SB ' + SB;
     put(G.players[bbSeat], BB); G.players[bbSeat].last = 'BB ' + BB;
@@ -83,15 +105,15 @@
     if (G.turn < 0) return nextStreet();
     const p = G.players[G.turn];
     if (p.hero) {
-      G.ctx = ctxFor(0, 5000); G.eq = G.ctx.eqr; G.rec = PE.recommend(G.ctx);
+      G.ctx = ctxFor(0, heroIters(alive().length - 1)); G.eq = G.ctx.eqr; G.rec = PE.recommend(G.ctx);
       render();
     } else {
       G.ctx = null; G.rec = null;
-      if (G.street > 0 || G.eqStreet !== G.street) { G.eq = PE.equity(hero().cards, G.board, G.players.slice(1).filter(q => !q.folded).map(q => ({ minChen: rangeOf(q) })), 3000); G.eqStreet = G.street; }
+      if (G.street > 0 || G.eqStreet !== G.street) { G.eq = PE.equity(hero().cards, G.board, G.players.slice(1).filter(q => !q.folded).map(q => ({ minChen: rangeOf(q) })), heroIters(alive().length - 1) >> 1); G.eqStreet = G.street; }
       render();
       setTimeout(() => {
         const seat = G.turn; if (G.over || seat < 0 || G.players[seat].hero) return;
-        const c = ctxFor(seat, 500);
+        const c = ctxFor(seat, n() > 5 ? 300 : 500);
         const d = PE.botDecide(c, G.players[seat].style);
         act(seat, d.action, d.to);
       }, delay());
@@ -102,6 +124,7 @@
     const toCall = Math.min(G.currentBet - p.bet, p.stack);
     if (action === 'check' && toCall > 0) action = 'call';
     if (action === 'call' && toCall === 0) action = 'check';
+    if (action === 'allin') { if (p.stack <= toCall) action = 'call'; else { action = 'raise'; to = p.bet + p.stack; } }
     if ((action === 'bet' || action === 'raise') && p.stack <= toCall) action = 'call';
     if (action === 'fold') { p.folded = true; p.last = 'Fold'; }
     else if (action === 'check') p.last = 'Check';
@@ -115,7 +138,7 @@
       if (inc >= G.minRaise) G.minRaise = inc;
       G.currentBet = Math.max(G.currentBet, to);
       G.raises++;
-      if (G.street === 0) p.pf = G.raises >= 2 ? 'raise3' : 'raise';
+      if (G.street === 0) p.pf = p.allIn && p.start <= 15 * BB ? 'shove' : G.raises >= 2 ? 'raise3' : 'raise';
       G.players.forEach((q, i) => { if (i !== seat) q.acted = false; });
       p.last = (p.allIn ? 'All-in ' : (action === 'bet' ? 'Bet ' : 'Raise ')) + to;
     }
@@ -125,12 +148,14 @@
   }
   function heroAct(action, to) {
     if (G.turn !== 0 || G.over) return;
-    const ctx = G.ctx, rec = G.rec;
+    const ctx = G.ctx, rec = G.rec, h = hero();
+    if ((action === 'bet' || action === 'raise') && to >= h.stack + h.bet) action = 'allin';
+    if (action === 'allin') to = h.stack + h.bet;
     const gr = PE.grade(rec, action, ctx);
     G.decisions.push({ street: G.street, action, to, rec, grade: gr, eq: ctx.eq });
     stats.decisions++; stats[gr.level]++;
     if (G.street === 0 && action !== 'fold' && !(action === 'check')) G.heroVpip = true;
-    if (G.street === 0 && (action === 'raise' || action === 'bet')) G.heroPfr = true;
+    if (G.street === 0 && (action === 'raise' || action === 'bet' || action === 'allin')) G.heroPfr = true;
     G.feedback = settings.learn ? Object.assign({ street: G.street, act: action }, gr) : null;
     act(0, action, to);
   }
@@ -169,7 +194,7 @@
         ws.forEach((w, i) => { w.stack += share + (i === 0 ? part - share * ws.length : 0); if (!G.winners.includes(w)) G.winners.push(w); });
       }
     }
-    const net = hero().stack - START;
+    const net = hero().stack - hero().start;
     G.heroNet = net;
     stats.hands++; stats.net += net; if (net > 0) stats.won++;
     if (G.heroVpip) stats.vpip++; if (G.heroPfr) stats.pfr++;
@@ -191,12 +216,15 @@
   function render() {
     $('recToggle').checked = settings.recs;
     // soupeři
+    $('opps').className = 'opps' + (n() > 5 ? ' compact' : '');
+    document.body.classList.toggle('many', n() > 5);
+    $('opps').style.gridTemplateColumns = n() > 5 ? `repeat(${Math.ceil((n() - 1) / 2)},1fr)` : '';
     $('opps').innerHTML = G.players.slice(1).map((p, i) => {
       const seat = i + 1;
       const cards = p.show ? p.cards.map(c => cardHTML(c, 'sm')).join('') : '';
       return `<div class="opp ${p.folded ? 'folded' : ''} ${G.turn === seat ? 'turn' : ''}">
         <div class="avatar" style="background:${p.color}">${p.name.slice(0, 2).toUpperCase()}${G.dealer === seat ? '<span class="dealer">D</span>' : ''}</div>
-        <div class="name">${p.name} · ${posLabel(seat)}</div><div class="stk">${p.stack}</div>
+        <div class="name">${p.name} · <span class="pos">${posLabel(seat)}</span></div><div class="stk">${p.stack}${p.allIn && !G.over ? ' <em>all-in</em>' : ''}</div>
         <div class="chip ${p.last ? '' : 'empty'}">${p.last || '-'}</div>
         <div class="mini">${cards}</div></div>`;
     }).join('');
@@ -204,12 +232,12 @@
     let b = ''; for (let i = 0; i < 5; i++) b += i < G.board.length ? cardHTML(G.board[i]) : cardHTML(null);
     $('board').innerHTML = b;
     $('pot').textContent = pot();
-    $('street').textContent = G.over ? 'Konec ruky' : STREETS[G.street];
+    $('street').textContent = (G.over ? 'Konec ruky' : STREETS[G.street]) + (G.scenario ? ' · ' + G.scenario : '');
     // hráč
     const h = hero();
     $('heroCards').innerHTML = h.cards.map(c => cardHTML(c, 'lg')).join('');
     $('heroStack').textContent = h.stack;
-    $('heroPos').innerHTML = posLabel(0) + (G.dealer === 0 ? ' · D' : '');
+    $('heroPos').innerHTML = posLabel(0) + (G.dealer === 0 ? ' · D' : '') + ' · ' + Math.round((h.stack + h.bet) / BB * 10) / 10 + ' BB';
     $('heroLast').textContent = h.last || '';
     // šance
     $('odds').classList.toggle('off', !settings.odds);
@@ -232,11 +260,11 @@
   }
   function recLabel(r) {
     const a = r.action;
-    return a === 'bet' ? `Bet ${r.to}` : a === 'raise' ? (r.to >= hero().stack + hero().bet ? `All-in ${r.to}` : `Raise na ${r.to}`) : a[0].toUpperCase() + a.slice(1);
+    return a === 'allin' ? `All-in ${r.to}` : r.allinCall ? `Call all-in ${G.ctx.toCall}` : a === 'bet' ? `Bet ${r.to}` : a === 'raise' ? (r.to >= hero().stack + hero().bet ? `All-in ${r.to}` : `Raise na ${r.to}`) : a[0].toUpperCase() + a.slice(1);
   }
   function defaultSize() {
     const c = G.ctx;
-    if (settings.recs && G.rec && G.rec.to && (G.rec.action === 'bet' || G.rec.action === 'raise')) return G.rec.to;
+    if (settings.recs && G.rec && G.rec.to && (G.rec.action === 'bet' || G.rec.action === 'raise' || G.rec.action === 'allin')) return G.rec.to;
     if (G.street === 0) return Math.max(c.minRaiseTo, Math.min(c.stack + c.myBet, G.raises ? G.currentBet * 3 : 3 * BB));
     return Math.max(c.minRaiseTo, Math.min(c.stack + c.myBet, c.toCall ? G.currentBet * 3 : Math.round(c.pot * 0.66)));
   }
@@ -251,8 +279,8 @@
     const allin = size >= h.stack + h.bet;
     el.innerHTML = `
       <button class="btn ${r === 'fold' ? 'hint' : ''}" data-a="fold" ${c.toCall === 0 ? 'disabled' : ''}>Fold</button>
-      <button class="btn ${r === 'check' || r === 'call' ? 'hint' : ''}" data-a="${c.toCall ? 'call' : 'check'}">${c.toCall ? (c.toCall >= h.stack ? 'All-in ' + c.toCall : 'Call ' + c.toCall) : 'Check'}</button>
-      <button class="btn ${r === 'bet' || r === 'raise' ? 'hint' : ''}" data-a="${c.toCall ? 'raise' : 'bet'}" data-to="${size}" ${canRaise ? '' : 'disabled'}>${allin ? 'All-in' : aggrName} ${size}</button>
+      <button class="btn ${r === 'check' || r === 'call' ? 'hint' : ''} ${c.toCall >= h.stack ? 'allin' : ''}" data-a="${c.toCall ? 'call' : 'check'}">${c.toCall ? (c.toCall >= h.stack ? 'All-in ' + c.toCall : 'Call ' + c.toCall) : 'Check'}</button>
+      <button class="btn ${r === 'bet' || r === 'raise' || r === 'allin' ? 'hint' : ''} ${allin ? 'allin' : ''}" data-a="${allin ? 'allin' : c.toCall ? 'raise' : 'bet'}" data-to="${size}" ${canRaise ? '' : 'disabled'}>${allin ? 'All-in' : aggrName} ${size}</button>
       <button class="btn round" id="sizeBtn" ${canRaise ? '' : 'disabled'} aria-label="Velikost sázky">↑</button>`;
     el.querySelectorAll('[data-a]').forEach(b => b.onclick = () => heroAct(b.dataset.a, +b.dataset.to || undefined));
     $('sizeBtn').onclick = showSizes;
@@ -272,7 +300,7 @@
     const recTo = settings.recs && G.rec && G.rec.to;
     const verb = c.toCall ? 'Raise na' : 'Bet';
     openSheet(`<h2>Velikost sázky</h2><div class="sub">Minimum ${c.minRaiseTo} · pot ${c.pot}${recTo ? ' · doporučeno ' + recTo : ''}</div>
-      <div class="sizes">${opts.map(([v, l]) => `<button class="btn ${v === recTo ? 'rec-size' : ''}" data-to="${v}">${verb} ${v}<small>${l}</small></button>`).join('')}</div>`);
+      <div class="sizes">${opts.map(([v, l]) => `<button class="btn ${v === recTo ? 'rec-size' : ''} ${v === max ? 'allin' : ''}" data-to="${v}">${v === max ? 'All-in' : verb} ${v}<small>${l}</small></button>`).join('')}</div>`);
     $('sheet').querySelectorAll('[data-to]').forEach(b => b.onclick = () => { closeSheet(); heroAct(c.toCall ? 'raise' : 'bet', +b.dataset.to); });
   }
   function showSummary() {
@@ -322,11 +350,12 @@
     return `<div class="row"><div>${title}<small>${sub}</small></div><label class="switch-pill" style="padding:6px"><input type="checkbox" data-k="${key}" ${settings[key] ? 'checked' : ''}><i></i></label></div>`;
   }
   function showSettings() {
-    openSheet(`<h2>Nastavení</h2><div class="sub">Trénink Texas Hold'em, blindy 1/2, stack 200 (100 BB) každou ruku.</div>
+    openSheet(`<h2>Nastavení</h2><div class="sub">Trénink Texas Hold'em, blindy 1/2, stack 200 (100 BB), občas krátké stacky.</div>
       ${toggleRow('recs', 'Doporučené tahy', 'Ukáže nejlepší akci a proč')}
       ${toggleRow('odds', 'Šance na výhru', 'Monte Carlo equity v procentech')}
       ${toggleRow('learn', 'Režim učení', 'Zpětná vazba po každém rozhodnutí')}
-      <div class="row"><div>Počet soupeřů<small>Projeví se od další ruky</small></div><div class="seg">${[1, 2, 3].map(k => `<button data-o="${k}" class="${settings.opps === k ? 'on' : ''}">${k}</button>`).join('')}</div></div>
+      ${toggleRow('shortStacks', 'Krátké stacky', 'Občas ruka s malým stackem – trénink push/fold a all-in')}
+      <div class="row col"><div>Počet soupeřů<small>${settings.opps + 1} hráčů u stolu${settings.opps === 5 ? ' (6-max)' : settings.opps === 8 ? ' (plný stůl)' : ''} · projeví se od další ruky</small></div><div class="seg seg8">${[1, 2, 3, 4, 5, 6, 7, 8].map(k => `<button data-o="${k}" class="${settings.opps === k ? 'on' : ''}">${k}</button>`).join('')}</div></div>
       <button class="btn primary wide" id="closeSet">Hotovo</button>`);
     $('sheet').querySelectorAll('[data-k]').forEach(i => i.onchange = () => { settings[i.dataset.k] = i.checked; save('pt_settings', settings); render(); });
     $('sheet').querySelectorAll('[data-o]').forEach(b => b.onclick = () => { settings.opps = +b.dataset.o; save('pt_settings', settings); showSettings(); });
