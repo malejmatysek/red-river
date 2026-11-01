@@ -1,0 +1,233 @@
+/* Poker trenér – herní logika (karty, vyhodnocení, equity, doporučení, boti).
+   Funguje v prohlížeči (window.PE) i v Node (module.exports). */
+(function (root) {
+  'use strict';
+  const RANKS = ['2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+  const RCH = '23456789TJQKA';
+  const SUITS = ['s','h','d','c'];
+  const SUIT_SYM = { s: '♠', h: '♥', d: '♦', c: '♣' };
+  const rankOf = c => c >> 2, suitOf = c => c & 3;
+  const cardStr = c => RCH[rankOf(c)] + SUITS[suitOf(c)];
+  function parseCard(s) { return RCH.indexOf(s[0].toUpperCase()) * 4 + SUITS.indexOf(s[1].toLowerCase()); }
+  const parseCards = s => (s.match(/[2-9TJQKA][shdc]/gi) || []).map(parseCard);
+
+  /* ---------- 7karetní vyhodnocení: vyšší číslo = lepší ruka ---------- */
+  const HAND_NAMES = ['Vysoká karta','Pár','Dva páry','Trojice','Postupka','Barva','Full house','Poker','Čistá postupka'];
+  function straightHigh(m) {
+    m = (m << 1) | ((m >> 12) & 1);           // eso i jako nejnižší
+    for (let h = 13; h >= 4; h--) if (((m >> (h - 4)) & 31) === 31) return h - 1;
+    return -1;
+  }
+  function topBits(m, n, out) { for (let r = 12; r >= 0 && out.length < n; r--) if (m & (1 << r)) out.push(r); return out; }
+  function score(cat, ks) { let s = cat; for (let i = 0; i < 5; i++) s = s * 16 + (ks[i] || 0); return s; }
+  const rc = new Int8Array(13);
+  function evaluate(cards) {
+    rc.fill(0); const sm = [0,0,0,0], sc = [0,0,0,0]; let rm = 0;
+    for (let i = 0; i < cards.length; i++) { const c = cards[i], r = c >> 2, s = c & 3; rc[r]++; sm[s] |= 1 << r; sc[s]++; rm |= 1 << r; }
+    for (let s = 0; s < 4; s++) if (sc[s] >= 5) {
+      const sh = straightHigh(sm[s]);
+      if (sh >= 0) return score(8, [sh]);
+      var flush = score(5, topBits(sm[s], 5, []));
+    }
+    let quad = -1, t1 = -1, t2 = -1, p1 = -1, p2 = -1, p3 = -1;
+    for (let r = 12; r >= 0; r--) {
+      const n = rc[r];
+      if (n === 4) quad = r;
+      else if (n === 3) { if (t1 < 0) t1 = r; else if (t2 < 0) t2 = r; }
+      else if (n === 2) { if (p1 < 0) p1 = r; else if (p2 < 0) p2 = r; else if (p3 < 0) p3 = r; }
+    }
+    if (quad >= 0) return score(7, [quad, topBits(rm & ~(1 << quad), 1, [])[0]]);
+    if (t1 >= 0 && (t2 >= 0 || p1 >= 0)) return score(6, [t1, Math.max(t2, p1)]);
+    if (flush !== undefined) return flush;
+    const sh = straightHigh(rm); if (sh >= 0) return score(4, [sh]);
+    if (t1 >= 0) return score(3, [t1].concat(topBits(rm & ~(1 << t1), 2, [])));
+    if (p2 >= 0) return score(2, [p1, p2, topBits(rm & ~(1 << p1) & ~(1 << p2), 1, [])[0]]);
+    if (p1 >= 0) return score(1, [p1].concat(topBits(rm & ~(1 << p1), 3, [])));
+    return score(0, topBits(rm, 5, []));
+  }
+  const handCategory = sc => Math.floor(sc / 1048576);
+  const handName = cards => HAND_NAMES[handCategory(evaluate(cards))];
+
+  /* ---------- Chenův vzorec (síla startovní ruky) ---------- */
+  function chen(c1, c2) {
+    let a = rankOf(c1), b = rankOf(c2); if (b > a) [a, b] = [b, a];
+    const base = r => r === 12 ? 10 : r === 11 ? 8 : r === 10 ? 7 : r === 9 ? 6 : (r + 2) / 2;
+    let s = base(a);
+    if (a === b) return Math.max(5, Math.ceil(s * 2));
+    if (suitOf(c1) === suitOf(c2)) s += 2;
+    const gap = a - b - 1;
+    s -= gap === 0 ? 0 : gap === 1 ? 1 : gap === 2 ? 2 : gap === 3 ? 4 : 5;
+    if (gap <= 1 && a < 10) s += 1;
+    return Math.ceil(s);
+  }
+  function handLabel(c1, c2) {
+    let a = rankOf(c1), b = rankOf(c2); if (b > a) [a, b] = [b, a];
+    return RCH[a] + RCH[b] + (a === b ? '' : suitOf(c1) === suitOf(c2) ? 's' : 'o');
+  }
+  const CHEN = new Int8Array(52 * 52);
+  for (let i = 0; i < 52; i++) for (let j = 0; j < 52; j++) if (i !== j) CHEN[i * 52 + j] = chen(i, j);
+
+  /* ---------- Equity: Monte Carlo (soupeři s odhadovaným rozsahem) ----------
+     opp: pole objektů {cards?: [c,c], minChen?: n}. Známé karty se použijí přímo. */
+  function equity(hero, board, opps, iters, rng) {
+    rng = rng || Math.random; iters = iters || 3000;
+    const dead = new Uint8Array(52); hero.concat(board).forEach(c => dead[c] = 1);
+    opps.forEach(o => o.cards && o.cards.forEach(c => dead[c] = 1));
+    const base = []; for (let c = 0; c < 52; c++) if (!dead[c]) base.push(c);
+    let win = 0, tie = 0, eq = 0;
+    const deck = base.slice(), need = 5 - board.length;
+    const all = new Array(7), oc = new Array(7);
+    for (let it = 0; it < iters; it++) {
+      let n = deck.length;
+      const draw = () => { const k = (rng() * n) | 0, c = deck[k]; deck[k] = deck[n - 1]; deck[n - 1] = c; n--; return c; };
+      const oh = [];
+      for (let o = 0; o < opps.length; o++) {
+        const op = opps[o];
+        if (op.cards) { oh.push(op.cards); continue; }
+        let a, b, tries = 0;
+        for (;;) {
+          a = draw(); b = draw();
+          if (!op.minChen || CHEN[a * 52 + b] >= op.minChen || tries > 60) break;
+          n += 2; tries++;                         // vrátit a táhnout znovu
+        }
+        oh.push([a, b]);
+      }
+      const bd = board.slice(); for (let i = 0; i < need; i++) bd.push(draw());
+      for (let i = 0; i < 5; i++) all[i] = oc[i] = bd[i];
+      all[5] = hero[0]; all[6] = hero[1];
+      const hs = evaluate(all);
+      let best = hs, cnt = 1, heroBest = true;
+      for (let o = 0; o < oh.length; o++) {
+        oc[5] = oh[o][0]; oc[6] = oh[o][1];
+        const s = evaluate(oc);
+        if (s > best) { best = s; heroBest = false; cnt = 1; }
+        else if (s === best) cnt++;
+      }
+      if (heroBest && best === hs) { if (cnt === 1) { win++; eq += 1; } else { tie++; eq += 1 / cnt; } }
+      
+    }
+    return { win: win / iters, tie: tie / iters, equity: eq / iters };
+  }
+
+  /* Přesný výpočet pro 2 známé ruce (všechny boardy) – pro testy */
+  function exactHeadsUp(h1, h2, board) {
+    board = board || [];
+    const dead = new Uint8Array(52); h1.concat(h2, board).forEach(c => dead[c] = 1);
+    const d = []; for (let c = 0; c < 52; c++) if (!dead[c]) d.push(c);
+    const need = 5 - board.length; let w = 0, t = 0, tot = 0;
+    const a = new Array(7), b = new Array(7);
+    const rec = (start, picked) => {
+      if (picked.length === need) {
+        const bd = board.concat(picked);
+        for (let i = 0; i < 5; i++) a[i] = b[i] = bd[i];
+        a[5] = h1[0]; a[6] = h1[1]; b[5] = h2[0]; b[6] = h2[1];
+        const x = evaluate(a), y = evaluate(b);
+        if (x > y) w++; else if (x === y) t++; tot++; return;
+      }
+      for (let i = start; i < d.length; i++) { picked.push(d[i]); rec(i + 1, picked); picked.pop(); }
+    };
+    rec(0, []);
+    return { win: w / tot, tie: t / tot, equity: (w + t / 2) / tot, boards: tot };
+  }
+
+  /* ---------- Doporučení tahu ----------
+     ctx: {street, hole, board, pot, toCall, currentBet, myBet, stack, minRaiseTo, bb,
+           position, numOpp, raisesThisStreet, facingRaise, eq, limpers, isPreflopAggressor} */
+  const fmt = n => Math.round(n);
+  const pct = x => Math.round(x * 100) + ' %';
+  function clampTo(to, ctx) { return Math.max(ctx.minRaiseTo, Math.min(Math.round(to), ctx.stack + ctx.myBet)); }
+
+  function recommend(ctx) {
+    return ctx.street === 0 ? recPreflop(ctx) : recPostflop(ctx);
+  }
+  function recPreflop(ctx) {
+    const c = chen(ctx.hole[0], ctx.hole[1]), lab = handLabel(ctx.hole[0], ctx.hole[1]);
+    const pos = ctx.position, r = ctx.raisesThisStreet, bb = ctx.bb;
+    const canCheck = ctx.toCall === 0;
+    const openThr = { 'CO': 8, 'BTN': ctx.numOpp === 1 ? 5 : 6, 'SB': 7, 'BB': 9 }[pos] || 8;
+    const tag = `${lab} (síla ${c}/20 podle Chena)`;
+    if (r === 0) {
+      if (c >= openThr) {
+        const to = clampTo(3 * bb + (ctx.limpers || 0) * bb, ctx);
+        return { action: canCheck ? 'bet' : 'raise', to, alt: [],
+          why: `${tag} je na pozici ${pos} dost silná na otevření. Navyš na ${to}, ať získáš iniciativu a vybereš blindy.` };
+      }
+      if (canCheck) return { action: 'check', alt: [], why: `${tag} není na navýšení. Na big blindu můžeš zadarmo checknout a vidět flop.` };
+      if (pos === 'SB' && ctx.numOpp === 1 && c >= 4) return { action: 'call', alt: ['fold'], why: `${tag}: dorovnání malého blindu je levné, ale lepší je hrát agresivně nebo složit.` };
+      return { action: 'fold', alt: [], why: `${tag} je na pozici ${pos} moc slabá. Hraj méně rukou, ale lepších – fold ušetří žetony.` };
+    }
+    // proti navýšení
+    if (r === 1) {
+      const callThr = pos === 'BB' ? 6 : 8;
+      if (c >= 11 || lab === 'AKo') {
+        const to = clampTo(ctx.currentBet * 3, ctx);
+        return { action: 'raise', to, alt: ['call'], why: `${tag} patří mezi nejlepší ruce. Dej 3-bet na ${to} – vyděláš víc proti horším rukám.` };
+      }
+      if (c >= callThr) return { action: 'call', alt: ['fold'], why: `${tag} je dost dobrá na dorovnání ${fmt(ctx.toCall)}, ale ne na re-raise. Platíš ${pct(ctx.toCall / (ctx.pot + ctx.toCall))} výsledného potu.` };
+      return { action: 'fold', alt: [], why: `Proti navýšení potřebuješ silnější ruku. ${tag} je pod hranicí (${callThr}) – fold.` };
+    }
+    // proti 3-betu a víc
+    if (c >= 14) return { action: 'raise', to: ctx.stack + ctx.myBet, alt: ['call'], why: `${tag} – prémiová ruka (QQ+). Proti 3-betu jdi all-in.` };
+    if (c >= 11) return { action: 'call', alt: ['fold'], why: `${tag} je dost silná na dorovnání 3-betu, ale all-in by byl risk proti úzkému rozsahu.` };
+    return { action: 'fold', alt: [], why: `Proti 3-betu soupeř ukazuje velmi silný rozsah. ${tag} tu prohrává – fold.` };
+  }
+  function recPostflop(ctx) {
+    const eq = ctx.eq, n = Math.max(1, ctx.numOpp), fair = 1 / (n + 1);
+    const strong = fair + (1 - fair) * 0.25, medium = fair + (1 - fair) * 0.05, raiseThr = fair + (1 - fair) * 0.42;
+    const pot = ctx.pot, made = handName(ctx.hole.concat(ctx.board));
+    const eqTxt = `Tvoje šance ${pct(eq)} (${made.toLowerCase()})`;
+    if (ctx.toCall === 0) {
+      if (eq >= strong) {
+        const to = clampTo(pot * 0.66, ctx);
+        return { action: 'bet', to, alt: [], why: `${eqTxt} je nad férovým podílem ${pct(fair)}. Sázej pro hodnotu ~2/3 potu (${to}), ať ti horší ruce platí.` };
+      }
+      if (eq >= medium) {
+        const to = clampTo(pot * 0.4, ctx);
+        return { action: 'bet', to, alt: ['check'], why: `${eqTxt} je mírně nad férovým podílem ${pct(fair)}. Menší sázka (${to}) chrání ruku a bere hodnotu; check je taky v pořádku.` };
+      }
+      return { action: 'check', alt: [], why: `${eqTxt} je pod férovým podílem ${pct(fair)}. Checkni a podívej se na další kartu zadarmo.` };
+    }
+    const need = ctx.toCall / (pot + ctx.toCall);
+    const oddsTxt = `Musíš dát ${fmt(ctx.toCall)} do potu ${fmt(pot + ctx.toCall)}, takže potřebuješ aspoň ${pct(need)} šanci (pot odds).`;
+    if (eq >= raiseThr && ctx.stack > ctx.toCall) {
+      const to = clampTo(ctx.currentBet * 3, ctx);
+      return { action: 'raise', to, alt: ['call'], why: `${eqTxt} je velmi silná. ${oddsTxt} Navyš na ${to} pro hodnotu.` };
+    }
+    if (eq >= need + 0.03) return { action: 'call', alt: eq >= strong ? ['raise'] : [], why: `${eqTxt}. ${oddsTxt} Máš víc, než potřebuješ → call je ziskový.` };
+    if (eq >= need - 0.03) return { action: 'call', alt: ['fold'], why: `${eqTxt}. ${oddsTxt} Je to těsné – call i fold jsou zhruba stejné.` };
+    return { action: 'fold', alt: [], why: `${eqTxt}. ${oddsTxt} Šance nestačí → fold.` };
+  }
+
+  /* Hodnocení rozhodnutí hráče */
+  const cls = a => a === 'fold' ? 'fold' : (a === 'check' || a === 'call') ? 'passive' : 'aggr';
+  function grade(rec, action, ctx) {
+    const ev = ctx.toCall > 0 && ctx.eq != null ? ctx.eq * (ctx.pot + ctx.toCall) - ctx.toCall : null;
+    const evTxt = ev != null && ctx.street > 0 ? ` Hrubé EV callu: ${ev >= 0 ? '+' : ''}${ev.toFixed(1)}.` : '';
+    if (cls(action) === cls(rec.action)) return { level: 'good', title: 'Správně', text: rec.why + evTxt };
+    if (rec.alt.some(a => cls(a) === cls(action))) return { level: 'ok', title: 'Dá se', text: `Doporučení bylo ${actName(rec.action)}. ${rec.why}${evTxt}` };
+    let big = false;
+    if (ctx.street > 0 && ctx.eq != null && ctx.toCall > 0) {
+      const need = ctx.toCall / (ctx.pot + ctx.toCall);
+      big = action === 'fold' ? ctx.eq - need > 0.12 : cls(action) !== 'fold' && need - ctx.eq > 0.12;
+    }
+    return { level: big ? 'bad' : 'meh', title: big ? 'Velká chyba' : 'Nepřesnost', text: `Lepší bylo ${actName(rec.action)}. ${rec.why}${evTxt}` };
+  }
+  const actName = a => ({ fold: 'fold', check: 'check', call: 'call', bet: 'bet', raise: 'raise' })[a] || a;
+
+  /* Rozhodnutí bota: doporučení + šum + občasný bluf */
+  function botDecide(ctx, style, rng) {
+    rng = rng || Math.random;
+    style = style || { loose: 0, aggr: 0, bluff: 0.08 };
+    const c2 = Object.assign({}, ctx);
+    if (ctx.street > 0) c2.eq = Math.max(0, Math.min(1, ctx.eq + (rng() - 0.5) * 0.12 + style.loose));
+    let rec = recommend(c2);
+    if (ctx.street === 0 && rec.action === 'fold' && rng() < 0.12 + style.loose) rec = { action: ctx.toCall ? 'call' : 'check' };
+    if (ctx.street > 0 && ctx.toCall === 0 && rec.action === 'check' && rng() < style.bluff) rec = { action: 'bet', to: clampTo(ctx.pot * 0.5, ctx) };
+    if ((rec.action === 'bet' || rec.action === 'raise') && rng() < 0.2 - style.aggr) rec = { action: ctx.toCall ? 'call' : 'check' };
+    return rec;
+  }
+
+  const api = { RANKS, RCH, SUITS, SUIT_SYM, rankOf, suitOf, cardStr, parseCard, parseCards, evaluate, handCategory,
+    handName, HAND_NAMES, chen, handLabel, equity, exactHeadsUp, recommend, grade, botDecide, actName };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.PE = api;
+})(typeof window !== 'undefined' ? window : globalThis);

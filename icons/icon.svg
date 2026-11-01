@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#000"/>
+  <g id="art">
+    <!-- zadní karta s pruhy -->
+    <g transform="rotate(-12 256 280)">
+      <defs><pattern id="st" width="22" height="22" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="22" height="22" fill="#fff"/><rect width="7" height="22" fill="#111"/></pattern>
+      <clipPath id="cb"><rect x="132" y="122" width="190" height="270" rx="30"/></clipPath></defs>
+      <rect x="120" y="110" width="214" height="294" rx="38" fill="#fff"/>
+      <rect x="132" y="122" width="190" height="270" rx="30" fill="url(#st)" clip-path="url(#cb)"/>
+    </g>
+    <!-- přední karta A♥ -->
+    <g transform="rotate(8 256 280)">
+      <rect x="190" y="128" width="214" height="294" rx="38" fill="#fff" stroke="#000" stroke-width="6"/>
+      <text x="218" y="232" font-family="Helvetica, Arial, sans-serif" font-size="112" font-weight="500" fill="#ef4b4b">A</text>
+      <path d="M262 392 C 262 392 214 360 214 328 C 214 310 228 298 243 298 C 252 298 259 303 262 310 C 265 303 272 298 281 298 C 296 298 310 310 310 328 C 310 360 262 392 262 392 Z" fill="#ef4b4b"/>
+    </g>
+    <circle cx="410" cy="112" r="22" fill="#4fe3a0"/>
+  </g>
+</svg>

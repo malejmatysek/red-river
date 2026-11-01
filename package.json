@@ -1,0 +1,12 @@
+{
+  "name": "poker-trener",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Poker trenér – PWA pro trénink Texas Hold'em",
+  "scripts": {
+    "test": "node test_equity.js && node test_play.js",
+    "verify:pwa": "node verify_pwa.js",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": { "playwright-core": "^1.64.0" }
+}
