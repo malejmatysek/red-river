@@ -1,4 +1,4 @@
-# trenér – poker trenér (Texas Hold'em)
+# Red River – poker trenér (Texas Hold'em)
 
 Návrh aplikace, která tě učí poker: ukazuje šance na výhru, radí, co zahrát (dá se vypnout), a po každém rozhodnutí vysvětlí, jestli bylo dobré a proč. Vzhled je minimalistický, inspirovaný aplikací **Offsuit**.
 
@@ -19,7 +19,7 @@ Vycházím z ověřených obrázků z App Store a webu offsuit.link (uloženo v 
 - akční tlačítka jako **tmavé pilulky** („Call 4“, „Raise 8“) + kulaté tlačítko se šipkou,
 - vlastní karty dole vlevo přes sebe, vpravo panel s rukou a stackem,
 - panel statistik „Win 71 %“ se **zeleným procentem** na tmavém panelu,
-- čisté bezpatkové písmo, malé písmo v názvu značky („offsuit“ → u nás „trenér“).
+- čisté bezpatkové písmo, malé písmo v názvu značky („offsuit“ → u nás „Red River“).
 
 Co jsem **nepřebíral**: avatary (Offsuit používá 3D postavičky – u nás iniciály v barevných kolečkách), logo, žádné jejich assety se v aplikaci nepoužívají.
 

@@ -1,6 +1,6 @@
-# Poker trenér
+# Red River
 
-Minimalistický trenér Texas Hold'em: **šance na výhru v %**, **doporučené tahy** (dají se vypnout) a **zpětná vazba** po každém rozhodnutí. Funguje jako webová aplikace, která se dá nainstalovat na telefon (PWA) a běží i offline.
+**Red River** je minimalistický trenér Texas Hold'em: **šance na výhru v %**, **doporučené tahy** (dají se vypnout) a **zpětná vazba** po každém rozhodnutí. Funguje jako webová aplikace, která se dá nainstalovat na telefon (PWA) a běží i offline.
 
 Podrobný návrh: [NAVRH.md](NAVRH.md)
 
@@ -11,7 +11,7 @@ Aplikace musí být na webu přes **https** (např. GitHub Pages: `https://<uziv
 1. Otevři adresu aplikace v **Safari**.
 2. Klepni na **Sdílet** (čtvereček se šipkou).
 3. Vyber **Přidat na plochu** → **Přidat**.
-4. Spouštěj ikonou „Trenér“ z plochy – otevře se na celou obrazovku bez lišty prohlížeče.
+4. Spouštěj ikonou „Red River“ z plochy – otevře se na celou obrazovku bez lišty prohlížeče.
 
 **Android (Chrome)**
 1. Otevři adresu aplikace v **Chrome**.

@@ -1,4 +1,4 @@
-/* Poker trenér – herní smyčka a UI */
+/* Red River (poker trenér) – herní smyčka a UI */
 (function () {
   'use strict';
   const $ = id => document.getElementById(id);

@@ -1,4 +1,4 @@
-/* Poker trenér – herní logika (karty, vyhodnocení, equity, doporučení, boti).
+/* Red River (poker trenér) – herní logika (karty, vyhodnocení, equity, doporučení, boti).
    Funguje v prohlížeči (window.PE) i v Node (module.exports). */
 (function (root) {
   'use strict';

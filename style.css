@@ -188,3 +188,8 @@ body.many .opps.compact .opp .card.sm{margin-top:1px}
 .opps.compact .name{flex-basis:100%;text-align:center}
 .opps.compact .mini{flex-basis:100%;justify-content:center;margin-top:1px}
 .opps.compact .stk{white-space:nowrap}
+/* název „Red River“ – hlavička vždy na jeden řádek */
+.top{gap:6px}
+.brand{white-space:nowrap;font-size:20px}
+.switch-pill span{white-space:nowrap}
+@media (max-width:379px){.switch-pill span{display:none}.switch-pill{padding:6px}}
