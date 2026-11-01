@@ -58,6 +58,35 @@ const path = require('path'), DIR = path.join(__dirname, 'screenshots'), URL = '
   await p.evaluate(() => document.querySelector('[data-sx="vpip"]').click()); await W(p, 400); await shot(p, '06c-statistiky-vysvetleni');
   await p.evaluate(() => { document.getElementById('scrim').click(); __nav.go('shop'); }); await W(p, 500); await shot(p, '10-obchod');
   await p.evaluate(() => document.querySelector('#scr-shop').scrollTo(0, 9999)); await W(p, 250); await shot(p, '10b-obchod-balicky');
+  await p.evaluate(() => document.querySelector('#scr-stats') && 0);
+  // v1.3: kolo štěstí (skutečná animace), úspěchy, vzhled, nápověda
+  await p.evaluate(() => { window.__FAST = false; __nav.go('home'); }); await W(p, 400);
+  await p.evaluate(() => __nav.go('wheel')); await W(p, 500); await shot(p, '12-kolo-stesti');
+  await p.click('#whSpin'); await W(p, 1300); await shot(p, '12b-kolo-toceni');
+  await p.waitForFunction(() => !document.getElementById('whSpin').textContent.includes('…') && document.getElementById('whCd'), null, { timeout: 15000 }); await W(p, 700); await shot(p, '12c-kolo-vysledek');
+  await p.evaluate(() => { window.__FAST = true; __nav.go('ach'); }); await W(p, 500); await shot(p, '13-uspechy');
+  await p.evaluate(() => document.querySelector('#scr-ach').scrollTo(0, 520)); await W(p, 250); await shot(p, '13b-uspechy-seznam');
+  await p.evaluate(() => { __poker.wallet.diamonds += 16; __nav.go('shop'); }); await W(p, 400);
+  await p.evaluate(() => [...document.querySelectorAll('[data-tab]')].find(b => b.dataset.tab === 'look').click()); await W(p, 300); await shot(p, '14-obchod-vzhled');
+  await p.evaluate(() => document.querySelector('[data-lk="felt:bordeaux"]').click()); await W(p, 400); await shot(p, '14b-vzhled-koupit');
+  await p.evaluate(() => { document.getElementById('lkYes').click(); __poker.buyLook('back', 'noir'); __poker.buyLook('lumi', 'crown'); }); await W(p, 300);
+  await p.evaluate(() => { document.querySelector('#scr-shop').scrollTo(0, 0); }); await W(p, 200); await shot(p, '14c-vzhled-koupeno');
+  await p.evaluate(() => { __nav.go('game'); if (__G.over) __poker.startHand(); });
+  for (let k = 0; k < 20; k++) {
+    await p.waitForFunction(() => (__G.turn === 0 && !__G.dealing && __G.rec) || __G.over, null, { timeout: 60000 });
+    if (!(await p.evaluate(() => __G.over))) break;
+    await p.evaluate(() => { document.getElementById('scrim').click(); __poker.startHand(); });
+  }
+  await W(p, 600); await shot(p, '14d-hra-vzhled');
+  await p.click('#gameHelp'); await W(p, 350); await shot(p, '15-napoveda-stul');
+  await p.evaluate(() => { const b = [...document.querySelectorAll('[data-hv]')].find(x => /D =/.test(x.textContent)); if (b) b.click(); }); await W(p, 250); await shot(p, '15b-napoveda-dealer');
+  await p.evaluate(() => { const b = [...document.querySelectorAll('[data-hv]')].find(x => /Tvoje místo/.test(x.textContent)); if (b) b.click(); }); await W(p, 250); await shot(p, '15c-napoveda-pozice');
+  await p.click('#hvRanks'); await W(p, 400); await shot(p, '15d-poradi-kombinaci');
+  await p.evaluate(() => { document.getElementById('scrim').click(); ['back', 'felt', 'lumi'].forEach((k, i) => __poker.buyLook(k, ['red', 'black', 'classic'][i])); __nav.go('stats'); }); await W(p, 400);
+  await p.evaluate(() => document.querySelector('#scr-stats').scrollTo(0, 1350)); await W(p, 250); await shot(p, '06d-statistiky-dva-grafy');
+  await p.evaluate(() => __poker.openScreenHelp('stats')); await W(p, 350); await shot(p, '15e-napoveda-statistiky');
+  await p.evaluate(() => { document.getElementById('scrim').click(); __nav.go('game'); const w = __poker.wallet, keep = [w.points, w.diamonds]; w.points = 100; w.wheelDay = ''; __poker.needPoints(1000); window.__keep = keep; }); await W(p, 400); await shot(p, '16-malo-bodu');
+  await p.evaluate(() => { document.getElementById('scrim').click(); const w = __poker.wallet; [w.points, w.diamonds] = window.__keep; w.wheelDay = __poker.today(); }); await W(p, 200);
   await p.evaluate(() => __nav.go('settings')); await W(p, 500); await shot(p, '05-nastaveni');
   await p.evaluate(() => __nav.go('drill')); await W(p, 500);
   await p.evaluate(() => [...document.querySelectorAll('#drActions button')].find(b => !b.disabled).click()); await W(p, 500); await shot(p, '07-trenink-situaci');

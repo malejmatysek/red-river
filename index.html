@@ -72,16 +72,18 @@
 <!-- DOMŮ -->
 <section class="screen" id="scr-home" data-title="Domů">
   <div class="page home">
-    <div class="h-top"><img src="icons/icon-192.png" alt=""><span class="t">Red River</span><button class="icon-btn" id="homeMenu" aria-label="Nastavení" data-i18n-aria="ui.settings"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></div>
+    <div class="h-top"><img src="icons/icon-192.png" alt=""><span class="t">Red River</span><button class="icon-btn help-btn" id="homeHelp" aria-label="Nápověda" data-i18n-aria="hv.btn">?</button><button class="icon-btn" id="homeMenu" aria-label="Nastavení" data-i18n-aria="ui.settings"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></div>
     <div class="bank"><div><div class="lbl" id="bankLbl">Bankroll</div><div class="v" id="bankV">–</div></div><div><div class="lbl" data-i18n="ui.accuracy">Přesnost</div><div class="v g" id="accV">–</div></div><div class="s" id="bankS"></div></div>
-    <div class="h-chips"><button class="hchip" id="homeLvlBtn">🎓 <span data-i18n="lv.cur">Úroveň</span> <b id="homeLvl"></b></button><button class="hchip pts" id="homePtsBtn">🪙 <b id="homePts"></b> <span data-i18n="pts.name">Body</span></button></div>
-    <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><img src="icons/lumi.svg" class="lumi" alt=""></div>
+    <div class="h-chips"><button class="hchip" id="homeLvlBtn" aria-label="Úroveň" data-i18n-aria="lv.cur">🎓 <b id="homeLvl"></b></button><button class="hchip pts" id="homePtsBtn" aria-label="Body" data-i18n-aria="pts.name"><span data-ic="pts" data-sz="18"></span><b id="homePts"></b></button><button class="hchip dia" id="homeDiaBtn" aria-label="Diamanty" data-i18n-aria="dia.name"><span data-ic="dia" data-sz="18"></span><b id="homeDia"></b></button></div>
+    <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><span class="lumi" id="homeLumi"></span></div>
     <button class="play" id="playBtn"><span id="playLbl">Hrát</span><small id="playSub"></small><small id="homeBuyin" class="buyin"></small></button>
     <div class="menu">
       <button class="mi wide" id="drillBtn"><span class="ic">🎯</span><div class="mi-t"><b data-i18n="ui.drill">Trénink situací</b><span data-i18n="ui.drillSub">Push/fold, sázka na flopu, river… nekonečně</span></div><span class="new" data-i18n="ui.new">NOVÉ</span></button>
       <button class="mi" id="homeStats"><span class="ic">📊</span><b data-i18n="ui.stats">Statistiky</b><span data-i18n="ui.statsSub">VPIP, PFR, přesnost, zisk</span></button>
       <button class="mi" id="homeLearn"><span class="ic">📘</span><b data-i18n="ui.learn">Učení</b><span data-i18n="ui.learnSub">Úvod, pozice, síla rukou</span></button>
-      <button class="mi wide" id="homeShop"><span class="ic">🪙</span><div class="mi-t"><b data-i18n="pts.shop">Body a obchod</b><span data-i18n="pts.shopSub">Dokup body, denní bonus</span></div></button>
+      <button class="mi" id="homeWheel"><span class="ic wheel-ic"><span data-ic="wheel" data-sz="22"></span><i class="dot-new" id="homeWheelBadge" hidden></i></span><b data-i18n="wh.title">Kolo štěstí</b><span id="homeWheelSub">Zdarma jednou denně</span></button>
+      <button class="mi" id="homeAch"><span class="ic"><span data-ic="dia" data-sz="20"></span></span><b data-i18n="ach.title">Úspěchy</b><span id="homeAchSub"></span></button>
+      <button class="mi wide" id="homeShop"><span class="ic"><span data-ic="pts" data-sz="20"></span></span><div class="mi-t"><b data-i18n="pts.shop">Body a obchod</b><span data-i18n="pts.shopSub">Dokup body, denní bonus</span></div></button>
     </div>
   </div>
 </section>
@@ -91,11 +93,12 @@
 <div class="app" id="app">
   <header class="top">
     <button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button>
-    <button class="pts-badge" id="ptsBadge" aria-label="Body"><span>🪙 <b id="ptsV">0</b></span><small id="ptsTable" hidden></small></button>
+    <button class="pts-badge" id="ptsBadge" aria-label="Body"><span class="bal2"><span data-ic="pts" data-sz="14"></span><b id="ptsV">0</b><span data-ic="dia" data-sz="14"></span><b id="diaV" class="dia">0</b></span><small id="ptsTable" hidden></small></button>
     <label class="switch-pill" id="recPill" title="Doporučené tahy">
-      <span data-i18n="ui.recs">Doporučené tahy</span>
+      <span data-i18n="ui.recsShort">Rady</span>
       <input type="checkbox" id="recToggle"><i></i>
     </label>
+    <button class="icon-btn help-btn" id="gameHelp" aria-label="Nápověda" data-i18n-aria="hv.btn">?</button>
     <button class="icon-btn" id="gameMenu" aria-label="Menu" data-i18n-aria="ui.menu">
       <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
     </button>
@@ -105,7 +108,7 @@
 
   <section class="table">
     <div class="board" id="board"></div>
-    <div class="pot-row"><span class="street" id="street">&nbsp;</span><span class="pot" id="pot">0</span></div>
+    <div class="pot-row"><span class="street" id="street">&nbsp;</span><span class="pot" id="pot" data-g="pot">0</span></div>
   </section>
 
   <section class="odds" id="odds">
@@ -127,7 +130,7 @@
     <div class="hero-cards" id="heroCards"><div class="card lg back slot"></div><div class="card lg back slot"></div></div>
     <div class="hero-panel" id="heroPanel">
       <div class="lbl" id="heroPos">–</div>
-      <div class="avatar me">TY</div>
+      <div class="avatar me">TY<span class="me-lumi" id="meLumi"></span></div>
       <div class="stack" id="heroStack">–</div>
       <div class="hero-last" id="heroLast"></div>
     </div>
@@ -151,6 +154,8 @@
 <section class="screen" id="scr-settings" data-title="Nastavení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.settings">Nastavení</span></div><div class="set" id="setBody"></div></div></section>
 <section class="screen" id="scr-stats" data-title="Statistiky"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.stats">Statistiky</span></div><div class="set" id="statsBody"></div></div></section>
 <section class="screen" id="scr-shop" data-title="Body"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="pts.shop">Body a obchod</span></div><div class="set" id="shopBody"></div></div></section>
+<section class="screen" id="scr-wheel" data-title="Kolo štěstí"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="wh.title">Kolo štěstí</span></div><div class="set" id="wheelBody"></div></div></section>
+<section class="screen" id="scr-ach" data-title="Úspěchy"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ach.title">Úspěchy</span></div><div class="set" id="achBody"></div></div></section>
 <section class="screen" id="scr-learn" data-title="Učení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.learn">Učení</span></div><div class="set" id="learnBody"></div></div></section>
 
 <!-- spodní panely + oznámení -->
@@ -158,6 +163,7 @@
 <div class="sheet" id="sheet" hidden></div>
 <div class="scrim gloss-scrim" id="glossScrim" hidden></div>
 <div class="sheet gloss" id="gloss" hidden></div>
+<div class="hv" id="helpOv" hidden></div>
 <div class="toast" id="toast" hidden><span id="toastTxt"></span><button id="toastBtn"></button></div>
 
 <script src="i18n.js"></script>

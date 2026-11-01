@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.2.0', BUILD = 'v8';
+  const APP_VERSION = '1.3.0', BUILD = 'v9';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -39,7 +39,7 @@
   const SETTINGS0 = { recs: true, odds: true, learn: true, opps: 5, shortStacks: true, v: 3, diff: 1, blinds: 0, depth: 100, randomDepth: false,
     bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true };
   const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 4,
-    br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [] };
+    br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [], histP: [] };
   const fresh = o => JSON.parse(JSON.stringify(o));
   /* úrovně hráče: předvolby (jednotlivá nastavení jde pak změnit) */
   const LEVELS = [
@@ -58,13 +58,32 @@
   if (stats.v !== 3 && stats.v !== 4) { stats.netBB = (stats.net || 0) / 2; delete stats.net; stats.v = 3; }   // starší verze: zisk v žetonech při BB 2
   if (stats.v === 3) { stats = Object.assign(fresh(STATS0), stats, { v: 4 }); save('pt_stats', stats); }
   stats.types = Object.assign({}, stats.types); stats.hist = (stats.hist || []).slice(); stats.bestCards = (stats.bestCards || []).slice();
+  if (!Array.isArray(stats.histP)) stats.histP = stats.hands ? [0, stats.profit] : [];   // v1.3: zisk z rukou zvlášť od zůstatku
   /* body: virtuální měna (žádné skutečné platby, žádný výběr) */
-  const PTS = { start: 1000, daily: 500, refillMin: 200, refillTo: 1000, good: 5, ok: 2, streak: 50, lesson: 100 };
+  const PTS = { start: 1000, daily: 500, refillMin: 200, refillTo: 1000, good: 5, ok: 2, streak: 50, lesson: 100, diaRate: 500, login7: 3 };
   const wallet = load('pt_wallet', { points: PTS.start, lastDaily: '', lessons: {}, v: 1 });
   wallet.lessons = Object.assign({}, wallet.lessons);
+  /* v1.3: diamanty, úspěchy, vzhled, kolo štěstí, série dní, výzvy dne */
+  const dayStr = d => d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  const today = () => dayStr(new Date());
+  const W13 = { diamonds: 0, ach: {}, flags: {}, owned: { back: { red: 1 }, felt: { black: 1 }, lumi: { classic: 1 } }, equip: { back: 'red', felt: 'black', lumi: 'classic' },
+    wheelDay: '', login: { last: '', streak: 0, best: 0 }, day: { d: '', hands: 0, drill: 0, dstreak: 0, done: {} } };
+  for (const k in W13) if (wallet[k] == null || typeof wallet[k] !== typeof W13[k]) wallet[k] = fresh(W13[k]);
+  ['back', 'felt', 'lumi'].forEach(k => { wallet.owned[k] = Object.assign({}, W13.owned[k], wallet.owned[k]); if (!wallet.equip[k]) wallet.equip[k] = W13.equip[k]; });
+  if (!wallet.wheelDay && wallet.lastDaily === today()) wallet.wheelDay = wallet.lastDaily;   // dnešní starý bonus = dnešní otočení
   const saveW = () => { save('pt_wallet', wallet); updatePts(); };
   const fmtPts = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  function updatePts() { const e = document.getElementById('ptsV'); if (e) e.textContent = fmtPts(wallet.points); const h = document.getElementById('homePts'); if (h) h.textContent = fmtPts(wallet.points); }
+  function updatePts() {
+    [['ptsV', wallet.points], ['homePts', wallet.points], ['diaV', wallet.diamonds], ['homeDia', wallet.diamonds]].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.textContent = fmtPts(v); });
+    const wb = document.getElementById('homeWheelBadge'); if (wb) wb.hidden = wallet.wheelDay === today();
+    const ws = document.getElementById('homeWheelSub'); if (ws && typeof I18N !== 'undefined') ws.textContent = wallet.wheelDay === today() ? I18N.t('wh.next', { t: untilMidnight(true) }) : I18N.t('ui.wheelSub');
+  }
+  function untilMidnight(short) {
+    const n = new Date(), m = new Date(n.getFullYear(), n.getMonth(), n.getDate() + 1), s = Math.max(0, Math.floor((m - n) / 1000));
+    const h = Math.floor(s / 3600), mi = Math.floor(s / 60) % 60, se = s % 60, z = x => String(x).padStart(2, '0');
+    return short ? `${h}:${z(mi)}` : `${h}:${z(mi)}:${z(se)}`;
+  }
+  function addDia(n, msg) { if (!n) return; wallet.diamonds = Math.max(0, wallet.diamonds + n); saveW(); if (msg && !FAST()) toast(msg); }
   function addPts(n, msg) { if (!n) return; wallet.points = Math.max(0, Math.round(wallet.points + n)); saveW(); if (msg && !FAST()) toast(msg); }
   let drillSt = load('pt_drill', DRILL0);
   let session = load('pt_session', { key: '', hero: 0, bots: [], hands: 0, netBB: 0, dealer: -1 });
@@ -100,7 +119,9 @@
       fold: () => tone(260, 0.14, 'sine', 0.04, 0, 150),
       turn: () => { tone(880, 0.12, 'sine', 0.045); tone(1320, 0.18, 'sine', 0.035, 0.09); },
       win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.26, 'triangle', 0.05, i * 0.085)),
-      tap: () => tone(1400, 0.03, 'sine', 0.015), unlock: () => A()
+      tap: () => tone(1400, 0.03, 'sine', 0.015), unlock: () => A(),
+      tick: () => tone(2300, 0.022, 'square', 0.018),
+      jackpot: () => { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => tone(f, 0.34, 'triangle', 0.055, i * 0.09)); tone(2093, 0.6, 'sine', 0.04, 0.56); }
     };
   })();
   const vib = p => { if (settings.vibrate && navigator.vibrate && !FAST()) try { navigator.vibrate(p); } catch (e) {} };
@@ -115,7 +136,7 @@
     a.classList.remove('enter-f', 'enter-b', 'leaving'); a.classList.add('active');
     if (!noAnim() && prev) { void a.offsetWidth; a.classList.add(dir === 'back' ? 'enter-b' : 'enter-f'); }
     a.scrollTop = 0;
-    nav.cur = id; onShow(id, prev);
+    nav.cur = id; if ($('helpOv')) $('helpOv').hidden = true; onShow(id, prev);
   }
   nav.go = id => { try { history.pushState({ s: id }, ''); } catch (e) {} show(id, 'fwd'); };
   nav.back = () => { if (history.state && history.state.s && history.state.s !== 'home') history.back(); else show('home', 'back'); };
@@ -128,6 +149,9 @@
     if (id === 'stats') renderStats();
     if (id === 'learn') renderLearn();
     if (id === 'shop') renderShop();
+    if (id === 'wheel') renderWheel();
+    if (id === 'ach') renderAch();
+    if (prev === 'wheel' && id !== 'wheel') clearInterval(wheelTimer);
     if (id === 'drill') { if (!D.spot) drillNew(); else renderDrill(); }
     if (id === 'game') {
       render();
@@ -471,13 +495,20 @@
     }
     if (!settings.bankroll) { wallet.points += net; saveW(); }
     stats.hist.push(Math.round(wallet.points + (settings.bankroll ? h0.stack : 0)));
-    if (stats.hist.length > 400) stats.hist = stats.hist.filter((_, i) => i % 2 === 0);
+    if (!stats.histP.length) stats.histP.push(stats.profit - net);
+    stats.histP.push(stats.profit);
+    const thin = a => a.length > 400 ? a.filter((_, i, x) => i % 2 === 0 || i === x.length - 1) : a;
+    stats.hist = thin(stats.hist); stats.histP = thin(stats.histP);
+    if (heroWon && h0.allIn) wallet.flags.allinWin = 1;
+    if (heroWon && pot() >= 50 * BB) wallet.flags.bigPot = 1;
+    dayTick(); wallet.day.hands++; save('pt_wallet', wallet);
     save('pt_stats', stats);
     session.hands++; session.netBB = Math.round((session.netBB + net / BB) * 10) / 10;
     session.hero = hero().stack; session.dealer = G.dealer; session.bank = settings.bankroll;
     session.bots = G.players.slice(1).map(p => ({ name: p.name, color: p.color, style: p.style, stack: p.stack }));
     save('pt_session', session);
     if (net > 0) { SFX.win(); vib([20, 40, 30]); }
+    checkAch();
     render();
     const shown = G.players.filter(p => p.show && !p.hero).length;
     if (!expert()) setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : (1000 + shown * 450) * spd());
@@ -521,9 +552,9 @@
     const box = $('opps'); box.textContent = '';
     oppEls = G.players.slice(1).map(() => {
       const o = el('div', 'opp'), av = el('div', 'avatar'), ini = el('span'), dl = el('span', 'dealer');
-      dl.textContent = 'D'; av.append(ini, dl);
+      dl.textContent = 'D'; dl.dataset.g = 'dealer'; av.append(ini, dl);
       const nm = el('div', 'name'), nmT = el('span'), ps = el('span', 'pos'); nm.append(nmT, document.createTextNode(' · '), ps);
-      const stk = el('div', 'stk'), stkT = el('span'), ai = el('em'); ai.textContent = 'all-in'; stk.append(stkT, ai);
+      const stk = el('div', 'stk'), stkT = el('span'); stk.dataset.g = 'stack'; const ai = el('em'); ai.textContent = 'all-in'; stk.append(stkT, ai);
       const chip = el('div', 'chip'), mini = el('div', 'mini');
       const m = [el('div', 'card sm back'), el('div', 'card sm back')]; m.forEach(x => { x.dataset.want = x.dataset.k = 'b'; mini.appendChild(x); });
       o.append(av, nm, stk, chip, mini); box.appendChild(o);
@@ -549,7 +580,7 @@
       e.dl.style.visibility = G.dealer === seat ? '' : 'hidden';
       const pc = posLabel(seat); if (e.ps.dataset.g !== 'pos.' + pc || e.ps.title !== t('ps.' + pc)) { e.ps.dataset.g = 'pos.' + pc; e.ps.title = t('ps.' + pc); } setText(e.ps, pc); setText(e.stkT, p.stack);
       e.ai.style.display = p.allIn && !G.over ? '' : 'none';
-      setText(e.chip, p.last || '-'); e.chip.classList.toggle('empty', !p.last);
+      setText(e.chip, p.last || '-'); e.chip.classList.toggle('empty', !p.last); { const cg = chipTerm(p.last || ''); if ((e.chip.dataset.g || '') !== cg) { if (cg) e.chip.dataset.g = cg; else delete e.chip.dataset.g; } }
       e.mini.classList.toggle('gone', p.folded && !p.show);
       const ord = G.players.slice(1, seat).filter(q => q.show).length;   // showdown: soupeři se otáčí postupně
       e.m.forEach((m, k) => { setCard(m, p.show ? p.cards[k] : null, 'sm', { flip: true, delay: p.show ? (ord * 420 + k * 140) * spd() : k * 80 }); m.style.visibility = p.seen > k ? '' : 'hidden'; });
@@ -565,11 +596,12 @@
     $('heroPanel').classList.toggle('turn', G.turn === 0 && !G.over && !G.dealing);
     setText($('heroStack'), h.stack);
     const hp = posLabel(0), hbb = Math.round((h.stack + h.bet) / BB * 10) / 10;
-    setHTML($('heroPos'), settings.adv ? `${gl('pos.' + hp, hp)}${G.dealer === 0 ? ' · D' : ''} · ${gl('bb', hbb + ' BB')}` : `${gl('pos.' + hp, t('ps.' + hp))} <small>${hp}</small><br>${gl('bb', bbWords(hbb))}`);
+    const dmk = G.dealer === 0 ? ` <span class="dmini" id="heroDealer" data-g="dealer">D</span>` : '';
+    setHTML($('heroPos'), settings.adv ? `${gl('pos.' + hp, hp)}${dmk} · ${gl('bb', hbb + ' BB')}` : `${gl('pos.' + hp, t('ps.' + hp))} <small>${hp}</small>${dmk}<br>${gl('bb', bbWords(hbb))}`);
     setText($('heroLast'), h.last || '');
     // šance
     $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() ? 'none' : '';
-    $('recPill').style.display = expert() ? 'none' : ''; updatePts();
+    $('recPill').style.display = expert() ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert()); updatePts();
     const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll; setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded && G.revealed) {
@@ -665,7 +697,9 @@
     openSheet(`<h2>Red River</h2><div class="menu-list">
       <button class="mrow" data-m="settings">⚙️<span>${t('m.settings')}</span></button>
       <button class="mrow" data-m="stats">📊<span>${t('m.stats')}</span></button>
-      <button class="mrow" data-m="shop">🪙<span>${t('pts.shop')}</span></button>
+      <button class="mrow" data-m="shop">${ICON.pts(20)}<span>${t('pts.shop')}</span></button>
+      <button class="mrow" data-m="wheel">${wheelMini(20)}<span>${t('wh.title')}</span></button>
+      <button class="mrow" data-m="ach">${ICON.dia(20)}<span>${t('ach.title')}</span></button>
       ${G.over && G.handNo ? `<button class="mrow" data-m="summary">🧾<span>${t('m.summary')}</span></button>` : ''}
       <button class="mrow" data-m="learn">📘<span>${t('m.learn')}</span></button>
       <button class="mrow" data-m="home">🏠<span>${t('m.home')}</span></button></div>`);
@@ -675,13 +709,23 @@
   /* málo bodů → nabídka, jak je získat */
   function needPoints(need) {
     G.dealing = false; render();
+    const wOk = wallet.wheelDay !== today(), exOk = wallet.diamonds > 0 && wallet.points < START, rfOk = wallet.points < PTS.refillMin;
     openSheet(`<h2>${t('pts.need')}</h2><div class="sub">${t('pts.needTxt', { n: fmtPts(need), h: fmtPts(wallet.points) })}</div>
-      <button class="btn primary wide" id="npShop">${t('pts.toShop')}</button>`);
+      <div class="np-opts">
+        <button class="btn wide ${wOk ? 'primary' : ''}" id="npWheel" ${wOk ? '' : 'disabled'}>${wheelMini()} ${wOk ? t('wh.go') : t('wh.next', { t: untilMidnight(true) })}</button>
+        ${exOk ? `<button class="btn wide" id="npEx">${icx(t('dia.exBtn', { n: fmtPts(PTS.diaRate) }))} ${ICON.pts(15)}</button>` : ''}
+        ${rfOk ? `<button class="btn wide" id="npRefill">${t('pts.refill')} → ${fmtPts(PTS.refillTo)}</button>` : ''}
+        <button class="btn wide" id="npShop">${t('pts.toShop')}</button></div>`);
     $('npShop').onclick = () => { closeSheet(); nav.go('shop'); };
+    if (wOk) $('npWheel').onclick = () => { closeSheet(); nav.go('wheel'); };
+    if (exOk) $('npEx').onclick = () => { exchangeDia(); closeSheet(); if (wallet.points >= need) startHand(); else needPoints(need); };
+    if (rfOk) $('npRefill').onclick = () => { refill(); closeSheet(); };
   }
   $('ptsBadge').onclick = () => nav.go('shop');
   $('recToggle').onchange = e => { settings.recs = e.target.checked; save('pt_settings', settings); lastActions = ''; render(); };
   $('gameMenu').onclick = showGameMenu;
+  $('gameHelp').onclick = openHelpOverlay;
+  $('homeHelp').onclick = () => openScreenHelp('home');
   document.addEventListener('click', e => { const x = e.target.closest('.rec-why,.feedback .txt'); if (x) x.classList.toggle('open'); });
 
   /* ---------- domovská obrazovka ---------- */
@@ -696,6 +740,7 @@
     setText($('playLbl'), G.handNo ? t('h.continue') : t('h.play'));
     setText($('playSub'), t('h.playSub', { n: settings.opps + 1, sb: SB, bb: BB, d: plain('[[bb:' + settings.depth + ']]'), diff: t('diff.' + settings.diff).toLowerCase() }));
     setText($('homeLvl'), t('lv.' + settings.level)); updatePts();
+    setText($('homeAchSub'), t('ui.achSub', { n: Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length, m: ACH.length }));
     setText($('homeBuyin'), settings.bankroll ? t('pts.buyin', { n: fmtPts(START) }) : '');
   }
   const fmtNum = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
@@ -707,6 +752,9 @@
   $('homeLvlBtn').onclick = () => nav.go('settings');
   $('homePtsBtn').onclick = () => nav.go('shop');
   $('homeShop').onclick = () => nav.go('shop');
+  $('homeDiaBtn').onclick = () => nav.go('ach');
+  $('homeWheel').onclick = () => { SFX.unlock(); nav.go('wheel'); };
+  $('homeAch').onclick = () => nav.go('ach');
 
   /* ---------- nastavení ---------- */
   const tg = (k, title, sub) => `<div class="row"><div>${title}${sub ? `<small>${sub}</small>` : ''}</div><label class="tg"><input type="checkbox" data-k="${k}" ${settings[k] ? 'checked' : ''}><i></i></label></div>`;
@@ -774,14 +822,16 @@
     return tight ? (aggr ? 'tag' : 'rock') : (aggr ? 'lag' : 'station');
   }
   const TYPE_ICON = { tag: '🦈', rock: '🪨', lag: '🔥', station: '📞' };
-  function lineChart(pts) {
+  function lineChart(pts, signed, cls) {
     if (pts.length < 2) return `<div class="sub">${t('stx.noData')}</div>`;
-    const W = 320, H = 120, P = 6, mn = Math.min(...pts), mx = Math.max(...pts), rg = mx - mn || 1;
+    const W = 320, H = 120, P = 6, mn = Math.min(...pts, signed ? 0 : Infinity), mx = Math.max(...pts, signed ? 0 : -Infinity), rg = mx - mn || 1;
+    const sg = v => signed ? (v > 0 ? '+' : v < 0 ? '−' : '') + fmtPts(Math.abs(v)) : fmtPts(v);
+    const zy = H - P - (0 - mn) / rg * (H - 2 * P), zero = signed ? `<line x1="0" x2="${W}" y1="${zy.toFixed(1)}" y2="${zy.toFixed(1)}" class="zero"/>` : '';
     const xy = pts.map((v, i) => [P + i / (pts.length - 1) * (W - 2 * P), H - P - (v - mn) / rg * (H - 2 * P)]);
     const d = xy.map(([x, y], i) => (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1)).join(' ');
     const last = xy[xy.length - 1];
-    return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"><path d="${d} L${last[0].toFixed(1)} ${H} L${P} ${H} Z" class="area"/><path d="${d}" class="ln"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" class="pt"/></svg>
-      <div class="chart-ax"><span>${fmtPts(mn)}</span><span>${fmtPts(pts[pts.length - 1])}</span><span>${fmtPts(mx)}</span></div>`;
+    return `<svg class="chart ${cls || ''}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">${zero}<path d="${d} L${last[0].toFixed(1)} ${signed ? zy.toFixed(1) : H} L${P} ${signed ? zy.toFixed(1) : H} Z" class="area"/><path d="${d}" class="ln"/><circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" class="pt"/></svg>
+      <div class="chart-ax"><span>${sg(mn)}</span><b class="${signed ? (pts[pts.length - 1] >= 0 ? 'g' : 'r') : ''}" data-end="${pts[pts.length - 1]}">${sg(pts[pts.length - 1])}</b><span>${sg(mx)}</span></div>`;
   }
   function barChart(types) {
     const tot = Object.values(types).reduce((a, b) => a + b, 0);
@@ -799,15 +849,16 @@
       ['af', af], ['wtsd', pc(s.sd, s.sawFlop)], ['wsd', pc(s.sdWon, s.sd)], ['allin', s.allins], ['bigpot', s.bigPot ? fmtPts(s.bigPot) : '–'],
       ['profit', `<span class="${s.profit >= 0 ? 'g' : 'r'}">${s.profit > 0 ? '+' : ''}${fmtPts(s.profit)}</span>`], ['agree', pc(s.recAgree, s.recN)], ['acc', pc(s.good + s.ok, s.decisions)]];
     const ty = playerType(s), d = drillSt, dot = c => `<span class="gdot g ${c}"></span>`;
-    const typeHTML = ty ? `<div class="ptype"><div class="pt-ic"><img src="icons/lumi.svg" alt=""><span>${TYPE_ICON[ty]}</span></div><div><b>${t('pt.' + ty)}</b>${settings.adv ? ` <small>${t('pt.' + ty + '.a')}</small>` : ''}<p>${t('pt.' + ty + '.d')}</p></div></div>
+    const typeHTML = ty ? `<div class="ptype"><div class="pt-ic">${lumiSVG(wallet.equip.lumi)}<span>${TYPE_ICON[ty]}</span></div><div><b>${t('pt.' + ty)}</b>${settings.adv ? ` <small>${t('pt.' + ty + '.a')}</small>` : ''}<p>${t('pt.' + ty + '.d')}</p></div></div>
         <h3>${t('stx.tips')}</h3><div class="grp tips">${[1, 2, 3].map(i => `<div class="row"><span>${rich(t('tip.' + ty + '.' + i))}</span></div>`).join('')}</div>`
-      : `<div class="ptype more"><div class="pt-ic"><img src="icons/lumi.svg" alt=""><span>🃏</span></div><div><b>${t('stx.more')}</b><p>${t('stx.moreTxt', { n: MIN_TYPE, k: MIN_TYPE - s.hands })}</p><div class="prog"><i style="width:${Math.min(100, s.hands / MIN_TYPE * 100)}%"></i></div></div></div>`;
+      : `<div class="ptype more"><div class="pt-ic">${lumiSVG(wallet.equip.lumi)}<span>🃏</span></div><div><b>${t('stx.more')}</b><p>${t('stx.moreTxt', { n: MIN_TYPE, k: MIN_TYPE - s.hands })}</p><div class="prog"><i style="width:${Math.min(100, s.hands / MIN_TYPE * 100)}%"></i></div></div></div>`;
     const best = s.best >= 0 && s.bestCards.length ? `<div class="row"><span>${PE.handName(s.bestCards)}</span><span class="ex">${s.bestCards.map(c => cardHTML(c, 'sm')).join('')}</span></div>` : `<div class="row"><span class="muted">${t('stx.noData')}</span></div>`;
     $('statsBody').innerHTML = `<h3>${t('stx.type')}</h3>${typeHTML}
       <h3>${t('stx.overview')}</h3><div class="sub">${t('stx.tap')}</div>
       <div class="grid stx">${M.map(([k, v]) => `<button class="tile" data-sx="${k}"><div class="lbl">${settings.adv ? t('sx.' + k + '.a') : t('sx.' + k)}</div><div class="v">${v}</div></button>`).join('')}</div>
       <h3>${t('stx.best')}</h3><div class="grp">${best}</div>
-      <h3>${t('stx.chartPts')}</h3><div class="grp chartbox">${lineChart(s.hist)}</div>
+      <h3>${t('stx.chartPts')}</h3><div class="grp chartbox"><div class="chart-sub">${t('stx.chartPtsSub')}</div>${lineChart(s.histP, true)}</div>
+      <h3>${t('stx.chartBal')}</h3><div class="grp chartbox"><div class="chart-sub">${t('stx.chartBalSub')}</div>${lineChart(s.hist, false, 'bal')}</div>
       <h3>${t('stx.chartHands')}</h3><div class="grp chartbox">${barChart(s.types)}</div>
       <h3>${t('stat.decisions', { n: s.decisions })}</h3><div class="grp">
         <div class="row"><span>${dot('good')} ${t('g.good')}</span><span>${s.good}</span></div>
@@ -960,7 +1011,8 @@
       if (drillSt.streak % 5 === 0) addPts(PTS.streak, t('pts.streak', { n: drillSt.streak, p: PTS.streak })); }
     else { drillSt.streak = 0; SFX.fold(); vib([30, 40, 30]); }
     save('pt_drill', drillSt);
-    renderDrill();
+    dayTick(); wallet.day.drill++; wallet.day.dstreak = Math.max(wallet.day.dstreak, drillSt.streak); save('pt_wallet', wallet);
+    renderDrill(); checkAch();
   }
 
   /* ---------- úvod (onboarding) ---------- */
@@ -990,26 +1042,277 @@
     z.addEventListener('touchend', e => { if (x0 == null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
       if (dx < -50 && obStep < OB_N - 1) { obStep++; obRender(1); } else if (dx > 50 && obStep > 0) { obStep--; obRender(-1); } }); })();
 
+  /* ---------- v1.3: ikony měn, Lumi varianty, vzhled ---------- */
+  let uid = 0;
+  const LUMI_C = [[-40, -10, 44], [14, -24, 50], [50, 14, 40], [-30, 28, 38], [10, 30, 42], [0, 4, 48]];
+  const blob = (fill, grow) => `<g fill="${fill}">${LUMI_C.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r + (grow || 0)}"/>`).join('')}</g>`;
+  const eyes = (fill, sx) => [[12, -20], [38, -13]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="${7.5 * (sx || 1)}" ry="13.5" transform="rotate(-14 ${x} ${y})" fill="${fill}"/>`).join('');
+  function lumiSVG(v, cls) {
+    const id = 'lh' + (++uid);
+    let body;
+    if (v === 'ghost') body = blob('#fff') + eyes('#111');
+    else if (v === 'noir') body = blob('#FF2D4A', 5) + blob('#111') + eyes('#FF2D4A');
+    else if (v === 'striped') body = `<defs><pattern id="${id}" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="16" height="16" fill="#d63a3a"/><rect width="4" height="16" fill="rgba(255,255,255,.22)"/></pattern></defs>` + blob(`url(#${id})`) + eyes('#fff');
+    else if (v === 'shades') body = blob('#FF2D4A') + eyes('#fff') + `<g transform="rotate(-14 25 -16)" fill="#111"><rect x="-2" y="-30" width="26" height="22" rx="7"/><rect x="28" y="-30" width="26" height="22" rx="7"/><rect x="20" y="-24" width="12" height="4"/><rect x="-24" y="-25" width="24" height="4" rx="2"/></g>`;
+    else if (v === 'crown') body = blob('#FF2D4A') + eyes('#fff') + `<path d="M-14 -66 L-22 -100 L-2 -82 L14 -108 L30 -82 L50 -100 L42 -66 Z" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/>`;
+    else body = blob('#FF2D4A') + eyes('#fff');
+    return `<svg class="lumi-svg ${cls || ''}" viewBox="-96 -112 196 190" aria-hidden="true">${body}</svg>`;
+  }
+  /* body = Lumi žeton, diamant = červený Lumi krystal (inline SVG ve stylu loga) */
+  const ICON = {
+    pts: (s = 16) => `<svg class="cur-ic" viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="#FF2D4A"/>${[0, 60, 120, 180, 240, 300].map(a => `<rect x="14.2" y="1" width="3.6" height="5" rx="1" fill="#fff" transform="rotate(${a} 16 16)"/>`).join('')}<circle cx="16" cy="16" r="9.5" fill="#d42039"/><ellipse cx="13.6" cy="15" rx="1.7" ry="3" fill="#fff" transform="rotate(-14 13.6 15)"/><ellipse cx="19.2" cy="16" rx="1.7" ry="3" fill="#fff" transform="rotate(-14 19.2 16)"/></svg>`,
+    dia: (s = 16) => `<svg class="cur-ic" viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true"><path d="M9 4 H23 L30 12 L16 30 L2 12 Z" fill="#FF2D4A"/><path d="M2 12 H30 M9 4 L12 12 L16 30 M23 4 L20 12 L16 30 M12 12 L16 4 L20 12" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.1" stroke-linejoin="round"/><path d="M9 4 H23 L30 12 H2 Z" fill="rgba(255,255,255,.14)"/><ellipse cx="13.4" cy="16.5" rx="1.6" ry="2.8" fill="#fff" transform="rotate(-14 13.4 16.5)"/><ellipse cx="18.8" cy="17.3" rx="1.6" ry="2.8" fill="#fff" transform="rotate(-14 18.8 17.3)"/></svg>`
+  };
+  const icx = str => String(str).replace(/💎/g, ICON.dia(14)).replace(/🪙/g, ICON.pts(14));
+  const wheelMini = (s = 18) => `<svg class="cur-ic" viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true">${[0, 1, 2, 3, 4, 5, 6, 7].map(i => { const a0 = (i * 45 - 90) * Math.PI / 180, a1 = ((i + 1) * 45 - 90) * Math.PI / 180;
+    return `<path d="M16 17 L${(16 + 14 * Math.cos(a0)).toFixed(2)} ${(17 + 14 * Math.sin(a0)).toFixed(2)} A14 14 0 0 1 ${(16 + 14 * Math.cos(a1)).toFixed(2)} ${(17 + 14 * Math.sin(a1)).toFixed(2)} Z" fill="${i % 2 ? '#111' : '#FF2D4A'}"/>`; }).join('')}<circle cx="16" cy="17" r="14" fill="none" stroke="#fff" stroke-width="1.4"/><circle cx="16" cy="17" r="3.2" fill="#fff"/><path d="M12.5 0.5 H19.5 L16 6 Z" fill="#fff"/></svg>`;
+  ICON.wheel = wheelMini;
+  const LOOKS = {
+    back: [['red', 0], ['noir', 3], ['dots', 3], ['stripes', 5], ['check', 8]],
+    felt: [['black', 0], ['bordeaux', 4], ['graphite', 4], ['forest', 6], ['midnight', 6]],
+    lumi: [['classic', 0], ['ghost', 4], ['striped', 5], ['noir', 6], ['shades', 8], ['crown', 12]]
+  };
+  function applyLook() {
+    const e = wallet.equip, B = document.body;
+    B.dataset.cback = e.back; B.dataset.cfelt = e.felt;
+    const hl = $('homeLumi'); if (hl) hl.innerHTML = lumiSVG(e.lumi);
+    const ml = $('meLumi'); if (ml) ml.innerHTML = lumiSVG(e.lumi);
+  }
+  function lookPreview(k, id) {
+    if (k === 'back') return `<div class="lk-prev"><div class="card back lk-card" data-back-prev="${id}"></div></div>`;
+    if (k === 'felt') return `<div class="lk-prev"><div class="lk-felt" data-felt-prev="${id}"><div class="card sm"><span class="rk">A</span><span class="st">♠</span></div><div class="card sm red"><span class="rk">K</span><span class="st">♥</span></div></div></div>`;
+    return `<div class="lk-prev">${lumiSVG(id)}</div>`;
+  }
+  function buyLook(k, id, direct) {
+    const it = LOOKS[k].find(x => x[0] === id); if (!it) return false;
+    const name = t(`lk.${k}.${id}`);
+    if (wallet.owned[k][id]) { wallet.equip[k] = id; saveW(); applyLook(); SFX.tap(); if (nav.cur === 'shop') renderShop(); return true; }
+    if (wallet.diamonds < it[1]) { toast(t('lk.lack', { n: it[1] - wallet.diamonds })); SFX.fold(); return false; }
+    const doBuy = () => { wallet.diamonds -= it[1]; wallet.owned[k][id] = 1; wallet.equip[k] = id; saveW(); applyLook(); SFX.win(); vib([15, 30, 15]); toast(t('lk.bought', { n: name })); if (nav.cur === 'shop') renderShop(); };
+    if (direct) { doBuy(); return true; }
+    openSheet(`<h2>${t('lk.buyQ', { n: name })}</h2><div class="lk-big">${lookPreview(k, id)}</div>
+      <button class="btn primary wide" id="lkYes">${icx(t('lk.buy', { n: it[1] }))}</button><button class="btn wide" id="lkNo" style="margin-top:8px">${t('lk.cancel')}</button>`);
+    $('lkYes').onclick = () => { closeSheet(); doBuy(); }; $('lkNo').onclick = closeSheet;
+    return true;
+  }
+
+  /* ---------- úspěchy, výzvy dne, série dní ---------- */
+  const catOf = sc => (sc >= 0 ? PE.handCategory(sc) : -1);
+  const ACH = [
+    ['hand1', 1, 1, () => stats.hands], ['win1', 1, 1, () => stats.won], ['good10', 10, 2, () => stats.good], ['type30', 30, 2, () => stats.hands],
+    ['sd10', 10, 3, () => stats.sdWon], ['hands100', 100, 3, () => stats.hands], ['allin', 1, 2, () => wallet.flags.allinWin ? 1 : 0], ['bigpot', 1, 3, () => wallet.flags.bigPot ? 1 : 0],
+    ['straight', 1, 2, () => catOf(stats.best) >= 4 ? 1 : 0], ['fullhouse', 1, 4, () => catOf(stats.best) >= 6 ? 1 : 0], ['good100', 100, 5, () => stats.good], ['hands500', 500, 8, () => stats.hands],
+    ['drill25', 25, 2, () => drillSt.n], ['streak10', 10, 3, () => drillSt.best], ['lessons', 4, 2, () => LESSONS.filter(l => wallet.lessons[l[0]]).length], ['login7', 7, 5, () => wallet.login.best]
+  ].map(([id, goal, dia, cur]) => ({ id, goal, dia, cur }));
+  const CHAL = [['hands', 10, 1], ['drill', 10, 1], ['dstreak', 5, 2]];
+  function dayTick() { if (wallet.day.d !== today()) wallet.day = { d: today(), hands: 0, drill: 0, dstreak: 0, done: {} }; }
+  function loginTick() {
+    const d = today(), L = wallet.login; if (L.last === d) return;
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    L.streak = L.last === dayStr(y) ? L.streak + 1 : 1; L.last = d; L.best = Math.max(L.best || 0, L.streak);
+    dayTick(); save('pt_wallet', wallet);
+    if (L.streak % 7 === 0) addDia(PTS.login7, t('dia.login7', { n: PTS.login7 }));
+  }
+  function checkAch(quiet) {
+    const msgs = []; let gain = 0;
+    ACH.forEach(a => { if (!wallet.ach[a.id] && a.cur() >= a.goal) { wallet.ach[a.id] = today(); gain += a.dia; msgs.push(t('ach.got', { n: t('a.' + a.id), d: a.dia })); } });
+    dayTick();
+    CHAL.forEach(([k, goal, dia]) => { if (!wallet.day.done[k] && wallet.day[k] >= goal) { wallet.day.done[k] = 1; gain += dia; msgs.push(t('ch.got', { n: t('ch.' + k), d: dia })); } });
+    if (!gain) return 0;
+    wallet.diamonds += gain; saveW();
+    if (!quiet || msgs.length) { if (!FAST()) { toast(msgs.length > 1 ? msgs[0] + ` (+${msgs.length - 1})` : msgs[0]); SFX.win(); vib([20, 40, 20]); } }
+    if (nav.cur === 'ach') renderAch(); if (nav.cur === 'home') renderHome();
+    return gain;
+  }
+  function renderAch() {
+    dayTick();
+    const done = ACH.filter(a => wallet.ach[a.id]).length, L = wallet.login;
+    const bar = (c, g) => `<div class="prog"><i style="width:${Math.min(100, c / g * 100)}%"></i></div>`;
+    $('achBody').innerHTML = `<div class="pts-hero dia-hero"><div class="lbl">${t('dia.name')}</div><div class="v">${ICON.dia(30)} <span id="achDia">${fmtPts(wallet.diamonds)}</span></div><div class="sub">${t('dia.what')}</div></div>
+      <h3>${t('ach.streak')}</h3><div class="grp"><div class="row col"><div class="streak7">${[1, 2, 3, 4, 5, 6, 7].map(i => `<span class="${i <= ((L.streak - 1) % 7) + 1 ? 'on' : ''}">${i === 7 ? ICON.dia(14) : i}</span>`).join('')}</div><small>${icx(t('ach.streakTxt', { n: L.streak, d: PTS.login7 }))}</small></div></div>
+      <h3>${t('ach.chal')} <small class="muted h3s">· ${t('ach.chalSub')}</small></h3><div class="grp">${CHAL.map(([k, g, d]) => { const c = Math.min(g, wallet.day[k] || 0), ok = wallet.day.done[k];
+        return `<div class="row ach ${ok ? 'done' : ''}" data-ch="${k}"><div class="ach-t"><b>${t('ch.' + k)}</b>${bar(c, g)}<small>${c} / ${g}</small></div><span class="ach-r">${ok ? '✓' : '+' + d} ${ICON.dia(14)}</span></div>`; }).join('')}</div>
+      <h3>${t('ach.list')} <small class="muted h3s">· ${t('ach.sub', { n: done, m: ACH.length })}</small></h3><div class="grp">${ACH.map(a => { const c = Math.min(a.goal, a.cur()), ok = !!wallet.ach[a.id];
+        return `<div class="row ach ${ok ? 'done' : ''}" data-ach="${a.id}"><span class="ach-ic">${ok ? ICON.dia(22) : '<i></i>'}</span><div class="ach-t"><b>${t('a.' + a.id)}</b><small>${t('a.' + a.id + '.d')}</small>${ok ? '' : bar(c, a.goal)}</div><span class="ach-r">${ok ? t('ach.done') : '+' + a.dia + ' ' + ICON.dia(14)}</span></div>`; }).join('')}</div>`;
+  }
+
+  /* ---------- kolo štěstí (1× za kalendářní den, místní čas) ---------- */
+  const SEG = [{ p: 100, w: 22 }, { p: 500, w: 12 }, { p: 200, w: 20 }, { p: 1000, w: 6 }, { p: 300, w: 16 }, { j: 5, w: 1.5 }, { p: 150, w: 20 }, { p: 2000, w: 2.5 }];
+  const SEG_W = SEG.reduce((a, b) => a + b.w, 0);
+  let wheelRot = 0, wheelBusy = false, wheelTimer = 0, wheelLast = null;
+  function pickSeg() {
+    let r; try { const u = new Uint32Array(1); crypto.getRandomValues(u); r = u[0] / 4294967296; } catch (e) { r = Math.random(); }
+    r *= SEG_W; for (let i = 0; i < SEG.length; i++) { if ((r -= SEG[i].w) < 0) return i; } return 0;
+  }
+  function wheelSVG() {
+    const R = 140, C = 150, pt = (a, r) => { const x = (a - 90) * Math.PI / 180; return [(C + r * Math.cos(x)).toFixed(2), (C + r * Math.sin(x)).toFixed(2)]; };
+    const segs = SEG.map((s, i) => { const a0 = i * 45, a1 = a0 + 45, [x0, y0] = pt(a0, R), [x1, y1] = pt(a1, R), jack = !!s.j;
+      const fill = jack ? '#fff' : i % 2 ? '#111' : '#FF2D4A', col = jack ? '#FF2D4A' : '#fff';
+      const lab = jack ? `<g transform="translate(150 ${C - R + 34}) scale(1.05)"><g transform="translate(-13 -13) scale(.82)">${ICON.dia(32).replace(/<\/?svg[^>]*>/g, '')}</g></g><text x="150" y="${C - R + 62}" fill="${col}" class="wl sm">${t('wh.jackLbl')}</text>`
+        : `<text x="150" y="${C - R + 40}" fill="${col}" class="wl">${fmtPts(s.p)}</text><g transform="translate(141 ${C - R + 50}) scale(.56)">${ICON.pts(32).replace(/<\/?svg[^>]*>/g, '')}</g>`;
+      return `<path d="M${C} ${C} L${x0} ${y0} A${R} ${R} 0 0 1 ${x1} ${y1} Z" fill="${fill}" stroke="#000" stroke-width="1.5"/><g transform="rotate(${a0 + 22.5} 150 150)">${lab}</g>`; }).join('');
+    const dots = Array.from({ length: 24 }, (_, i) => { const [x, y] = pt(i * 15, R + 5); return `<circle cx="${x}" cy="${y}" r="2.2" class="wdot ${i % 2 ? 'b' : ''}"/>`; }).join('');
+    return `<div class="wheel-wrap"><svg class="wheel-ptr" viewBox="0 0 30 34" aria-hidden="true"><path d="M3 2 H27 L15 32 Z" fill="#fff" stroke="#000" stroke-width="2" stroke-linejoin="round"/></svg>
+      <svg class="wheel" viewBox="0 0 300 300" role="img" aria-label="${t('wh.title')}"><circle cx="150" cy="150" r="149" fill="#16151a"/><g id="wheelRot" style="transform:rotate(${wheelRot}deg);transform-origin:150px 150px">${segs}</g>${dots}<circle cx="150" cy="150" r="34" fill="#000" stroke="#2e2d35" stroke-width="3"/></svg>
+      <div class="wheel-hub">${lumiSVG(wallet.equip.lumi)}</div></div>`;
+  }
+  function renderWheel() {
+    clearInterval(wheelTimer);
+    const used = wallet.wheelDay === today();
+    const res = wheelLast ? (wheelLast.j ? t('wh.jack', { n: wheelLast.j }) : t('wh.won', { n: fmtPts(wheelLast.p) })) : '';
+    $('wheelBody').innerHTML = `<div class="bal-row"><span>${ICON.pts(18)} <b id="whPts">${fmtPts(wallet.points)}</b></span><span>${ICON.dia(18)} <b id="whDia">${fmtPts(wallet.diamonds)}</b></span></div>
+      <div class="sub center">${t('wh.sub')}</div>${wheelSVG()}
+      <div class="wh-res ${wheelLast && wheelLast.j ? 'jack' : ''}" id="whRes">${icx(res)}</div>
+      <button class="btn primary wide" id="whSpin" ${used || wheelBusy ? 'disabled' : ''}>${wheelBusy ? t('wh.spinning') : used ? t('wh.next', { t: `<span id="whCd">${untilMidnight()}</span>` }) : t('wh.spin')}</button>
+      <h3>${t('wh.prizes')}</h3><div class="grp prizes">${SEG.map((s, i) => i).sort((a, b) => SEG[b].w - SEG[a].w).map(i => { const s = SEG[i];
+        return `<div class="row"><span>${s.j ? `${ICON.dia(16)} <b>${t('wh.jackLbl')}</b> · ${icx(t('dia.got', { n: s.j }))}` : `${ICON.pts(16)} ${fmtPts(s.p)}`}</span><span class="muted">${(s.w / SEG_W * 100).toLocaleString(I18N.lang, { maximumFractionDigits: 1 })} %</span></div>`; }).join('')}</div>
+      <div class="note">${t('wh.note')}</div>`;
+    if (!used && !wheelBusy) $('whSpin').onclick = spinWheel;
+    if (used) wheelTimer = setInterval(() => { if (wallet.wheelDay !== today()) { wheelLast = null; renderWheel(); updatePts(); return; } const c = $('whCd'); if (c) c.textContent = untilMidnight(); }, 1000);
+  }
+  function spinWheel() {
+    if (wheelBusy || wallet.wheelDay === today()) return null;
+    SFX.unlock();
+    const i = pickSeg(), s = SEG[i];
+    // výhra se uloží hned (zavření aplikace během točení o ni nepřipraví ani ji nezdvojí)
+    wallet.wheelDay = today(); wallet.lastDaily = today();
+    if (s.j) { wallet.diamonds += s.j; wallet.flags.jackpot = (wallet.flags.jackpot || 0) + 1; } else wallet.points += s.p;
+    save('pt_wallet', wallet);
+    const jitter = (Math.random() - 0.5) * 30, target = i * 45 + 22.5 + jitter;
+    const from = wheelRot, to = from + 360 * 6 + ((((-target - from) % 360) + 360) % 360);
+    const done = () => { wheelRot = to % 360; wheelBusy = false; wheelLast = s; updatePts(); renderWheel();
+      if (s.j) { SFX.jackpot(); vib([40, 60, 40, 60, 120]); } else { SFX.win(); vib([20, 40, 30]); }
+      if (nav.cur === 'home') renderHome(); };
+    if (FAST() || nav.cur !== 'wheel') { wheelRot = to; done(); return i; }
+    wheelBusy = true; wheelLast = null;
+    const b = $('whSpin'); b.disabled = true; b.textContent = t('wh.spinning'); setText($('whRes'), '');
+    const g = $('wheelRot'), dur = reduced() ? 1500 : 5200, t0 = performance.now();
+    let lastSeg = Math.floor(from / 45);
+    const ease = x => 1 - Math.pow(1 - x, 4);
+    const step = now => {
+      const x = Math.min(1, (now - t0) / dur), r = from + (to - from) * ease(x);
+      g.style.transform = `rotate(${r}deg)`;
+      const sg = Math.floor((r + 22.5) / 45); if (sg !== lastSeg) { lastSeg = sg; SFX.tick(); if (x < 0.85) vib(4); }
+      if (x < 1) requestAnimationFrame(step); else done();
+    };
+    requestAnimationFrame(step);
+    return i;
+  }
+
+  /* ---------- v1.3: nápověda „Co co znamená“ (stůl) + nápověda obrazovek + pořadí kombinací ---------- */
+  const HV = ['seats', 'dealer', 'blinds', 'stacks', 'pot', 'board', 'win', 'rec', 'pos', 'cards', 'actions'];
+  let hvItems = [], hvI = 0;
+  const shown = e => { if (!e) return false; const r = e.getBoundingClientRect(); if (r.width < 2 || r.height < 2) return false; for (let x = e; x && x !== document.body; x = x.parentElement) { const cs = getComputedStyle(x); if (cs.display === 'none' || cs.visibility === 'hidden') return false; } return true; };
+  function hvTarget(k) {
+    const q = s => [...document.querySelectorAll(s)];
+    switch (k) {
+      case 'seats': return $('opps');
+      case 'dealer': return q('#opps .dealer').find(shown) || $('heroDealer') || null;
+      case 'blinds': return q('#opps .chip').find(x => shown(x) && /^(SB|BB)\b/.test(x.textContent)) || null;
+      case 'stacks': return q('#opps .stk').find(shown) || null;
+      case 'pot': return document.querySelector('#scr-game .pot-row');
+      case 'board': return $('board');
+      case 'win': return $('odds');
+      case 'rec': return $('rec');
+      case 'pos': return $('heroPos');
+      case 'cards': return $('heroCards');
+      case 'actions': return $('actions');
+    }
+  }
+  function openHelpOverlay() {
+    SFX.tap(); closeSheet();
+    hvItems = HV.map(k => ({ k, e: hvTarget(k) })).filter(x => shown(x.e));
+    if (!hvItems.length) return;
+    hvI = 0; $('helpOv').hidden = false; hvLayout();
+  }
+  function closeHelpOverlay() { $('helpOv').hidden = true; }
+  function hvLayout() {
+    const ov = $('helpOv'); if (ov.hidden) return;
+    const W = innerWidth, H = innerHeight, placed = [];
+    const rings = hvItems.map((it, i) => { const r = it.e.getBoundingClientRect(), p = 4;
+      return `<div class="hv-ring ${i === hvI ? 'on' : ''}" style="left:${r.left - p}px;top:${r.top - p}px;width:${r.width + 2 * p}px;height:${r.height + 2 * p}px"></div>`; }).join('');
+    const labels = hvItems.map((it, i) => { const r = it.e.getBoundingClientRect(), txt = t('hv.' + it.k + '.l'), w = Math.min(150, 26 + txt.length * 7.2), h = 24;
+      let x = r.width < 60 ? r.right + 6 : r.left, y = r.top - h - 2;
+      if (y < 6) y = r.top + 4;
+      x = Math.max(6, Math.min(W - w - 6, x));
+      for (let k = 0; k < 12 && placed.some(b => x < b.x + b.w + 4 && b.x < x + w + 4 && y < b.y + b.h + 3 && b.y < y + h + 3); k++) y += h + 4;
+      placed.push({ x, y, w, h });
+      return `<button class="hv-lab ${i === hvI ? 'on' : ''}" data-hv="${i}" style="left:${x}px;top:${y}px"><b>${i + 1}</b>${txt}</button>`; }).join('');
+    const it = hvItems[hvI], r = it.e.getBoundingClientRect(), top = r.top + r.height / 2 > H * 0.5;
+    ov.innerHTML = `<div class="hv-dim"></div>${rings}${labels}
+      <div class="hv-card ${top ? 'hv-top' : 'hv-bot'}"><div class="hv-k">${t('hv.title')} · ${t('hv.of', { i: hvI + 1, n: hvItems.length })}<button class="hv-x" id="hvX" aria-label="${t('hv.close')}">✕</button></div>
+        <h2>${t('hv.' + it.k + '.t')}</h2><p>${rich(t('hv.' + it.k + '.d'), { nolink: true })}</p>
+        <div class="hv-nav"><button class="btn round" id="hvPrev" ${hvI ? '' : 'disabled'}>‹</button><button class="btn" id="hvRanks">${t('hv.ranks')}</button><button class="btn" id="hvGloss">${t('hv.gloss')}</button><button class="btn round" id="hvNext" ${hvI < hvItems.length - 1 ? '' : 'disabled'}>›</button></div>
+        <div class="hv-tip">${t('hv.tap')}</div></div>`;
+    ov.querySelectorAll('[data-hv]').forEach(b => b.onclick = () => { hvI = +b.dataset.hv; SFX.tap(); hvLayout(); });
+    $('hvX').onclick = closeHelpOverlay;
+    $('hvPrev').onclick = () => { if (hvI) { hvI--; hvLayout(); } };
+    $('hvNext').onclick = () => { if (hvI < hvItems.length - 1) { hvI++; hvLayout(); } };
+    $('hvRanks').onclick = () => { closeHelpOverlay(); openRanks(); };
+    $('hvGloss').onclick = () => { closeHelpOverlay(); toGlossary(); };
+    ov.querySelector('.hv-dim').onclick = closeHelpOverlay;
+  }
+  window.addEventListener('resize', () => { if (!$('helpOv').hidden) hvLayout(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('helpOv').hidden) closeHelpOverlay(); });
+  function toGlossary() { closeSheet(); closeGloss(); if (nav.cur !== 'learn') nav.go('learn'); setTimeout(() => { const x = $('glossary'); if (x) x.scrollIntoView({ block: 'start' }); }, 60); }
+  const RANK_EX = { 9: 'Ah Kh Qh Jh Th', 8: '9s 8s 7s 6s 5s', 7: 'Qc Qd Qh Qs 7d', 6: 'Kh Kd Ks 4c 4h', 5: 'Ad Jd 8d 5d 2d', 4: 'Ts 9h 8d 7c 6s', 3: '7h 7c 7s Kd 2c', 2: 'Jc Jd 4s 4h Ad', 1: 'Ah Ad 9c 6s 3h', 0: 'Ad Jc 8h 5s 2d' };
+  function openRanks() {
+    SFX.tap();
+    openSheet(`<h2>${t('rk.title')}</h2><div class="sub">${t('rk.sub')}</div><div class="ranks">${[9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((i, n) => `<div class="rk-row"><span class="rk-n">${n + 1}</span><div class="rk-t"><b>${t('rk.' + i)}</b><small>${t('rk.' + i + 'd')}</small></div><span class="rk-c">${PE.parseCards(RANK_EX[i]).map(c => cardHTML(c, 'sm')).join('')}</span></div>`).join('')}</div>
+      <div class="gl-btns"><button class="btn primary" id="rkOk">${t('gl.ok')}</button><button class="btn" id="rkGl">${t('hv.gloss')}</button></div>`);
+    $('rkOk').onclick = closeSheet; $('rkGl').onclick = toGlossary;
+  }
+  const SCREEN_HELP = { home: 4, stats: 3, drill: 2, settings: 2, shop: 2, wheel: 1, ach: 2, learn: 1 };
+  function openScreenHelp(id) {
+    if (id === 'game') return openHelpOverlay();
+    SFX.tap();
+    const n = SCREEN_HELP[id] || 0;
+    openSheet(`<h2>${t('hv.title')}</h2><div class="grp help-list">${Array.from({ length: n }, (_, i) => `<div class="row col"><b>${t(`help.${id}.${i + 1}t`)}</b><small>${t(`help.${id}.${i + 1}d`)}</small></div>`).join('')}</div>
+      <div class="gl-btns" style="margin-top:14px"><button class="btn" id="hpRanks">${t('hv.ranks')}</button><button class="btn" id="hpGloss">${t('hv.gloss')}</button></div>
+      <button class="btn primary wide" id="hpOk" style="margin-top:8px">${t('gl.ok')}</button>`);
+    $('hpOk').onclick = closeSheet; $('hpRanks').onclick = openRanks; $('hpGloss').onclick = toGlossary;
+  }
+  ['settings', 'stats', 'shop', 'learn', 'wheel', 'ach', 'drill'].forEach(id => { const nv = document.querySelector(`#scr-${id} .nav`); if (!nv) return;
+    const b = el('button', 'icon-btn help-btn'); b.textContent = '?'; b.dataset.help = id; b.dataset.i18nAria = 'hv.btn'; b.setAttribute('aria-label', t('hv.btn')); nv.appendChild(b); });
+  document.addEventListener('click', e => { const b = e.target.closest('[data-help]'); if (b) openScreenHelp(b.dataset.help); });
+  const chipTerm = s => /^(SB|BB)\b/.test(s) ? 'blind' : /^call/i.test(s) ? 'call' : /^(raise|bet)/i.test(s) ? 'raise' : /^fold/i.test(s) ? 'fold' : /^check/i.test(s) ? 'check' : /^all/i.test(s) ? 'allin' : '';
+
   /* ---------- body a obchod (bez skutečných plateb) ---------- */
-  const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
   const LESSONS = [['pos', 'l.pos', 'l.posTxt'], ['odds', 'l.odds', 'l.oddsTxt'], ['push', 'l.push', 'l.pushTxt'], ['chen', 'l.chen', 'l.chenTxt']];
+  let shopTab = 'pts';
+  function exchangeDia() { if (wallet.diamonds < 1 || wallet.points >= START) return false; wallet.diamonds--; addPts(PTS.diaRate, t('dia.exDone', { n: fmtPts(PTS.diaRate) })); SFX.chip(); return true; }
+  function refill() { if (wallet.points >= PTS.refillMin) return; addPts(PTS.refillTo - wallet.points, t('pts.got', { n: PTS.refillTo - wallet.points })); }
   function renderShop() {
-    const dailyOk = wallet.lastDaily !== today(), refillOk = wallet.points < PTS.refillMin;
-    $('shopBody').innerHTML = `<div class="pts-hero"><div class="lbl">${t('pts.bal')}</div><div class="v">🪙 ${fmtPts(wallet.points)}</div>${settings.bankroll && session.hero > 0 && session.bank ? `<div class="sub">${t('pts.table')}: ${fmtPts(session.hero)}</div>` : ''}</div>
-      <div class="grp">
-        <div class="row"><div>${t('pts.daily')}<small>${t('pts.dailySub', { n: PTS.daily })}</small></div><button class="btn sm ${dailyOk ? 'primary' : ''}" id="shDaily" ${dailyOk ? '' : 'disabled'}>${dailyOk ? t('pts.claim') : t('pts.claimed')}</button></div>
+    const wOk = wallet.wheelDay !== today(), refillOk = wallet.points < PTS.refillMin, exOk = wallet.diamonds > 0 && wallet.points < START;
+    const hero = `<div class="pts-hero two"><div><div class="lbl">${t('pts.bal')}</div><div class="v">${ICON.pts(26)} ${fmtPts(wallet.points)}</div>${settings.bankroll && session.hero > 0 && session.bank ? `<div class="sub">${t('pts.table')}: ${fmtPts(session.hero)}</div>` : ''}</div>
+      <div><div class="lbl">${t('dia.name')}</div><div class="v dia">${ICON.dia(26)} ${fmtPts(wallet.diamonds)}</div></div></div>
+      <div class="seg full shop-tabs"><button data-tab="pts" class="${shopTab === 'pts' ? 'on' : ''}">${t('pts.tabPts')}</button><button data-tab="look" class="${shopTab === 'look' ? 'on' : ''}">${t('pts.tabLook')}</button></div>`;
+    let body;
+    if (shopTab === 'look') {
+      body = `<div class="note">${t('lk.hint')}</div>` + ['back', 'felt', 'lumi'].map(k => `<h3>${t('lk.' + k)}</h3><div class="looks">${LOOKS[k].map(([id, price]) => {
+        const own = !!wallet.owned[k][id], on = wallet.equip[k] === id;
+        return `<button class="look ${on ? 'on' : ''}" data-lk="${k}:${id}">${lookPreview(k, id)}<b>${t(`lk.${k}.${id}`)}</b><span class="lk-st">${on ? '✓ ' + t('lk.using') : own ? t('lk.use') : `${ICON.dia(13)} ${price}`}</span></button>`; }).join('')}</div>`).join('');
+    } else {
+      body = `<div class="grp">
+        <div class="row"><div>${wheelMini(18)} ${t('wh.title')}<small>${wOk ? t('wh.sub') : t('wh.next', { t: untilMidnight(true) })}</small></div><button class="btn sm ${wOk ? 'primary' : ''}" id="shWheel">${wOk ? t('wh.free') : t('wh.used')}</button></div>
         <div class="row"><div>${t('pts.refill')}<small>${t('pts.refillSub', { n: fmtPts(PTS.refillTo) })}</small></div><button class="btn sm ${refillOk ? 'primary' : ''}" id="shRefill" ${refillOk ? '' : 'disabled'}>${refillOk ? t('pts.refillBtn') : t('pts.refillNo', { n: PTS.refillMin })}</button></div>
+        <div class="row"><div>${t('dia.ex')}<small>${icx(t('dia.exSub', { n: fmtPts(PTS.diaRate), m: fmtPts(START) }))}</small></div><button class="btn sm ${exOk ? 'primary' : ''}" id="shEx" ${exOk ? '' : 'disabled'}>${exOk ? icx(t('dia.exBtn', { n: fmtPts(PTS.diaRate) })) : wallet.diamonds ? t('dia.exNo', { m: fmtPts(START) }) : t('dia.exNone')}</button></div>
       </div>
       <h3>${t('pts.learn')}</h3><div class="grp">${LESSONS.map(([k, ti]) => `<div class="row"><span>📘 ${t(ti)}</span><button class="btn sm ${wallet.lessons[k] ? '' : 'primary'}" data-les="${k}">${wallet.lessons[k] ? t('pts.lessonDone') : t('pts.lesson', { n: PTS.lesson })}</button></div>`).join('')}</div>
-      <h3>${t('pts.packs')}</h3><div class="packs">${[[1, 5000], [2, 20000], [3, 100000]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${'🪙'.repeat(i)}</div><b>${fmtPts(v)}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
+      <h3>${t('pts.packs')}</h3><div class="packs">${[[1, 5000], [2, 20000], [3, 100000]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${ICON.pts(20).repeat(i)}</div><b>${fmtPts(v)}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
+      <h3>${t('pts.diaPacks')}</h3><div class="packs">${[[1, 10], [2, 50], [3, 120]].map(([i, v]) => `<div class="pack"><div class="pk-ic">${ICON.dia(20).repeat(i)}</div><b>${v}</b><span>${t('pts.pack' + i)}</span><button class="btn sm soon" disabled>${t('pts.soon')}</button></div>`).join('')}</div>
       <div class="note">${t('pts.soonNote')}</div>
-      <h3>${t('pts.earn')}</h3><div class="grp"><div class="txtblk">${t('pts.earnTxt', { g: PTS.good, s: PTS.streak })}</div></div>
-      <div class="about">${t('pts.virtual')}</div>`;
-    $('shDaily').onclick = () => { if (wallet.lastDaily === today()) return; wallet.lastDaily = today(); addPts(PTS.daily, t('pts.got', { n: PTS.daily })); SFX.win(); renderShop(); };
-    $('shRefill').onclick = () => { if (wallet.points >= PTS.refillMin) return; addPts(PTS.refillTo - wallet.points, t('pts.got', { n: PTS.refillTo - wallet.points })); renderShop(); };
+      <h3>${t('pts.earn')}</h3><div class="grp"><div class="txtblk">${t('pts.earnTxt', { g: PTS.good, s: PTS.streak })}<br><br>${t('dia.what')}</div></div>`;
+    }
+    $('shopBody').innerHTML = hero + body + `<div class="about">${t('pts.virtual')}</div>`;
+    $('shopBody').querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { shopTab = b.dataset.tab; SFX.tap(); renderShop(); });
+    if (shopTab === 'look') { $('shopBody').querySelectorAll('[data-lk]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.lk.split(':'); buyLook(k, id); }); return; }
+    $('shWheel').onclick = () => { SFX.unlock(); nav.go('wheel'); };
+    $('shRefill').onclick = () => { refill(); renderShop(); };
+    $('shEx').onclick = () => { exchangeDia(); renderShop(); };
     $('shopBody').querySelectorAll('[data-les]').forEach(b => b.onclick = () => { const L = LESSONS.find(x => x[0] === b.dataset.les);
       openSheet(`<h2>${t(L[1])}</h2><div class="txtblk">${rich(t(L[2]))}</div><button class="btn primary wide" id="lesOk">${wallet.lessons[L[0]] ? t('gl.ok') : t('pts.lesson', { n: PTS.lesson })}</button>`);
-      $('lesOk').onclick = () => { closeSheet(); if (!wallet.lessons[L[0]]) { wallet.lessons[L[0]] = 1; addPts(PTS.lesson, t('pts.got', { n: PTS.lesson })); } renderShop(); }; });
+      $('lesOk').onclick = () => { closeSheet(); if (!wallet.lessons[L[0]]) { wallet.lessons[L[0]] = 1; addPts(PTS.lesson, t('pts.got', { n: PTS.lesson })); checkAch(); } renderShop(); }; });
   }
 
   /* ---------- jazyk ---------- */
@@ -1017,6 +1320,7 @@
     document.documentElement.lang = I18N.lang;
     document.querySelectorAll('[data-i18n]').forEach(e => { e.textContent = t(e.dataset.i18n); });
     document.querySelectorAll('[data-i18n-html]').forEach(e => { e.innerHTML = rich(t(e.dataset.i18nHtml)); });
+    document.querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ICON[e.dataset.ic](+e.dataset.sz || 16); });
     document.querySelectorAll('[data-i18n-aria]').forEach(e => e.setAttribute('aria-label', t(e.dataset.i18nAria)));
   }
   function setLang(l) {
@@ -1026,13 +1330,14 @@
     if (G.players.length) render();
     obRender(0); renderHome(); if (D.spot) renderDrill();
     if (nav.cur === 'stats') renderStats(); if (nav.cur === 'learn') renderLearn(); if (nav.cur === 'shop') renderShop(); if (nav.cur === 'settings') renderSettings();
+    if (nav.cur === 'wheel') renderWheel(); if (nav.cur === 'ach') renderAch();
     if (!$('sheet').hidden && G.over) showSummary(); else closeSheet();
   }
 
   /* ---------- oznámení (toast) + aktualizace ---------- */
   let toastT = 0;
   function toast(msg, btn, fn, sticky) {
-    setText($('toastTxt'), msg); $('toastBtn').hidden = !btn; if (btn) { setText($('toastBtn'), btn); $('toastBtn').onclick = fn; }
+    $('toastTxt').innerHTML = icx(String(msg).replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c])); $('toastBtn').hidden = !btn; if (btn) { setText($('toastBtn'), btn); $('toastBtn').onclick = fn; }
     $('toast').hidden = false; $('toast').classList.remove('out');
     clearTimeout(toastT); if (!sticky) toastT = setTimeout(() => { $('toast').classList.add('out'); setTimeout(() => $('toast').hidden = true, 250); }, 2600);
   }
@@ -1047,6 +1352,7 @@
   if (window.__NOSPLASH || FAST()) sp.remove();
   else setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 420); }, reduced() ? 700 : 1500);
 
-  updatePts();
-  window.__poker = { startHand, heroAct, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss };
+  applyLook(); loginTick(); checkAch(true); updatePts();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { loginTick(); updatePts(); if (nav.cur === 'wheel') renderWheel(); } });
+  window.__poker = { startHand, heroAct, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
 })();

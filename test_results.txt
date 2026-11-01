@@ -1,27 +1,60 @@
-Red River v1.2.0 (sw v8) – výsledky testů 2026-11-01 18:20 (Europe/Prague)
+Red River v1.3.0 (sw v9) – výsledky testů 2026-11-01 18:41 (Europe/Prague)
 
 == test_equity
-24
+OK  100 BB, UTG, KJo → fold (těsná raná pozice): fold – [[h:44,38]] (síla 7/20) [[p:UTG]] je moc slabá (hranice 10/20). Z rané pozice hraj jen sil…
+OK  100 BB, BTN, KJo → raise: raise 6 – [[h:44,38]] (síla 7/20) [[p:BTN]] je dost silná na otevření (hranice 6/20). Navyš na 6, ať…
+OK  proti 3-betu s KK → all-in: allin 200 – [[h:44,46]] (síla 16/20) – prémiová ruka (dvě dámy nebo lepší). Proti 3-betu jdi all-in: s…
+OK  call all-in: dobrá equity: call – Soupeř tě dává all-in: musíš dát 38 (celý stack) do potu 81, potřebuješ aspoň 47 %. Tvoje …
+OK  fold proti all-in: slabá equity: fold – Soupeř tě dává all-in: musíš dát 38 (celý stack) do potu 81, potřebuješ aspoň 47 %. Tvoje …
+OK  nízké SPR + silná ruka postflop → all-in: allin 70 – Tvoje šance 90 % (trojice) je silná a stack je proti potu malý (SPR 1.2). Jdi rovnou all-i…
+OK  hluboký stack + silná ruka postflop → bet: bet 13 – Tvoje šance 90 % (trojice) je nad férovým podílem 50 %. Sázej pro hodnotu ~2/3 potu (13), …
+OK  hodnocení: fold místo pushe → Velká chyba
+exit 0
+== test_v13
+
+v1.3 OK
+exit 0
+== test_v13 (repeat)
+
+v1.3 OK
 exit 0
 == test_play EN beginner 150
-{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":264,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":57,"handsWithAllin":31,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":58,\"netBB\":-126,\"vpip\":69,
+session hands 50 table Ty,Lukáš,Kateřina,Tereza,Adam,Zuzana,David,Alena,Vojta
+{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":252,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":63,"handsWithAllin":38,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":64,\"netBB\":134,\"vpip\":67,\"pfr\":39,\"decisions\":252,\"good\":173,\"ok\":10,\"meh\":51,\"bad\":
 exit 0
 == test_play CS beginner 150
-{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":251,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":64,"handsWithAllin":36,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":56,\"netBB\":378.5,\"vpip\":58
+session hands 50 table Ty,Pavel,Veronika,Filip,Kateřina,David,Adam,Jakub,Petr
+{"hands":150,"tables":{"2":50,"6":50,"9":50},"decisions":285,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":68,"handsWithAllin":41,"chipErr":0,"errors":[],"stats":"{\"hands\":150,\"won\":57,\"netBB\":72,\"vpip\":73,\"pfr\":39,\"decisions\":285,\"good\":191,\"ok\":7,\"meh\":74,\"bad\":13
 exit 0
 == test_play CS intermediate 60
-{"hands":60,"tables":{"2":20,"6":20,"9":20},"decisions":97,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":27,"handsWithAllin":21,"chipErr":0,"errors":[],"stats":"{\"hands\":60,\"won\":23,\"netBB\":515,\"vpip\":26,\"pf
+session hands 20 table Ty,Adam,Kateřina,Monika,Hana,Martin,Ondřej,Alena,Petr
+{"hands":60,"tables":{"2":20,"6":20,"9":20},"decisions":82,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":23,"handsWithAllin":14,"chipErr":0,"errors":[],"stats":"{\"hands\":60,\"won\":18,\"netBB\":-96.5,\"vpip\":24,\"pfr\":11,\"decisions\":82,\"good\":58,\"ok\":2,\"meh\":17,\"bad\":5,\"
 exit 0
 == test_play CS expert 60
 expert: help hidden OK
-session hands 20 table Ty,Eva,Hana,Adam,Martin,Zuzana,Jakub,Marek,Tomáš
-{"hands":60,"tables":{"2":20,"6":20,"9":20},"decisions":98,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":20,"handsWithAllin":17,"chipErr":0,"errors":[],"stats":"{\"hands\":60,\"won\":17,\"netBB\":23.5,\"vpip\":28,\"p
+session hands 20 table Ty,Kateřina,Jana,Veronika,Pavel,Tomáš,Ondřej,Vojta,Adam
+{"hands":60,"tables":{"2":20,"6":20,"9":20},"decisions":97,"rawNot":0,"block":{"dealt":false,"sheet":true},"showdowns":21,"handsWithAllin":19,"chipErr":0,"errors":[],"stats":"{\"hands\":60,\"won\":22,\"netBB\":-412,\"vpip\":31,\"pfr\":20,\"decisions\":97,\"good\":64,\"ok\":5,\"meh\":22,\"bad\":6,\"v
 exit 0
 == test_flicker
+   "maxShiftPx": 0,
+   "frames": 144,
+   "ms": 2385
+  }
+ ],
+ "errors": []
+}
 FLICKER OK {"rem":0,"sh":0,"rep":0}
 exit 0
 == verify_pwa
+    "engine": "object",
+    "buttons": 0,
+    "screen": "onboarding"
+  },
+  "offlineIndex": 200,
+  "errors": []
+}
 PWA OK
 exit 0
 == shots
 shots OK
+exit 0
