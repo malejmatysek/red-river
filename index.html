@@ -83,6 +83,7 @@
       <button class="mi" id="homeLearn"><span class="ic">📘</span><b data-i18n="ui.learn">Učení</b><span data-i18n="ui.learnSub">Úvod, pozice, síla rukou</span></button>
       <button class="mi" id="homeWheel"><span class="ic wheel-ic"><span data-ic="wheel" data-sz="22"></span><i class="dot-new" id="homeWheelBadge" hidden></i></span><b data-i18n="wh.title">Kolo štěstí</b><span id="homeWheelSub">Zdarma jednou denně</span></button>
       <button class="mi" id="homeAch"><span class="ic"><span data-ic="dia" data-sz="20"></span></span><b data-i18n="ach.title">Úspěchy</b><span id="homeAchSub"></span></button>
+      <button class="mi wide" id="homeOnline"><span class="ic">👥</span><div class="mi-t"><b data-i18n="on.title">Hrát s kamarády</b><span data-i18n="on.tileSub">Soukromý stůl s kódem, body bez hodnoty</span></div><span class="new" data-i18n="ui.new">NOVÉ</span></button>
       <button class="mi wide" id="homeShop"><span class="ic"><span data-ic="pts" data-sz="20"></span></span><div class="mi-t"><b data-i18n="pts.shop">Body a obchod</b><span data-i18n="pts.shopSub">Dokup body, denní bonus</span></div></button>
     </div>
   </div>
@@ -158,6 +159,23 @@
 <section class="screen" id="scr-ach" data-title="Úspěchy"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ach.title">Úspěchy</span></div><div class="set" id="achBody"></div></div></section>
 <section class="screen" id="scr-learn" data-title="Učení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.learn">Učení</span></div><div class="set" id="learnBody"></div></div></section>
 
+<!-- ONLINE: soukromé stoly (online/ui.js) -->
+<section class="screen" id="scr-online" data-title="Hrát s kamarády"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="on.title">Hrát s kamarády</span></div><div class="set" id="onBody"></div></div></section>
+<section class="screen" id="scr-oncreate" data-title="Založit stůl"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="on.create">Založit stůl</span></div><div class="set" id="onCreateBody"></div></div></section>
+<section class="screen" id="scr-onjoin" data-title="Připojit kódem"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="on.join">Připojit kódem</span></div><div class="set" id="onJoinBody"></div></div></section>
+<section class="screen" id="scr-lobby" data-title="Stůl"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="on.lobby">Stůl</span></div><div class="set" id="lobbyBody"></div></div></section>
+<section class="screen" id="scr-ontable" data-title="Online stůl">
+<div class="app on-app">
+  <header class="top"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="on-code" id="otCode"></span><span class="on-hand" id="otHand"></span><button class="icon-btn" id="otMenu" aria-label="Menu" data-i18n-aria="ui.menu"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></header>
+  <section class="opps" id="otOpps"></section>
+  <section class="table"><div class="board" id="otBoard"></div><div class="pot-row"><span class="street" id="otStreet">&nbsp;</span><span class="pot" id="otPot">0</span></div></section>
+  <section class="on-status" id="otStatus"></section>
+  <section class="on-raise" id="otRaise" hidden></section>
+  <section class="actions" id="otActions"></section>
+  <section class="hero"><div class="hero-cards" id="otHero"></div><div class="hero-panel" id="otMe"></div></section>
+</div>
+</section>
+
 <!-- spodní panely + oznámení -->
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" hidden></div>
@@ -169,6 +187,10 @@
 <script src="i18n.js"></script>
 <script src="engine.js"></script>
 <script src="app.js"></script>
+<script src="online/config.js"></script>
+<script src="online/core.js"></script>
+<script src="online/net.js"></script>
+<script src="online/ui.js"></script>
 <script>
   /* Service worker: offline + oznámení o nové verzi („Nová verze – obnovit“) */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {

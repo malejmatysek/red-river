@@ -1,12 +1,13 @@
 /* Service worker – offline cache. Při změně souborů zvyš VERSION.
    Nová verze se nainstaluje na pozadí (čerstvé soubory, ne z HTTP cache), převezme stránku
    a aplikace ukáže oznámení „Nová verze je připravená – Obnovit“. */
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CACHE = 'poker-trener-' + VERSION;
 const FILES = [
   './', './index.html', './style.css', './i18n.js', './engine.js', './app.js', './manifest.webmanifest',
   './icons/icon.svg', './icons/lumi.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
-  './icons/apple-touch-icon.png', './icons/favicon-32.png'
+  './icons/apple-touch-icon.png', './icons/favicon-32.png',
+  './online/config.js', './online/core.js', './online/net.js', './online/ui.js'
 ];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE)
