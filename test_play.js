@@ -31,10 +31,12 @@ const { chromium } = require(process.env.PW || 'playwright-core');
     if (res.sd) showdowns++;
     const third = Math.floor(HANDS / 3);
     if (h === third - 1) await page.evaluate(() => { __poker.settings.opps = 5; });
-    if (h === 2 * third - 1) await page.evaluate(() => { __poker.settings.opps = 8; });
+    if (h === 2 * third - 1) await page.evaluate(() => { __poker.settings.opps = 8; __poker.settings.bankroll = false; __poker.settings.randomDepth = true; });
     await page.evaluate(() => __poker.startHand());
   }
   const stats = await page.evaluate(() => localStorage.getItem('pt_stats'));
+  const extra = await page.evaluate(() => ({ session: JSON.parse(localStorage.getItem('pt_session')), names: __G.players.map(p => p.name).join(',') }));
+  console.log('session hands', extra.session.hands, 'table', extra.names);
   console.log(JSON.stringify({ hands: HANDS, tables, decisions, showdowns, handsWithAllin: allins, chipErr, errors: errors.slice(0, 10), stats }));
   await browser.close();
   process.exit(errors.length || chipErr ? 1 : 0);

@@ -17,17 +17,79 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<!-- úvodní obrazovka -->
+<div class="splash" id="splash">
+  <img src="icons/icon.svg" alt="">
+  <div class="name">Red River</div>
+  <div class="tag" data-i18n="ui.tag">poker trenér</div>
+  <div class="dots"><span></span><span></span><span></span></div>
+</div>
+
+<!-- ÚVOD (onboarding) -->
+<section class="screen" id="scr-onboarding" data-title="Úvod">
+  <div class="page ob">
+    <div class="ob-top"><span class="step" id="obStep">1 / 4</span><button class="skip" id="obSkip" data-i18n="ob.skip">Přeskočit</button></div>
+    <div class="ob-slides" id="obSlides">
+      <div class="ob-slide">
+        <div class="ob-art">
+          <img src="icons/icon.svg" class="ob-logo" alt="">
+          <div class="pill-row" data-i18n-html="ob.1t"><span class="tagp"><b>1–8</b> botů</span><span class="tagp"><b>∞</b> rozdání</span><span class="tagp">offline</span></div>
+        </div>
+        <div class="ob-text"><h1 data-i18n="ob.1h">Vítej u stolu</h1><p data-i18n="ob.1p">Red River tě naučí Texas Hold'em. Hraješ proti botům, každá ruka je nově zamíchaná – kombinace se nikdy neopakují.</p></div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art">
+          <div class="ob-cards"><div class="card lg"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg red"><span class="rk">K</span><span class="st">♥</span></div></div>
+          <div class="odds mock"><div class="odds-cell"><div class="lbl">Výhra</div><div class="big win">64 %</div></div><div class="odds-cell"><div class="lbl">Start. ruka</div><div class="mid">AKo · 12/20</div></div><div class="odds-sub" data-i18n="ob.2s">proti 2 soupeřům · náhodné ruce · remíza 2 %</div></div>
+        </div>
+        <div class="ob-text"><h1 data-i18n="ob.2h">Šance na výhru</h1><p data-i18n="ob.2p">V každé chvíli vidíš, jak často tvoje ruka vyhraje. Počítá se z tisíců simulovaných rozdání podle toho, co soupeři hrají.</p></div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art">
+          <div class="switch-pill demo"><span data-i18n="ui.recs">Doporučené tahy</span><span class="sw on"></span></div>
+          <div class="rec mock"><div class="rec-head"><span class="dot"></span><span data-i18n-html="ob.3d">Doporučeno: <b>Raise na 6</b></span></div><div class="rec-why" data-i18n="ob.3r">AKo je na pozici BTN dost silná na otevření. Navyš na 3 BB, ať získáš iniciativu a vybereš blindy.</div></div>
+          <div class="actions mock"><span class="btn">Fold</span><span class="btn">Call 2</span><span class="btn hint">Raise 6</span></div>
+        </div>
+        <div class="ob-text"><h1 data-i18n="ob.3h">Doporučené tahy</h1><p data-i18n="ob.3p">Nevíš si rady? Zapni doporučení – ukáže nejlepší akci a vysvětlí proč. Tlačítko s doporučeným tahem má zelený rámeček.</p></div>
+      </div>
+      <div class="ob-slide">
+        <div class="ob-art" style="gap:8px">
+          <div class="feedback good mock" data-i18n-html="ob.4a"><b>Správně</b>Raise s AKo z BTN – přesně tak.</div>
+          <div class="feedback meh mock" data-i18n-html="ob.4b"><b>Nepřesnost</b>Call s Q5o z CO je moc volný. Fold ušetří žetony.</div>
+          <div class="feedback bad mock" data-i18n-html="ob.4c"><b>Velká chyba</b>S 10 BB a A4o z CO patří all-in, ne fold.</div>
+        </div>
+        <div class="ob-text"><h1 data-i18n="ob.4h">Hodnocení rozhodnutí</h1><p data-i18n="ob.4p">Po každém tahu dostaneš zpětnou vazbu a po ruce rozbor. Hodnotí se rozhodnutí, ne štěstí – tak se zlepšíš nejrychleji.</p></div>
+      </div>
+    </div>
+    <div class="ob-bottom"><div class="pdots" id="obDots"><span class="on"></span><span></span><span></span><span></span></div><button class="btn primary" id="obNext" data-i18n="ob.next">Další</button></div>
+  </div>
+</section>
+
+<!-- DOMŮ -->
+<section class="screen" id="scr-home" data-title="Domů">
+  <div class="page home">
+    <div class="h-top"><img src="icons/icon-192.png" alt=""><span class="t">Red River</span><button class="icon-btn" id="homeMenu" aria-label="Nastavení" data-i18n-aria="ui.settings"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></div>
+    <div class="bank"><div><div class="lbl" id="bankLbl">Bankroll</div><div class="v" id="bankV">–</div></div><div><div class="lbl" data-i18n="ui.accuracy">Přesnost</div><div class="v g" id="accV">–</div></div><div class="s" id="bankS"></div></div>
+    <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><img src="icons/lumi.svg" class="lumi" alt=""></div>
+    <button class="play" id="playBtn"><span id="playLbl">Hrát</span><small id="playSub"></small></button>
+    <div class="menu">
+      <button class="mi wide" id="drillBtn"><span class="ic">🎯</span><div class="mi-t"><b data-i18n="ui.drill">Trénink situací</b><span data-i18n="ui.drillSub">Push/fold, sázka na flopu, river… nekonečně</span></div><span class="new" data-i18n="ui.new">NOVÉ</span></button>
+      <button class="mi" id="homeStats"><span class="ic">📊</span><b data-i18n="ui.stats">Statistiky</b><span data-i18n="ui.statsSub">VPIP, PFR, přesnost, zisk</span></button>
+      <button class="mi" id="homeLearn"><span class="ic">📘</span><b data-i18n="ui.learn">Učení</b><span data-i18n="ui.learnSub">Úvod, pozice, síla rukou</span></button>
+    </div>
+  </div>
+</section>
+
+<!-- HRA -->
+<section class="screen" id="scr-game" data-title="Hra">
 <div class="app" id="app">
   <header class="top">
-    <div class="brand">Red River</div>
+    <button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button>
     <label class="switch-pill" title="Doporučené tahy">
-      <span>Doporučené tahy</span>
+      <span data-i18n="ui.recs">Doporučené tahy</span>
       <input type="checkbox" id="recToggle"><i></i>
     </label>
-    <button class="icon-btn" id="statsBtn" aria-label="Statistiky">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
-    </button>
-    <button class="icon-btn" id="settingsBtn" aria-label="Nastavení">
+    <button class="icon-btn" id="gameMenu" aria-label="Menu" data-i18n-aria="ui.menu">
       <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
     </button>
   </header>
@@ -36,44 +98,71 @@
 
   <section class="table">
     <div class="board" id="board"></div>
-    <div class="pot-row"><span class="street" id="street"></span><span class="pot" id="pot"></span></div>
+    <div class="pot-row"><span class="street" id="street">&nbsp;</span><span class="pot" id="pot">0</span></div>
   </section>
 
   <section class="odds" id="odds">
-    <div class="odds-cell"><div class="lbl">Výhra</div><div class="big win" id="eqWin">–</div></div>
+    <div class="odds-cell"><div class="lbl" data-i18n="ui.win">Výhra</div><div class="big win" id="eqWin">–</div></div>
     <div class="odds-cell"><div class="lbl" id="madeLbl">Ruka</div><div class="mid" id="made">–</div></div>
-    <div class="odds-sub" id="eqSub"></div>
+    <div class="odds-sub" id="eqSub">&nbsp;</div>
   </section>
 
-  <section class="rec" id="rec" hidden>
-    <div class="rec-head"><span class="dot"></span><span>Doporučeno: <b id="recAct"></b></span></div>
+  <section class="rec idle" id="rec">
+    <div class="rec-head"><span class="dot"></span><span><span data-i18n="ui.recommended">Doporučeno:</span> <b id="recAct"></b></span></div>
     <div class="rec-why" id="recWhy"></div>
   </section>
 
-  <section class="feedback" id="feedback" hidden></section>
+  <section class="feedback idle" id="feedback"><b id="fbTitle"></b><div class="txt" id="fbTxt"></div></section>
 
   <section class="actions" id="actions"></section>
 
   <section class="hero">
-    <div class="hero-cards" id="heroCards"></div>
-    <div class="hero-panel">
+    <div class="hero-cards" id="heroCards"><div class="card lg back slot"></div><div class="card lg back slot"></div></div>
+    <div class="hero-panel" id="heroPanel">
       <div class="lbl" id="heroPos">–</div>
       <div class="avatar me">TY</div>
-      <div class="stack" id="heroStack">200</div>
+      <div class="stack" id="heroStack">–</div>
       <div class="hero-last" id="heroLast"></div>
     </div>
   </section>
 </div>
+</section>
 
-<!-- spodní panely -->
+<!-- TRÉNINK SITUACÍ -->
+<section class="screen" id="scr-drill" data-title="Trénink situací">
+  <div class="page drill">
+    <div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.drillT">Trénink</span><span class="score" id="drScore">0 / 0</span></div>
+    <div class="dr-spot" id="drSpot"><div class="dr-kind" id="drKind"></div><div class="dr-desc" id="drDesc"></div></div>
+    <div class="table"><div class="board" id="drBoard"></div><div class="pot-row"><span class="street" id="drStreet"></span><span class="pot" id="drPot"></span></div></div>
+    <div class="dr-hero"><div class="hero-cards" id="drHero"></div><div class="dr-info" id="drInfo"></div></div>
+    <div class="dr-result idle" id="drResult"><div class="feedback" id="drFb"><b id="drFbT"></b><div class="txt" id="drFbX"></div></div><div class="dr-eq" id="drEq"></div></div>
+    <div class="dr-actions" id="drActions"></div>
+  </div>
+</section>
+
+<!-- NASTAVENÍ / STATISTIKY / UČENÍ -->
+<section class="screen" id="scr-settings" data-title="Nastavení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.settings">Nastavení</span></div><div class="set" id="setBody"></div></div></section>
+<section class="screen" id="scr-stats" data-title="Statistiky"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.stats">Statistiky</span></div><div class="set" id="statsBody"></div></div></section>
+<section class="screen" id="scr-learn" data-title="Učení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.learn">Učení</span></div><div class="set" id="learnBody"></div></div></section>
+
+<!-- spodní panely + oznámení -->
 <div class="scrim" id="scrim" hidden></div>
 <div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" hidden><span id="toastTxt"></span><button id="toastBtn"></button></div>
 
+<script src="i18n.js"></script>
 <script src="engine.js"></script>
 <script src="app.js"></script>
 <script>
+  /* Service worker: offline + oznámení o nové verzi („Nová verze – obnovit“) */
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW:', e)));
+    const hadCtrl = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCtrl && window.__rr) __rr.updateReady(); });
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(e => console.warn('SW:', e)));
   }
 </script>
 </body>
