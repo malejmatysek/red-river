@@ -620,7 +620,7 @@ body[data-cback="check"] .card.back::before,.lk-card[data-back-prev="check"]::be
 /* ===== v1.4.1 — návrh 3: tlustší písmo, červené Hrát, lišta, Profil, Obchod ===== */
 body{font-weight:500}
 #scr-home .play{background:#FF2D4A;color:#fff;height:78px;min-height:78px;border-radius:999px;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 30px rgba(255,45,74,.28)}
-#scr-home .play #playLbl{font-size:31px;font-weight:800;letter-spacing:-.02em;color:#fff}
+#scr-home .play .pl-t{font-size:31px;font-weight:800;letter-spacing:-.02em;color:#fff}
 #scr-home .play:active{transform:scale(.98);background:#e8223e}
 .fr-card{display:flex;align-items:center;gap:13px;width:100%;margin-top:12px;background:var(--panel2);border-radius:22px;padding:14px 16px;box-shadow:inset 0 0 0 1px rgba(255,45,74,.38);text-align:left;color:#fff}
 .fr-card:active{transform:scale(.985)}
@@ -631,7 +631,7 @@ body{font-weight:500}
 .fr-t span{font-size:13px;color:var(--muted);font-weight:500}
 .fr-card .new{flex:none;font-size:11px;font-weight:750;color:#000;background:#FF2D4A;border-radius:999px;padding:3px 8px}
 .fr-ch{font-size:24px;color:#6d6c75;flex:none;line-height:1}
-#drillBtn{margin-top:12px}
+#drillBtn{margin-top:0}
 /* spodní lišta */
 /* lišta: přišpendlená ke spodní hraně okna (bottom:0), safe-area jen jednou. Když iOS PWA hlásí okno kratší
    o mezeru --vgap (pod oknem je pak černý proužek, kam nejde kreslit), část safe-area už leží v té mezeře → odečíst. */
@@ -740,3 +740,7 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 .pub-who{width:100%;display:flex;justify-content:space-between;background:none;border:0;color:var(--text);font:inherit;text-align:left}
 .pub-who.on{color:#FF2D4A;font-weight:700}
 .pub-reap{margin:4px 0 8px;color:#ffb3bd}
+
+/* v1.5.1: Hrát online jako hlavní červené tlačítko */
+#scr-home .play .pl-row{display:flex;align-items:center;gap:11px}
+#scr-home .play .pl-ic{flex:none;color:#fff}

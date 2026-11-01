@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.5.1', BUILD = 'v17';
+  const APP_VERSION = '1.5.2', BUILD = 'v18';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -766,7 +766,7 @@
     setText($('bankV'), bank != null ? fmtNum(bank) : (stats.profit >= 0 ? '+' : '') + fmtNum(stats.profit));
     setText($('accV'), acc);
     setText($('bankS'), settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '−') + plain('[[bb:' + Math.abs(session.netBB) + ']]') }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh'));
-    setText($('playLbl'), G.handNo ? t('h.continue') : t('h.play'));
+    setText($('playLbl'), G.handNo ? t('h.continue') : t('h.train'));
     setText($('homeLvl'), t('lv.' + settings.level)); updatePts();
     setText($('homeAchSub'), t('ui.achSub', { n: Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length, m: ACH.length }));
   }
