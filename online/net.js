@@ -9,6 +9,9 @@
      await net.start() / addBot() / removeBot(i) / next() / rebuy() / sitIn()
      await net.act({ t: 'fold'|'check'|'call'|'raise'|'allin', to })
      await net.state() / net.tick()
+     await net.quickseat(tier, name) → view   veřejný stůl: sedne k otevřenému stolu dané úrovně (nebo založí nový)
+     await net.lobby()              → { tiers: [{ id, tables, players }] }   kolik se hraje na veřejných stolech
+     await net.report(seat, reason) nahlásí hráče u veřejného stolu
      net.onChange(fn)               fn(view) při každé změně stolu; vrací odhlášení
    Chyby: Promise reject s { code } (např. not_your_turn, raise_too_small, full, no_room, points). */
 (function (root) {
@@ -26,13 +29,46 @@
       this.core = Core.makeCore({ PE, now: () => this.clock(), randInt: opts.randInt });
       this.rooms = new Map(); this.points = new Map(); this.subs = new Map(); this.where = new Map();
       this.latency = opts.latency || 0;
-      this.log = [];
+      this.log = []; this.reports = []; this.hits = new Map();
+      this.demoBots = !!opts.demoBots;          // offline ukázka veřejných stolů: doplní označené boty, aby se dalo hrát i bez lidí
+      this.limits = Object.assign({ all: [240, 60], quickseat: [12, 60], report: [5, 600] }, opts.limits || {});
       if (opts.autoTick !== false && typeof setInterval === 'function') { this.timer = setInterval(() => this.tickAll(), opts.tickMs || 400); if (this.timer.unref) this.timer.unref(); }
     }
     stop() { clearInterval(this.timer); }
     pts(uid) { if (!this.points.has(uid)) this.points.set(uid, START_POINTS); return this.points.get(uid); }
     debit(uid, n) { if (n <= 0) return; const p = this.pts(uid); if (p < n) throw err('points'); this.points.set(uid, p - n); this.log.push({ uid, d: -n }); }
     credit(uid, n) { if (n > 0) { this.points.set(uid, this.pts(uid) + n); this.log.push({ uid, d: n }); } }
+    /* stejné limity jako server (rr_hit): max požadavků za okno v sekundách */
+    hit(uid, bucket) {
+      const [max, win] = this.limits[bucket] || [1e9, 60], k = uid + '|' + bucket, t = this.clock();
+      let h = this.hits.get(k); if (!h || t - h.t0 >= win * 1000) { h = { t0: t, n: 0 }; this.hits.set(k, h); }
+      if (++h.n > max) throw err('rate');
+    }
+    reapRoom(room) { this.core.reap(room).forEach(r => { this.credit(r.uid, r.refund); if (this.where.get(r.uid) === room.code) this.where.delete(r.uid); }); }
+    quickseat(uid, a) {
+      const C = this.core, T = C.TIERS.find(x => x.id === a.tier); if (!T) throw err('bad_tier');
+      if (C.badName(a.name)) throw err('bad_name');
+      if (this.pts(uid) < T.bb * T.buyInBB) throw err('points');
+      const mine = this.where.get(uid), cur = mine && this.rooms.get(mine);
+      if (cur && C.isPub(cur) && cur.status !== 'closed' && C.seatOf(cur, uid) >= 0) return cur;   // už sedí u veřejného stolu
+      const open = [...this.rooms.values()].filter(r => C.isPub(r) && r.status !== 'closed' && r.settings.tier === T.id && C.humans(r).length < C.PUB_MAX)
+        .sort((x, y) => C.humans(y).length - C.humans(x).length);
+      let room = open[0];
+      if (!room) { room = C.createPublic({ tier: T.id, code: (() => { let c; do c = C.newPubCode(); while (this.rooms.has(c)); return c; })() }); this.rooms.set(room.code, room); }
+      const buy = room.settings.buyIn; this.debit(uid, buy);
+      try { C.join(room, uid, a.name); } catch (e) { this.credit(uid, buy); throw e; }
+      if (this.demoBots && C.humans(room).length === 1) {               // jen offline ukázka
+        while (room.seats.filter(Boolean).length < 4) C.addBot(room, null, true);
+        if (room.waiting && !room.hand) C.startHand(room);
+      }
+      this.where.set(uid, room.code);
+      return room;
+    }
+    lobby() {
+      const C = this.core;
+      return { tiers: C.TIERS.map(T => { const rs = [...this.rooms.values()].filter(r => C.isPub(r) && r.status !== 'closed' && r.settings.tier === T.id);
+        return { id: T.id, sb: T.sb, bb: T.bb, buyIn: T.bb * T.buyInBB, tables: rs.length, players: rs.reduce((s, r) => s + C.humans(r).length, 0) }; }) };
+    }
     room(code) { const r = this.rooms.get(String(code || '').toUpperCase().trim()); if (!r) throw err('no_room'); return r; }
     notify(room) { const s = this.subs.get(room.code); if (s) s.forEach(sub => { try { sub.fn(this.core.view(room, sub.uid)); } catch (e) { console.error(e); } }); }
     async call(uid, op, a) {
@@ -41,8 +77,17 @@
       const C = this.core;
       try {
         let room;
+        this.hit(uid, 'all');
         switch (op) {
           case 'points': return { points: this.pts(uid) };
+          case 'lobby': return this.lobby();
+          case 'quickseat': this.hit(uid, 'quickseat'); room = this.quickseat(uid, a); break;
+          case 'report': {
+            this.hit(uid, 'report'); room = this.room(a.code || this.where.get(uid));
+            const tg = C.reportTarget(room, uid, a.seat);
+            this.reports.push({ reporter: uid, reported: tg.uid, name: tg.name, code: room.code, hand: tg.hand, reason: String(a.reason || 'other').slice(0, 20) });
+            return { ok: true };
+          }
           case 'create': {
             const st = C.checkSettings(a.settings);
             this.debit(uid, st.buyIn);
@@ -61,6 +106,7 @@
           }
           default: {
             room = this.room(a.code || this.where.get(uid));
+            if (C.isPub(room)) this.reapRoom(room);
             if (op === 'leave') { const r = C.leave(room, uid); this.credit(uid, r.refund); this.where.delete(uid); }
             else if (op === 'start') C.start(room, uid);
             else if (op === 'addBot') C.addBot(room, uid);
@@ -77,7 +123,7 @@
         return { view: C.view(room, uid), points: this.pts(uid) };
       } catch (e) { throw err(e.code || 'server'); }
     }
-    tickAll() { this.rooms.forEach(r => { if (r.status === 'playing' && this.core.tick(r)) this.notify(r); }); }
+    tickAll() { this.rooms.forEach(r => { if (r.status !== 'playing') return; const v = r.ver; this.core.tick(r); if (this.core.isPub(r)) this.reapRoom(r); if (r.ver !== v) this.notify(r); }); }
     subscribe(code, uid, fn) { if (!this.subs.has(code)) this.subs.set(code, new Set()); const sub = { uid, fn }; this.subs.get(code).add(sub); return () => this.subs.get(code).delete(sub); }
   }
 
@@ -104,6 +150,9 @@
     act(action) { return this.op('act', { action }); }
     state() { return this.op('state'); }
     tick() { return this.op('tick'); }
+    quickseat(tier, name) { return this.op('quickseat', { tier, name, code: null }); }
+    lobby() { return this.server.call(this.uid, 'lobby', {}); }
+    report(seat, reason) { return this.server.call(this.uid, 'report', { code: this.code, seat, reason }); }
     onChange(fn) { this.fns.add(fn); return () => this.fns.delete(fn); }
   }
 
@@ -155,6 +204,9 @@
     act(action) { return this.op('act', { action }); }
     state() { return this.op('state'); }
     tick() { return this.op('tick'); }
+    quickseat(tier, name) { return this.op('quickseat', { tier, name, code: null }); }
+    lobby() { return this.call('lobby'); }
+    report(seat, reason) { return this.call('report', { seat, reason }); }
     onChange(fn) { this.fns.add(fn); return () => this.fns.delete(fn); }
   }
 
@@ -166,7 +218,7 @@
     try { return /[?&]mock=1\b/.test(root.location.search); } catch (e) { return false; }
   }
   function mockNet() {
-    if (!shared) shared = new MockServer();
+    if (!shared) shared = new MockServer({ demoBots: !root.__RR_PUB_NOBOTS });
     let uid = null; try { uid = localStorage.getItem('rr_mock_uid'); if (!uid) { uid = 'u-' + Math.random().toString(36).slice(2, 10); localStorage.setItem('rr_mock_uid', uid); } } catch (e) {}
     return new MockNet(shared, uid);
   }
@@ -177,6 +229,6 @@
     if (cfg.SUPABASE_URL && key && !/^sb_secret_/.test(key) && !wantMock(cfg)) return new SupabaseNet(cfg);
     return mockNet();
   }
-  const api = { MockServer, MockNet, SupabaseNet, makeNet, mockNet, mockServer: () => shared || (shared = new MockServer()), START_POINTS };
+  const api = { MockServer, MockNet, SupabaseNet, makeNet, mockNet, mockServer: () => shared || (shared = new MockServer({ demoBots: !root.__RR_PUB_NOBOTS })), START_POINTS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.RRNet = api;
 })(typeof window !== 'undefined' ? window : globalThis);
