@@ -38,8 +38,6 @@ const server = http.createServer((req, res) => {
   server.close();
   await ctx.setOffline(true);
   await page.goto(url, { waitUntil: 'load' });
-  await page.waitForTimeout(500);
-  if (await page.$('#playBtn')) await page.click('#playBtn');
   await page.waitForTimeout(800);
   out.offline = await page.evaluate(() => ({ title: document.title, cards: document.querySelectorAll('#heroCards .card').length, engine: typeof PE, buttons: document.querySelectorAll('#actions button,#actions .waiting').length }));
   await page.screenshot({ path: path.join(ROOT, 'screenshots/05-offline-pwa.png') });

@@ -10,14 +10,11 @@ Návrh aplikace, která tě učí poker: ukazuje šance na výhru, radí, co zah
   - **Režim učení** – po každém tahu hodnocení (Správně / Dá se / Nepřesnost / Velká chyba) a na konci ruky rozbor.
 - **Hlavní myšlenka učení:** hodnotit rozhodnutí, ne výsledek. Dobrý call může prohrát, špatný může vyhrát.
 
-## 2. Vizuální styl
-**Aktuální (v0.2): tmavé kasino.** Tmavě zelené plátno s jemnou texturou a radiálním světlem, zlaté a krémové akcenty, krémové karty se stínem, rub karet vínový se zlatou mřížkou, stůl jako ovál se zlatým lemem, pot jako zlatý žeton. Velká čitelná „Šance na výhru“ (zeleně, když je výrazně nad férovým podílem, červeně, když je hodně pod ním) s ukazatelem. Velká tlačítka (58 px). Na hlavní obrazovce je jen přepínač **Doporučené tahy** a malá ikona statistik. Šance i zpětná vazba jsou vždy zapnuté, počet soupeřů se volí na úvodní obrazovce (nebo ve statistikách).
-
-### Původní inspirace (Offsuit, v0.1)
+## 2. Vizuální styl (podle Offsuit)
 Vycházím z ověřených obrázků z App Store a webu offsuit.link (uloženo v `research/`):
 - čistě **černé pozadí**, tmavě šedé zaoblené panely (~`#24232A`), žádný zelený stůl,
 - **bílé karty** se zaoblenými rohy: velká hodnota vlevo nahoře („10“, ne „T“), symbol barvy vlevo dole, srdce/káry červeně,
-- neotočené karty boardu jako **bílé karty s černými diagonálními pruhy**,
+- neotočené karty boardu jako **červené rubové karty** (Offsuit má bílé s černými pruhy; u nás červené na přání),
 - soupeři v **řadě nahoře** (avatar, jméno, stack, malý odznak D pro dealera),
 - akční tlačítka jako **tmavé pilulky** („Call 4“, „Raise 8“) + kulaté tlačítko se šipkou,
 - vlastní karty dole vlevo přes sebe, vpravo panel s rukou a stackem,
@@ -27,11 +24,11 @@ Vycházím z ověřených obrázků z App Store a webu offsuit.link (uloženo v 
 Co jsem **nepřebíral**: avatary (Offsuit používá 3D postavičky – u nás iniciály v barevných kolečkách), logo, žádné jejich assety se v aplikaci nepoužívají.
 
 ## 3. Obrazovky
-1. **Stůl (hlavní obrazovka)** – lišta (přepínač *Doporučené tahy*, ikona statistik) → soupeři → board + pot → panel šancí (Výhra %, aktuální ruka / síla startovní ruky) → karta doporučení → karta zpětné vazby → akční tlačítka → tvoje karty a stack.
+1. **Stůl (hlavní obrazovka)** – lišta (logo, přepínač *Doporučené tahy*, statistiky, nastavení) → soupeři → board + pot → panel šancí (Výhra %, aktuální ruka / síla startovní ruky) → karta doporučení → karta zpětné vazby → akční tlačítka → tvoje karty a stack.
 2. **Velikost sázky** (spodní panel) – preflop 2,5 / 3 / 4 BB nebo 2,5× / 3× / 4×; postflop 1/3, 1/2, 2/3 potu, pot, all-in. Doporučená velikost je zvýrazněná.
 3. **Rozbor ruky** (po skončení) – výsledek, karty ve showdownu, seznam tvých rozhodnutí s barevným hodnocením a vysvětlením, tlačítko *Další ruka*.
 4. **Statistiky** – přesnost rozhodnutí, zisk v BB, BB/100, VPIP, PFR, % vyhraných rukou, počty hodnocení. Uloženo v prohlížeči.
-5. **Úvodní obrazovka** – výběr počtu soupeřů (1–3) a tlačítko *Začít hrát*. (Samostatné nastavení bylo zrušeno kvůli jednoduchosti.)
+5. **Nastavení** – Doporučené tahy, Šance na výhru, Režim učení, počet soupeřů (1–3).
 
 ## 4. Jak funguje „mozek“
 - **Vyhodnocení rukou:** vlastní 7karetní evaluátor (otestováno na všech typech kombinací).

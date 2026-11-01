@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0b2a1c">
+<meta name="theme-color" content="#000000">
 <meta name="description" content="Poker trenér – šance na výhru, doporučené tahy a zpětná vazba.">
 <title>Poker trenér</title>
 <link rel="manifest" href="manifest.webmanifest">
@@ -19,34 +19,29 @@
 <body>
 <div class="app" id="app">
   <header class="top">
-    <label class="rec-switch" title="Doporučené tahy">
-      <span class="rs-text"><b>Doporučené tahy</b><small id="recState">zapnuto</small></span>
+    <div class="brand">trenér</div>
+    <label class="switch-pill" title="Doporučené tahy">
+      <span>Doporučené tahy</span>
       <input type="checkbox" id="recToggle"><i></i>
     </label>
     <button class="icon-btn" id="statsBtn" aria-label="Statistiky">
-      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none"/></svg>
+      <svg viewBox="0 0 24 24" width="20" height="20"><path d="M5 20V10M12 20V4M19 20v-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" aria-label="Nastavení">
+      <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
     </button>
   </header>
 
   <section class="opps" id="opps"></section>
 
   <section class="table">
-    <div class="felt">
-      <div class="board" id="board"></div>
-      <div class="pot-row"><span class="street" id="street"></span><span class="pot" id="pot"></span></div>
-    </div>
+    <div class="board" id="board"></div>
+    <div class="pot-row"><span class="street" id="street"></span><span class="pot" id="pot"></span></div>
   </section>
 
   <section class="odds" id="odds">
-    <div class="odds-main">
-      <div class="lbl">Šance na výhru</div>
-      <div class="big" id="eqWin">–</div>
-    </div>
-    <div class="odds-side">
-      <div class="lbl" id="madeLbl">Ruka</div>
-      <div class="mid" id="made">–</div>
-    </div>
-    <div class="eqbar"><i id="eqBar"></i></div>
+    <div class="odds-cell"><div class="lbl">Výhra</div><div class="big win" id="eqWin">–</div></div>
+    <div class="odds-cell"><div class="lbl" id="madeLbl">Ruka</div><div class="mid" id="made">–</div></div>
     <div class="odds-sub" id="eqSub"></div>
   </section>
 
