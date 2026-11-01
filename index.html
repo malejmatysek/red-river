@@ -15,6 +15,27 @@
 <meta name="apple-mobile-web-app-title" content="Red River">
 <meta name="format-detection" content="telephone=no">
 <link rel="stylesheet" href="style.css">
+<script>
+/* v1.4.2: iOS (26) v režimu aplikace z plochy hlásí výšku okna menší, než je displej (o výšku stavového řádku).
+   Lišta s bottom:0 pak „visí“ nad spodním okrajem. Změříme mezeru a lištu posuneme až k hraně displeje (--vgap);
+   pod popisky zůstane jen místo pro indikátor Home (safe-area). */
+(function () {
+  var d = document.documentElement, ua = navigator.userAgent || '';
+  var ios = /iP(hone|od|ad)/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  function fix() {
+    var sa = navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+    var h = window.innerHeight, w = window.innerWidth, gap = 0;
+    if (ios && sa && h > w) { var sh = Math.max(screen.width, screen.height); gap = Math.round(sh - h); if (gap < 0 || gap > 140) gap = 0; }
+    d.style.setProperty('--vgap', gap + 'px');
+    d.style.setProperty('--sabfix', gap ? '34px' : '0px');   /* env() bývá v tomto stavu 0 */
+    d.classList.toggle('standalone', !!sa);
+  }
+  fix();
+  addEventListener('resize', fix); addEventListener('orientationchange', function () { setTimeout(fix, 300); });
+  addEventListener('pageshow', fix);
+  if (window.visualViewport) visualViewport.addEventListener('resize', fix);
+})();
+</script>
 </head>
 <body>
 <!-- úvodní obrazovka -->

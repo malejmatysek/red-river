@@ -204,7 +204,7 @@ body{display:block}
 @keyframes scrIn{from{transform:translateX(32px);opacity:0}}
 @keyframes scrBack{from{transform:translateX(-32px);opacity:0}}
 .screen>.app{margin:0 auto}
-.page{width:100%;max-width:440px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;
+.page{width:100%;max-width:440px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;
   padding:max(14px,env(safe-area-inset-top)) max(18px,env(safe-area-inset-right)) max(22px,calc(env(safe-area-inset-bottom) + 10px)) max(18px,env(safe-area-inset-left))}
 
 /* úvodní logo (splash) – Lumi se zatočí a usadí */
@@ -633,13 +633,16 @@ body{font-weight:500}
 .fr-ch{font-size:24px;color:#6d6c75;flex:none;line-height:1}
 #drillBtn{margin-top:0}
 /* spodní lišta */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:5;display:flex;justify-content:space-around;background:rgba(0,0,0,.88);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid #1c1b21;padding:9px max(10px,env(safe-area-inset-right)) max(12px,calc(env(safe-area-inset-bottom) + 6px)) max(10px,env(safe-area-inset-left))}
+/* lišta: vždy přišpendlená dole; pozadí sahá až ke spodní hraně displeje (i přes iOS mezeru --vgap),
+   tlačítka zůstávají nad indikátorem Home a v dotykové oblasti */
+:root{--sab:env(safe-area-inset-bottom,0px);--sabfix:0px;--vgap:0px;--tabpad:calc(max(var(--sab),var(--sabfix)) + 4px);--tabh:calc(56px + var(--tabpad))}
+.tabbar{position:fixed;left:0;right:0;bottom:calc(-1 * var(--vgap));top:auto;z-index:5;display:flex;justify-content:space-around;align-items:flex-start;margin:0;transform:none;background:rgba(0,0,0,.92);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border-top:1px solid #1c1b21;padding:8px max(10px,env(safe-area-inset-right)) var(--tabpad) max(10px,env(safe-area-inset-left))}
 .tabbar[hidden]{display:none}
 .tb{display:flex;flex-direction:column;align-items:center;gap:4px;color:#6d6c75;font-size:11px;font-weight:650;line-height:1;width:88px;background:none;border:0;padding:2px 0}
 .tb svg{width:24px;height:24px}
 .tb.on{color:#fff}.tb.on svg{color:#FF2D4A}
-body.tabs .tabscr .page{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
-body.tabs .toast{bottom:calc(80px + env(safe-area-inset-bottom))}
+body.tabs .tabscr .page{padding-bottom:calc(var(--tabh) + 24px)}
+body.tabs .toast{bottom:calc(var(--tabh) - var(--vgap) + 10px)}
 .tabroot .nav .bk{display:none}
 .tabroot .nav .t{margin-left:4px}
 /* Profil */
