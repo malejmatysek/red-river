@@ -153,6 +153,7 @@
     if (id === 'ach') renderAch();
     if (prev === 'wheel' && id !== 'wheel') clearInterval(wheelTimer);
     if (id === 'drill') { if (!D.spot) drillNew(); else renderDrill(); }
+    if (window.OnlineUI) window.OnlineUI.onShow(id, prev);   // online stoly (online/ui.js)
     if (id === 'game') {
       render();
       if (!G.handNo) startHand();
@@ -1332,6 +1333,7 @@
     if (nav.cur === 'stats') renderStats(); if (nav.cur === 'learn') renderLearn(); if (nav.cur === 'shop') renderShop(); if (nav.cur === 'settings') renderSettings();
     if (nav.cur === 'wheel') renderWheel(); if (nav.cur === 'ach') renderAch();
     if (!$('sheet').hidden && G.over) showSummary(); else closeSheet();
+    if (window.OnlineUI) window.OnlineUI.onLang();
   }
 
   /* ---------- oznámení (toast) + aktualizace ---------- */
@@ -1341,6 +1343,8 @@
     $('toast').hidden = false; $('toast').classList.remove('out');
     clearTimeout(toastT); if (!sticky) toastT = setTimeout(() => { $('toast').classList.add('out'); setTimeout(() => $('toast').hidden = true, 250); }, 2600);
   }
+  /* sdílené pomůcky pro online stoly (online/ui.js) */
+  window.RR = { nav, t, $, openSheet, closeSheet, toast, cardHTML, SFX, vib, fmtPts, rich, settings, applyStatic, noAnim };
   window.__rr = { updateReady: () => toast(t('upd.msg'), t('upd.btn'), () => location.reload(), true), toast };
 
   /* ---------- start ---------- */

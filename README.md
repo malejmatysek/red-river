@@ -57,3 +57,7 @@ python3 -m http.server 8080   # pak otevři http://localhost:8080
   - `node test_flicker.js <složka projektu> [složka na snímky]` – kontrola blikání (DOM + snímky po framech)
   - `node shots.js` – snímky obrazovek skutečné aplikace do `screenshots/app-*.png`
   - cestu k prohlížeči lze nastavit proměnnou `CHROME=/cesta/k/chrome`
+
+## Online stoly (větev `online`, zatím nenasazeno)
+
+Hra s kamarády u soukromého stolu s kódem, o virtuální body. Nastavení serveru (Supabase) a popis architektury: [ONLINE.md](ONLINE.md).

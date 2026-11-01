@@ -1,0 +1,10 @@
+# Supabase CLI – projekt Red River (online stoly)
+project_id = "ffrmpprhcgyfbtabhmzu"
+
+[functions.table]
+# JWT ověřuje funkce sama (admin.auth.getUser), aby šel i `sweep` s tajným klíčem z cronu
+verify_jwt = false
+
+[auth]
+# Online stoly používají anonymní přihlášení (bez e-mailu/hesla) – v dashboardu: Authentication → Sign In / Providers → Allow anonymous sign-ins
+enable_anonymous_sign_ins = true

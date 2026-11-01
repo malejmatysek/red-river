@@ -58,3 +58,12 @@ exit 0
 == shots
 shots OK
 exit 0
+
+== Online (větev online) 2026-11-01 19:43 Europe/Prague
+== test_online
+     showdowny 214, dělené poty 9, all-iny 114, dokoupení 78
+--
+== test_online_ui
+ONLINE UI OK
+deno check supabase/functions/table/index.ts + supabase/dashboard/table.ts: OK
+SETUP.sql na PostgreSQL 17 (Supabase-like role): 2× spuštěno OK, RLS testy OK
