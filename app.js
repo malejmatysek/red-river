@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.8.1', BUILD = 'v24';
+  const APP_VERSION = '1.8.2', BUILD = 'v25';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -1040,36 +1040,41 @@
     };
     const begin = (x, y, target) => {
       if (sh.hidden || (target && target.closest && target.closest('input[type=range],.no-swipe'))) return;
-      const top = y - sh.getBoundingClientRect().top < 58 || !!(target && target.closest && target.closest('.grab'));
+      const top = y - sh.getBoundingClientRect().top < 64 || !!(target && target.closest && target.closest('.grab'));
       st = { x0: x, y0: y, top, sc: scroller(target), drag: false, d: 0, pts: [[performance.now(), y]] };
     };
     const move = (x, y, ev) => {
       if (!st) return;
       const dy = y - st.y0, dx = x - st.x0;
       if (!st.drag) {
-        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { st = null; return; }
-        if (dy > 6 && (st.top || (st.sc.scrollTop <= 0 && sh.scrollTop <= 0))) { st.drag = true; st.y0 = y; sh.classList.add('dragging'); }
-        else if (dy < -6 && !st.top) { st = null; return; }
-        else return;
+        if (!st.top && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { st = null; return; }
+        const pull = st.top || (st.sc.scrollTop <= 0 && sh.scrollTop <= 0);
+        if (dy < 0 && !st.top) { st = null; return; }                    // nahoru = normální rolování
+        if (!pull) { st = null; return; }
+        if (ev && ev.cancelable) ev.preventDefault();                      // hned od prvního pohybu, jinak iOS převezme scroll
+        if (dy <= 4) return;
+        st.drag = true; st.y0 = y; sh.classList.add('dragging');
       }
       if (ev && ev.cancelable) ev.preventDefault();
+      clearTimeout(st.wd); st.wd = setTimeout(end, 800);                 // pojistka: iOS někdy nepošle touchend
       const d = y - st.y0; st.d = d > 0 ? d : d / 4;
       st.pts.push([performance.now(), y]); if (st.pts.length > 6) st.pts.shift();
       set(Math.max(0, st.d), false);
     };
-    const end = () => {
-      if (!st) return; const S = st; st = null;
+    function end() {
+      if (!st) return; const S = st; st = null; clearTimeout(S.wd);
       if (!S.drag) return;
       sh.classList.remove('dragging');
       const a = S.pts[0], b = S.pts[S.pts.length - 1], v = (b[1] - a[1]) / Math.max(1, b[0] - a[0]);   // px/ms
       if (S.d > Math.min(150, sh.offsetHeight * 0.3) || (v > 0.4 && S.d > 24)) {
         set(sh.offsetHeight + 40, true);
         setTimeout(() => { close(); set(0, false); requestAnimationFrame(() => { sh.style.transition = ''; if (scrim) scrim.style.transition = ''; }); }, 210);
-      } else set(0, true);
-    };
+      } else { set(0, true); setTimeout(() => { if (!st) { sh.style.transition = ''; sh.style.transform = ''; if (scrim) { scrim.style.transition = ''; scrim.style.opacity = ''; } } }, 260); }
+    }
     sh.addEventListener('touchstart', e => { if (e.touches.length === 1) begin(e.touches[0].clientX, e.touches[0].clientY, e.target); else st = null; }, { passive: true });
     sh.addEventListener('touchmove', e => { if (e.touches.length === 1) move(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
     sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
+    document.addEventListener('touchend', end, true); document.addEventListener('touchcancel', end, true);
     // myš (desktop): jen za úchyt/hlavičku
     sh.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button) return; begin(e.clientX, e.clientY, e.target); if (st && !st.top) st = null; });
     addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && st) move(e.clientX, e.clientY, null); });

@@ -1000,6 +1000,7 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 /* ---------- sheet: swipe dolů ---------- */
 .sheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .sheet .grab{position:relative;touch-action:none;cursor:grab}
+.sheet>.grab+h2,.sheet>.grab+h2+.sub{touch-action:none}
 .sheet .grab::before{content:'';position:absolute;left:-90px;right:-90px;top:-12px;bottom:-14px}
 .sheet.dragging{animation:none;user-select:none;-webkit-user-select:none}
 /* ligy: zamčené v plných barvách, jen zámek */
