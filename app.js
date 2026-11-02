@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.8.0', BUILD = 'v23';
+  const APP_VERSION = '1.8.1', BUILD = 'v24';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -173,7 +173,7 @@
   }
   document.addEventListener('visibilitychange', () => playClock(nav.cur === 'game'));
   function onShow(id, prev) {
-    if (id === 'home') { renderHome(); renderHomeGuide(); }
+    if (id === 'home') { renderHome(); renderHomeGuide(); if (prev === 'game') maybeCoach(); }
     if (id === 'profile') renderProfile();
     if (id === 'settings') renderSettings();
     if (id === 'stats') renderStats();
@@ -257,6 +257,7 @@
     $('glAll').onclick = () => { closeGloss(); closeSheet(); gdTab = 'terms'; if (nav.cur === 'guide') renderGuide(); else nav.go('guide'); };
   }
   function closeGloss() { $('gloss').hidden = true; $('glossScrim').hidden = true; }
+  setTimeout(() => sheetSwipe($('gloss'), $('glossScrim'), () => closeGloss()), 0);
   $('glossScrim').onclick = closeGloss;
   document.addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (!g || g.closest('#gloss') || (classic && g.closest('#scr-game'))) return; e.stopPropagation(); e.preventDefault(); openGloss(g.dataset.g); }, true);
 
@@ -354,19 +355,23 @@
 
   /* ---------- průběh ruky ---------- */
   function startHand() {
-    closeSheet();
+    closeSheet(); hideFx();
     if (G.dealing) return;
-    applyBlinds();
-    if (!setupPlayers()) return needPoints(START);
-    if (settings.bankroll && hero().stack < BB && wallet.points < START) return needPoints(START);
-    if (!settings.bankroll && wallet.points < START) return needPoints(START);
+    if (G.tableKey === 'tour' && !(tour && tour.active)) G.tableKey = '';
+    if (G.tableKey === 'tour' && G.over && G.handNo && hero().stack <= 0) return;   // turnaj skončil
+    if (!inTour()) {
+      applyBlinds();
+      if (!setupPlayers()) return needPoints(START);
+      if (settings.bankroll && hero().stack < BB && wallet.points < START) return needPoints(START);
+      if (!settings.bankroll && wallet.points < START) return needPoints(START);
+    } else tourPrep();
     const prevShown = G.players.map(p => p.cards && !p.folded ? 2 : 0);
     G.handNo++;
     G.dealer = (G.dealer + 1) % n();
     G.deck = newDeck(); G.board = []; G.street = 0; G.over = false; G.decisions = []; G.feedback = null; G.lastDec = null; G.coach = null; G.hold = false; G.hint = false; G.retry = false;
     G.pfAgg = -1; G.read = G.read || session.read || {}; G.players.forEach(p => p.chk = false);
     G.heroVpip = G.heroPfr = G.heroFlop = false; G.winners = null; G.eq = null; G.eqStreet = -1; G.ctx = null; G.rec = null;
-    assignStacks();
+    if (!inTour()) assignStacks();
     G.players.forEach((p, i) => Object.assign(p, { bet: 0, total: 0, folded: false, allIn: false, acted: false, last: '', pf: '', cards: [G.deck.pop(), G.deck.pop()], show: false, seen: noAnim() ? 2 : prevShown[i] }));
     const sbSeat = n() === 2 ? G.dealer : (G.dealer + 1) % n(), bbSeat = (sbSeat + 1) % n();
     put(G.players[sbSeat], SB); G.players[sbSeat].last = 'SB ' + SB;
@@ -598,7 +603,8 @@
     stats.hands++; stats.netBB = Math.round((stats.netBB + net / BB) * 10) / 10; if (heroWon) stats.won++;
     if (G.heroVpip) stats.vpip++; if (G.heroPfr) stats.pfr++;
     if (G.heroFlop) stats.sawFlop++;
-    trophiesForHand(heroWon && net > 0, sdHand, !heroWon && G.heroVpip && net < 0, classic ? LG.TROPHY.classicX : 1);
+    const T = inTour();
+    if (!T) trophiesForHand(heroWon && net > 0, sdHand, !heroWon && G.heroVpip && net < 0, classic ? LG.TROPHY.classicX : 1);
     if (sdHand && !h0.folded) { stats.sd++; if (heroWon) stats.sdWon++; }
     if (h0.allIn) stats.allins++;
     if (heroWon) stats.bigPot = Math.max(stats.bigPot, pot());
@@ -608,7 +614,7 @@
       stats.types[cat] = (stats.types[cat] || 0) + 1;
       if (sc > stats.best) { stats.best = sc; stats.bestCards = h0.cards.concat(G.board); }
     }
-    if (!settings.bankroll) { wallet.points += net; saveW(); }
+    if (!settings.bankroll && !T) { wallet.points += net; saveW(); }
     stats.hist.push(Math.round(wallet.points + (settings.bankroll ? h0.stack : 0)));
     if (!stats.histP.length) stats.histP.push(stats.profit - net);
     stats.histP.push(stats.profit);
@@ -618,16 +624,23 @@
     if (heroWon && pot() >= 50 * BB) wallet.flags.bigPot = 1;
     dayTick(); wallet.day.hands++; save('pt_wallet', wallet);
     save('pt_stats', stats);
-    session.hands++; session.netBB = Math.round((session.netBB + net / BB) * 10) / 10;
-    session.hero = hero().stack; session.dealer = G.dealer; session.bank = settings.bankroll;
-    PE.readHand(G.read || (G.read = {})); session.read = G.read;
-    session.bots = G.players.slice(1).map(p => ({ name: p.name, color: p.color, style: p.style, stack: p.stack }));
-    save('pt_session', session);
+    PE.readHand(G.read || (G.read = {}));
+    if (T) tourAfter();
+    else {
+      session.hands++; session.netBB = Math.round((session.netBB + net / BB) * 10) / 10;
+      session.hero = hero().stack; session.dealer = G.dealer; session.bank = settings.bankroll;
+      session.read = G.read;
+      session.bots = G.players.slice(1).map(p => ({ name: p.name, color: p.color, style: p.style, stack: p.stack }));
+      save('pt_session', session);
+    }
+    coachNote();
     if (net > 0) { SFX.win(); vib([20, 40, 30]); }
     checkAch();
     render();
     const shown = G.players.filter(p => p.show && !p.hero).length;
-    if (!expert() && !classic) setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : (1000 + shown * 450) * spd());
+    const fxK = h0.folded ? 'fold' : net > 0 ? 'win' : net < 0 ? 'lose' : 'split', fxBig = fxK !== 'fold' && !(T && !(tour && tour.active));
+    if (fxK === 'fold' || fxBig) handFx(fxK, Math.abs(net), fxK === 'fold' ? 150 : (sdHand ? 500 + shown * 450 : 250) * spd());
+    if (!expert() && !classic) setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : (1000 + shown * 450 + (fxBig ? 1500 : 0)) * spd());
   }
 
   /* ---------- ukazatel síly ruky (jen vlastní karty + board; bez informací o soupeřích) ---------- */
@@ -664,10 +677,213 @@
         <button class="btn primary wide" id="setupGo">${t('cl.go')}</button>`);
       $('sheet').querySelectorAll('[data-bl]').forEach(b => b.onclick = () => { settings[dk] = +b.dataset.bl; save('pt_settings', settings); SFX.tap(); draw(); });
       $('setupMeter').onchange = e => { settings[mk] = e.target.checked; save('pt_settings', settings); };
-      $('setupGo').onclick = () => { SFX.unlock(); classic = cl; closeSheet(); syncBotLvl(); lastActions = ''; nav.go('game'); };
+      $('setupGo').onclick = () => { SFX.unlock(); leaveTourTable(); classic = cl; closeSheet(); syncBotLvl(); lastActions = ''; nav.go('game'); };
     };
     draw();
   }
+
+  /* ---------- Lumi kouč: po sezení krátké osobní shrnutí – největší chyby + doporučený trénink ---------- */
+  const LEAKS = {
+    loosePre: { drill: 'vsOpen' }, tightPre: { drill: 'vsOpen' }, shortPre: { drill: 'push' }, allinCall: { drill: 'vsShove' },
+    station: { drill: 'riverBet' }, foldMuch: { drill: 'flopBet' }, passive: { drill: 'checked' }, overAgg: { drill: 'bluff' }, lowSpr: { drill: 'lowSpr' }
+  };
+  let CS = load('pt_coach', { hands: 0, dec: 0, good: 0, vpip: 0, leaks: {}, ex: {}, mode: '' });
+  const saveCS = () => save('pt_coach', CS);
+  function leakOf(d) {
+    const g = d.grade; if (!g || (g.level !== 'meh' && g.level !== 'bad')) return null;
+    const c = d.ctx, a = d.action, r = (PE.recommend(c) || {}).action || '', bb = c.bb || BB, effBB = (c.eff || c.stack) / bb;
+    const agg = x => x === 'bet' || x === 'raise' || x === 'allin', pas = x => x === 'check' || x === 'call';
+    if (c.street === 0) {
+      if (effBB <= 15) return 'shortPre';
+      if (a === 'call' && c.toCall >= c.stack) return 'allinCall';
+      if (a === 'fold') return 'tightPre';
+      return r === 'fold' ? 'loosePre' : null;
+    }
+    if (effBB <= 12 && c.pot > c.stack) return 'lowSpr';
+    if (a === 'call' && c.toCall >= c.stack && r === 'fold') return 'allinCall';
+    if (a === 'call' && r === 'fold') { const k = 'station'; LEAKS.station.drill = c.street === 3 ? 'riverBet' : c.street === 2 ? 'turnBet' : 'flopBet'; return k; }
+    if (a === 'fold' && r !== 'fold') { LEAKS.foldMuch.drill = c.street === 3 ? 'riverBet' : c.street === 2 ? 'turnBet' : 'flopBet'; return 'foldMuch'; }
+    if (pas(a) && agg(r)) return 'passive';
+    if (agg(a) && !agg(r)) return 'overAgg';
+    return null;
+  }
+  function coachNote() {
+    const ds = G.decisions.filter(d => d.grade);
+    CS.hands++; CS.mode = inTour() ? 'tour' : classic ? 'classic' : 'train';
+    if (G.heroVpip) CS.vpip++;
+    ds.forEach(d => { CS.dec++; if (d.grade.level === 'good' || d.grade.level === 'ok') CS.good++;
+      const k = leakOf(d); if (k) { CS.leaks[k] = (CS.leaks[k] || 0) + (d.grade.level === 'bad' ? 2 : 1); if (!CS.ex[k]) CS.ex[k] = { h: d.ctx.hole.slice(), b: d.ctx.board.slice(), a: d.action }; } });
+    saveCS();
+  }
+  const COACH_MIN = 8;
+  function coachReport() {
+    const acc = CS.dec ? Math.round(CS.good / CS.dec * 100) : 0, vp = CS.hands ? CS.vpip / CS.hands : 0;
+    const L = Object.assign({}, CS.leaks);
+    if (CS.hands >= 12 && vp > 0.45) L.loosePre = (L.loosePre || 0) + 3;
+    if (CS.hands >= 15 && vp < 0.1) L.tightPre = (L.tightPre || 0) + 3;
+    const top = Object.entries(L).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]);
+    return { acc, vp, top, drill: top.length ? LEAKS[top[0]].drill : (acc >= 85 ? 'riverBet' : 'flopBet') };
+  }
+  function maybeCoach() {
+    if (!window.__COACH) return;   // kouč zatím vypnutý (nedokončeno)
+    if (CS.hands < COACH_MIN) return false;
+    setTimeout(showCoach, FAST() ? 0 : 450); return true;
+  }
+  function showCoach() {
+    if (CS.hands < COACH_MIN || !$('lgUp').hidden) return;
+    const R = coachReport(), mood = R.acc >= 80 ? 'good' : R.acc >= 60 ? 'ok' : 'low';
+    const exHTML = k => { const e = CS.ex[k]; return e ? `<span class="co-ex">${e.h.map(c => chip(c)).join('')}${e.b.length ? ' · ' + e.b.map(c => chip(c)).join('') : ''}</span>` : ''; };
+    openSheet(`<div class="co-hd"><span class="co-lumi">${lumiSVG(wallet.equip.lumi)}</span><div><span class="lg-k">${t('lc.kicker')}</span><h2>${t('lc.title.' + mood)}</h2>
+        <div class="sub">${t('lc.stats', { n: CS.hands, a: CS.dec ? R.acc + ' %' : '–', v: Math.round(R.vp * 100) + ' %' })}</div></div></div>
+      ${R.top.length ? `<h3>${t('lc.leaks')}</h3>` + R.top.map((k, i) => `<div class="co-leak"><b><i>${i + 1}</i>${t('lc.l.' + k)}</b><p>${t('lc.d.' + k)}</p>${exHTML(k)}</div>`).join('')
+        : `<div class="co-leak ok"><b>${t('lc.clean')}</b><p>${t('lc.cleanD')}</p></div>`}
+      <h3>${t('lc.drill')}</h3>
+      <button class="co-drill" id="coDrill"><span class="co-dic">🎯</span><span><b>${t('drk.' + R.drill)}</b><small>${t('lc.drillSub')}</small></span><span class="fr-ch">›</span></button>
+      <button class="btn wide ghost" id="coLater">${t('lc.later')}</button>`);
+    const reset = () => { CS = { hands: 0, dec: 0, good: 0, vpip: 0, leaks: {}, ex: {}, mode: '' }; saveCS(); };
+    stats.coach = (stats.coach || 0) + 1; save('pt_stats', stats);
+    $('coDrill').onclick = () => { reset(); closeSheet(); SFX.tap(); D.focus = R.drill; D.spot = null; nav.go('drill'); };
+    $('coLater').onclick = () => { reset(); closeSheet(); };
+  }
+  window.RRCoach = { show: showCoach, state: () => CS };
+
+  /* ---------- turnaj proti botům: 6 hráčů, rostoucí blindy, hraje se do posledního, výhry v bodech + trofeje do ligy ---------- */
+  const TOUR = {
+    seats: 6, stack: 1500, perLevel: 5,
+    levels: [[10, 20], [15, 30], [25, 50], [40, 80], [60, 120], [100, 200], [150, 300], [250, 500], [400, 800], [600, 1200], [1000, 2000], [1500, 3000]],
+    buyins: [{ pts: 200, lg: 0, skill: 0 }, { pts: 1000, lg: 2, skill: 1 }, { pts: 5000, lg: 4, skill: 2 }],
+    payout: [0.6, 0.3, 0.1],                 // z banku 6 × vklad
+    trophies: [30, 15, 6, -4, -4, -4]        // podle umístění (pod hranici ligy se nespadne)
+  };
+  let tour = (() => { try { const x = JSON.parse(localStorage.getItem('pt_tour') || 'null'); return x && x.active ? x : null; } catch (e) { return null; } })();
+  const saveTour = () => { try { localStorage.setItem('pt_tour', JSON.stringify(tour)); } catch (e) {} };
+  const inTour = () => !!(tour && tour.active && G.tableKey === 'tour');
+  const tourLevel = () => Math.min(TOUR.levels.length - 1, Math.floor(Math.max(0, tour.hand - 1) / TOUR.perLevel));
+  const tourPrize = (bi, place) => Math.round(TOUR.buyins[bi].pts * TOUR.seats * (TOUR.payout[place - 1] || 0));
+  function tourSnapshot() {
+    tour.players = G.players.map(p => ({ name: p.name, color: p.color, hero: !!p.hero, stack: p.stack, style: p.style || null }));
+    tour.dealer = G.dealer; saveTour();
+  }
+  function tourSeat() {                                   // posadit (nebo obnovit) turnajový stůl
+    G.tableKey = 'tour'; classic = true;
+    G.players = tour.players.map(p => p.hero ? { name: 'Ty', hero: true, stack: p.stack } : { name: p.name, color: p.color, style: PE.botOf(p.style, rnd), stack: p.stack });
+    G.players.forEach(p => Object.assign(p, { cards: [], bet: 0, total: 0, folded: false, allIn: false, show: false, seen: 0, last: '' }));
+    G.dealer = tour.dealer; G.handNo = 0; G.over = true; G.read = {}; G.revealed = false; G.winners = null; G.board = [];
+    buildOpps();
+  }
+  function tourStart(bi) {
+    const B = TOUR.buyins[bi];
+    if (wallet.points < B.pts) return needPoints(B.pts);
+    addPts(-B.pts);
+    tour = { active: true, bi, hand: 0, out: [], started: Date.now(), players: [], dealer: -1 };
+    G.tableKey = 'tour'; G.players = [{ name: 'Ty', hero: true, stack: TOUR.stack }];
+    for (let i = 1; i < TOUR.seats; i++) { const b = newBot(TOUR.stack); b.style.skill = B.skill; G.players.push(b); }
+    G.dealer = randInt(TOUR.seats) - 1;
+    tourSnapshot(); tourSeat();
+    closeSheet(); SFX.unlock(); lastActions = ''; nav.go('game');
+  }
+  /* před každou rukou: vyřadit boty bez žetonů, blindy podle úrovně */
+  function tourPrep() {
+    const busted = G.players.filter(p => !p.hero && p.stack <= 0);
+    if (busted.length) {
+      let d = G.dealer;
+      G.players.forEach((p, i) => { if (busted.includes(p) && i <= G.dealer) d--; });
+      G.players = G.players.filter(p => !busted.includes(p)); G.dealer = d;
+      buildOpps();
+    }
+    tour.hand++;
+    const lv = tourLevel(), [sb, bb] = TOUR.levels[lv];
+    SB = sb; BB = bb;
+    G.players.forEach(p => p.start = p.stack);
+    G.scenario = busted.length ? t('to.out', { a: busted.map(p => p.name).join(', ') }) : lv && (tour.hand - 1) % TOUR.perLevel === 0 ? t('to.up', { b: sb + '/' + bb }) : '';
+    if (G.scenario && lv && (tour.hand - 1) % TOUR.perLevel === 0) vib([10, 30, 10]);
+  }
+  /* po ruce: kdo vypadl, konec turnaje */
+  function tourAfter() {
+    if (!tour || !tour.active) return;
+    const startOf = p => p.start;
+    const bust = G.players.filter(p => p.stack <= 0).sort((a, b) => startOf(b) - startOf(a));
+    const left = G.players.filter(p => p.stack > 0);
+    bust.forEach((p, k) => { if (!tour.out.some(o => o.name === p.name && !o.hero)) tour.out.push({ name: p.hero ? '' : p.name, hero: !!p.hero, place: left.length + 1 + k }); });
+    const h = hero();
+    if (h.stack <= 0) return tourEnd(tour.out.find(o => o.hero).place);
+    if (left.length === 1) return tourEnd(1);
+    tourSnapshot();
+  }
+  function tourEnd(place) {
+    const bi = tour.bi, prize = tourPrize(bi, place), tr = TOUR.trophies[place - 1] || 0;
+    tour.active = false; tour.place = place; saveTour();
+    stats.tours = (stats.tours || 0) + 1; if (place === 1) stats.tourWins = (stats.tourWins || 0) + 1; save('pt_stats', stats);
+    if (prize) addPts(prize);
+    const lg0 = wallet.league;
+    addTrophies(tr);
+    setTimeout(() => showTourResult(place, prize, tr, bi), FAST() ? 0 : 1800);
+    return lg0;
+  }
+  function showTourResult(place, prize, tr, bi, id) {
+    if (id === undefined) id = tour && tour.started;
+    if (!tour || tour.started !== id || tour.active) return;   // mezitím jiný turnaj / už zavřeno
+    const el = $('lgUp'); if (!el.hidden) { setTimeout(() => showTourResult(place, prize, tr, bi, id), 600); return; }
+    const win = place === 1;
+    el.className = 'lg-up tr-res' + (win ? ' win' : '');
+    el.innerHTML = `<div class="lg-rays"></div><div class="lg-in"><div class="lg-kick">${t('to.over')}</div>
+      <div class="tr-place"><b>${place}.</b><small>${t('to.of', { n: TOUR.seats })}</small></div>
+      <div class="tr-lumi">${lumiSVG(win ? 'crown' : wallet.equip.lumi)}</div>
+      <h1>${t(win ? 'to.win' : place <= 3 ? 'to.itm' : 'to.bust')}</h1>
+      <div class="lg-rw"><div><span>${ICON.pts(18)}</span>${prize ? t('to.prize', { n: fmtNum(prize) }) : t('to.noPrize')}</div>
+      <div><span>${TROPHY_IC}</span>${tr >= 0 ? '+' : '−'}${Math.abs(tr)} ${t('to.tro')}</div></div>
+      <button class="btn primary wide" id="trAgain">${t('to.again')}</button><button class="btn wide ghost" id="trOk">${t('to.home')}</button></div>`;
+    el.hidden = false; if (win) { SFX.win(); vib([20, 40, 20, 40, 60]); }
+    const close = () => { el.hidden = true; G.tableKey = ''; G.handNo = 0; G.players = []; tour = null; saveTour(); };
+    $('trOk').onclick = () => { SFX.tap(); close(); nav.home(); };
+    $('trAgain').onclick = () => { SFX.tap(); close(); nav.home(); setTimeout(() => openTour(bi), 300); };
+  }
+  function renderTourBar() {
+    const el = $('tourBar'); if (!el) return;
+    const on = inTour(); el.hidden = !on; if (!on) return;
+    if (tour.active && !G.over && G.handNo) { const hp = tour.players.find(p => p.hero); if (hp && hp.stack !== hero().stack) { hp.stack = Math.max(0, hero().stack); saveTour(); } }   // reload uprostřed ruky = fold
+    const lv = tourLevel(), [sb, bb] = TOUR.levels[lv], left = G.players.filter(p => p.stack > 0 || !G.over).length;
+    const nx = TOUR.perLevel - ((tour.hand - 1) % TOUR.perLevel) - 1;
+    setHTML(el, `<span class="tb-k">${t('to.short')}</span><span><b>${sb}/${bb}</b> ${t('to.lvl', { n: lv + 1 })}</span><span>${t('to.left', { n: left, m: TOUR.seats })}</span><span class="tb-nx">${lv < TOUR.levels.length - 1 ? t('to.next', { n: nx + 1 }) : ''}</span>`);
+  }
+  function openTour(sel) {
+    if (tour && tour.active) {
+      openSheet(`<h2>${t('to.title')}</h2><div class="sub">${t('to.running', { n: tour.players.length, b: TOUR.levels[tourLevel()].join('/') })}</div>
+        <button class="btn primary wide" id="toCont">${t('to.cont')}</button><button class="btn wide ghost" id="toQuit">${t('to.quit')}</button>`);
+      $('toCont').onclick = () => { closeSheet();
+        const hp = tour.players.find(p => p.hero); if (G.tableKey !== 'tour' && hp && hp.stack <= 0) { tour.out.push({ hero: true, place: tour.players.filter(p => p.stack > 0).length + 1 }); tourEnd(tour.out[tour.out.length - 1].place); return; }
+        if (G.tableKey !== 'tour') tourSeat(); classic = true; lastActions = ''; nav.go('game'); };
+      $('toQuit').onclick = () => { const bi = tour.bi; tour.players = tour.players.map(p => p.hero ? Object.assign(p, { stack: 0 }) : p);
+        tour.out.push({ hero: true, place: tour.players.filter(p => p.stack > 0).length + 1 }); closeSheet();
+        if (G.tableKey === 'tour') { G.tableKey = ''; G.handNo = 0; G.players = []; }
+        tour.active = true; const pl = tour.out[tour.out.length - 1].place; tourEnd(pl); };
+      return;
+    }
+    let bi = sel != null ? sel : Math.min(+settings.tourBi || 0, TOUR.buyins.length - 1);
+    const draw = () => {
+      openSheet(`<h2>${t('to.title')}</h2><div class="sub">${t('to.sub', { n: TOUR.seats, s: fmtNum(TOUR.stack), h: TOUR.perLevel })}</div>
+        <h3>${t('to.buyin')}</h3><div class="bl-opts">${TOUR.buyins.map((B, i) => { const lock = wallet.league < B.lg;
+          return `<button class="bl-opt to-opt ${bi === i ? 'on' : ''} ${lock ? 'lock' : ''}" data-bi="${i}" ${lock ? 'disabled' : ''}><b>${ICON.pts(15)} ${fmtNum(B.pts)}</b><small>${lock ? t('to.lock', { l: lgName(B.lg) }) : t('to.win1', { n: fmtNum(tourPrize(i, 1)) })}</small><span class="bl-dots">${'●'.repeat(B.skill + 1)}${'○'.repeat(2 - B.skill)}</span></button>`; }).join('')}</div>
+        <div class="to-pay">${[1, 2, 3].map(pl => `<div><b>${pl}.</b><span>${ICON.pts(13)} ${fmtNum(tourPrize(bi, pl))}</span><small>+${TOUR.trophies[pl - 1]} ${t('to.tro')}</small></div>`).join('')}</div>
+        <div class="sub cl-note">${t('to.note')}</div>
+        <button class="btn primary wide" id="toGo">${t('to.go', { n: fmtNum(TOUR.buyins[bi].pts) })}</button>`);
+      $('sheet').querySelectorAll('[data-bi]').forEach(b => b.onclick = () => { bi = +b.dataset.bi; settings.tourBi = bi; save('pt_settings', settings); SFX.tap(); draw(); });
+      $('toGo').onclick = () => tourStart(bi);
+    };
+    draw();
+  }
+  /* odchod od rozehrané turnajové ruky (do tréninku / klasické hry) = fold: vložené žetony propadnou */
+  function leaveTourTable() {
+    if (G.tableKey !== 'tour') return;
+    if (tour && tour.active && !G.over && G.handNo) { const hp = tour.players.find(p => p.hero); if (hp) hp.stack = Math.max(0, hero().stack); saveTour(); }
+    G.tableKey = ''; G.handNo = 0;
+  }
+  function renderTourTile() {
+    const sub = $('homeTourSub'); if (!sub) return;
+    setText(sub, tour && tour.active ? t('to.tileRun', { b: TOUR.levels[tourLevel()].join('/'), n: tour.players.filter(p => p.stack > 0).length }) : t('to.tileSub', { n: fmtNum(tourPrize(TOUR.buyins.reduce((m, B, i) => wallet.league >= B.lg ? i : m, 0), 1)) }));
+    $('homeTour').classList.toggle('run', !!(tour && tour.active));
+  }
+  $('homeTour').onclick = () => { SFX.unlock(); SFX.tap(); openTour(); };
 
   /* ---------- vykreslení: trvalé DOM prvky, mění se jen obsah (žádné blikání) ---------- */
   function cardInner(c) { const s = PE.SUITS[PE.suitOf(c)]; return `<span class="rk">${PE.RANKS[PE.rankOf(c)]}</span><span class="st">${PE.SUIT_SYM[s]}</span>`; }
@@ -756,9 +972,9 @@
     // šance
     $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() || classic ? 'none' : '';
     $('kombiBtn').style.display = expert() || classic ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert() || classic); updatePts();
-    $('app').classList.toggle('classic', classic); renderMeter();
+    $('app').classList.toggle('classic', classic); renderMeter(); renderTourBar();
     renderShowdown();
-    const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll; setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
+    const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll || inTour(); setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded && G.revealed) {
       setText($('eqWin'), Math.round(G.eq.equity * 100) + ' %');
@@ -787,6 +1003,7 @@
       html = (bad ? `<button class="btn" id="retryBtn">↺ ${t('co.retry')}</button>` : `<button class="btn" id="whyBtn">${t('co.whyNot', { a: ACT_NAME(c.fb.level === 'good' ? (c.action === 'fold' ? (c.ctx.toCall ? 'call' : 'check') : 'fold') : c.rec.action) })}</button>`)
         + `<button class="btn primary" id="goBtn">${G.over ? t('co.seeEnd') : t('co.go')}</button>`;
     }
+    else if (G.over && G.tableKey === 'tour' && !(tour && tour.active)) html = `<div class="waiting">${t('to.over')}</div>`;
     else if (G.over) html = (expert() ? `<button class="btn" id="revBtn">${t('m.review')}</button>` : '') + `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
     else if (G.turn !== 0 || G.dealing || !G.ctx || !G.rec) html = `<div class="waiting">${G.dealing ? t('g.dealing') + '…' : hero().folded ? t('g.foldedWait') : G.turn > 0 ? t('g.thinking', { a: G.players[G.turn].name }) : t('g.dealing') + '…'}</div>`;
     else {
@@ -812,6 +1029,53 @@
   function openSheet(html) { $('sheet').innerHTML = '<div class="grab"></div>' + html; $('sheet').hidden = false; $('scrim').hidden = false; }
   function closeSheet() { $('sheet').hidden = true; $('scrim').hidden = true; }
   $('scrim').onclick = closeSheet;
+  /* swipe dolů zavírá sheet: za úchyt/hlavičku kdykoli, za obsah když je odrolovaný nahoře (jako iOS) */
+  function sheetSwipe(sh, scrim, close) {
+    let st = null;
+    const scroller = el0 => { for (let e = el0; e && e !== sh; e = e.parentElement) { if (e.scrollHeight > e.clientHeight + 2 && /(auto|scroll)/.test(getComputedStyle(e).overflowY)) return e; } return sh; };
+    const set = (d, anim) => {
+      sh.style.transition = anim ? 'transform .22s cubic-bezier(.2,.8,.2,1)' : 'none';
+      sh.style.transform = d ? `translate(-50%,${d}px)` : '';
+      if (scrim) { scrim.style.transition = sh.style.transition.replace('transform', 'opacity'); scrim.style.opacity = d ? String(Math.max(0, 1 - d / Math.max(200, sh.offsetHeight))) : ''; }
+    };
+    const begin = (x, y, target) => {
+      if (sh.hidden || (target && target.closest && target.closest('input[type=range],.no-swipe'))) return;
+      const top = y - sh.getBoundingClientRect().top < 58 || !!(target && target.closest && target.closest('.grab'));
+      st = { x0: x, y0: y, top, sc: scroller(target), drag: false, d: 0, pts: [[performance.now(), y]] };
+    };
+    const move = (x, y, ev) => {
+      if (!st) return;
+      const dy = y - st.y0, dx = x - st.x0;
+      if (!st.drag) {
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { st = null; return; }
+        if (dy > 6 && (st.top || (st.sc.scrollTop <= 0 && sh.scrollTop <= 0))) { st.drag = true; st.y0 = y; sh.classList.add('dragging'); }
+        else if (dy < -6 && !st.top) { st = null; return; }
+        else return;
+      }
+      if (ev && ev.cancelable) ev.preventDefault();
+      const d = y - st.y0; st.d = d > 0 ? d : d / 4;
+      st.pts.push([performance.now(), y]); if (st.pts.length > 6) st.pts.shift();
+      set(Math.max(0, st.d), false);
+    };
+    const end = () => {
+      if (!st) return; const S = st; st = null;
+      if (!S.drag) return;
+      sh.classList.remove('dragging');
+      const a = S.pts[0], b = S.pts[S.pts.length - 1], v = (b[1] - a[1]) / Math.max(1, b[0] - a[0]);   // px/ms
+      if (S.d > Math.min(150, sh.offsetHeight * 0.3) || (v > 0.4 && S.d > 24)) {
+        set(sh.offsetHeight + 40, true);
+        setTimeout(() => { close(); set(0, false); requestAnimationFrame(() => { sh.style.transition = ''; if (scrim) scrim.style.transition = ''; }); }, 210);
+      } else set(0, true);
+    };
+    sh.addEventListener('touchstart', e => { if (e.touches.length === 1) begin(e.touches[0].clientX, e.touches[0].clientY, e.target); else st = null; }, { passive: true });
+    sh.addEventListener('touchmove', e => { if (e.touches.length === 1) move(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
+    sh.addEventListener('touchend', end); sh.addEventListener('touchcancel', end);
+    // myš (desktop): jen za úchyt/hlavičku
+    sh.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button) return; begin(e.clientX, e.clientY, e.target); if (st && !st.top) st = null; });
+    addEventListener('pointermove', e => { if (e.pointerType === 'mouse' && st) move(e.clientX, e.clientY, null); });
+    addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); });
+  }
+  sheetSwipe($('sheet'), $('scrim'), () => closeSheet());
   function showSizes() {
     const c = G.ctx, h = hero(), max = h.stack + h.bet;
     let opts;
@@ -951,11 +1215,12 @@
     el.hidden = false; SFX.win(); vib([20, 40, 20, 40, 60]);
     $('lgOk').onclick = () => { el.hidden = true; SFX.tap(); renderHome(); if (lgQueue.length) setTimeout(showLeagueUp, 300); };
   }
+  const LOCK_IC = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2.5" fill="#fff" stroke="none"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>';
   function openLeagues() {
     const P = lgProgress();
     openSheet(`<h2>${t('lg.title')}</h2><div class="sub">${t('lg.how')}</div><div class="lg-list">${LGS.map((l, i) => {
       const st = i < P.i ? 'done' : i === P.i ? 'cur' : 'lock';
-      return `<div class="lg-item ${st}" data-t="${i < 2 ? 0 : i < 4 ? 1 : 2}"><span class="lg-ic">${LG.logo(i, 56, 's' + i)}</span><div class="lg-it"><b>${lgName(i)}</b><small>${TROPHY_IC} ${fmtNum(l.min)}${st === 'done' ? ' · ✓' : st === 'cur' ? ' · ' + fmtNum(wallet.trophies) + (P.nx ? ' / ' + fmtNum(P.nx.min) : '') : ''}</small>
+      return `<div class="lg-item ${st}" data-t="${i < 2 ? 0 : i < 4 ? 1 : 2}"><span class="lg-ic">${LG.logo(i, 56, 's' + i)}${st === 'lock' ? `<i class="lg-lk">${LOCK_IC}</i>` : ''}</span><div class="lg-it"><b>${lgName(i)}</b><small>${TROPHY_IC} ${fmtNum(l.min)}${st === 'done' ? ' · ✓' : st === 'cur' ? ' · ' + fmtNum(wallet.trophies) + (P.nx ? ' / ' + fmtNum(P.nx.min) : '') : ''}</small>
         ${i === P.i && P.nx ? `<span class="lg-bar"><i style="width:${Math.round(P.f * 100)}%"></i></span>` : ''}
         <div class="lg-rws">${rewardList(i).map(([ic, tx]) => `<span>${ic} ${tx}</span>`).join('')}</div></div></div>`; }).reverse().join('')}</div>`);
     const cur = $('sheet').querySelector('.lg-item.cur'); if (cur) setTimeout(() => cur.scrollIntoView({ block: 'center' }), 50);
@@ -969,7 +1234,7 @@
     const bank = settings.bankroll ? (G.players.length && G.tableKey === tableKey() ? hero().stack : session.key === `${settings.blinds}|${settings.depth}` && session.hero ? session.hero : START) : null;
     homeBank = { bank, acc, lbl: settings.bankroll ? t('h.bankroll') : t('h.profit'), v: bank != null ? fmtNum(bank) : (stats.profit >= 0 ? '+' : '') + fmtNum(stats.profit),
       sub: settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '−') + plain('[[bb:' + Math.abs(session.netBB) + ']]') }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh') };
-    renderLeagueRow();
+    renderLeagueRow(); renderTourTile();
     setText($('playLbl'), G.handNo ? t('h.continue') : t('h.train'));
     setText($('homeLvl'), t('lv.' + settings.level)); updatePts();
     setText($('homeAchSub'), t('ui.achSub', { n: Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length, m: ACH.length }));
@@ -1207,7 +1472,7 @@
   function preOrder(N) { const P = POSITIONS[N]; return N === 2 ? ['BTN', 'BB'] : P.slice(3).concat(['BTN', 'SB', 'BB']); }
   function drillNew() {
     const types = ['push', 'push', 'vsOpen', 'vsShove', 'flopBet', 'flopBet', 'checked', 'checked', 'turnBet', 'riverBet', 'lowSpr'];
-    const type = settings.drPack === 'bluff' ? 'bluff' : pick(types), deck = newDeck();
+    const type = D.focus || (settings.drPack === 'bluff' ? 'bluff' : pick(types)), deck = newDeck();
     const hole = [deck.pop(), deck.pop()];
     let N = 2 + randInt(8);
     const s = { type, hole, board: [], street: 0, N, opps: [] };
@@ -1293,8 +1558,9 @@
     const c = s.ctx, rec = PE.recommend(c), A = D.answered;
     setText($('drScore'), `${drillSt.good + drillSt.ok} / ${drillSt.n}` + (drillSt.streak > 1 ? ` · 🔥${drillSt.streak}` : ''));
     setText($('drKind'), t('drk.' + s.type) + ' · ' + t('dr.players', { n: s.type === 'bluff' ? c.numOpp + 1 : s.N }));
-    setHTML($('drPacks'), ['mix', 'bluff'].map(k => `<button class="dr-pack ${(settings.drPack || 'mix') === k ? 'on' : ''}" data-pack="${k}">${t('dr.pack.' + k)}</button>`).join(''));
-    $('drPacks').querySelectorAll('[data-pack]').forEach(b => b.onclick = () => { if ((settings.drPack || 'mix') === b.dataset.pack) return; settings.drPack = b.dataset.pack; save('pt_settings', settings); SFX.tap(); drillNew(); });
+    setHTML($('drPacks'), (D.focus ? `<button class="dr-pack on lumi" data-pack="focus">${t('lc.focus', { n: t('drk.' + D.focus) })} ✕</button>` : '') + ['mix', 'bluff'].map(k => `<button class="dr-pack ${!D.focus && (settings.drPack || 'mix') === k ? 'on' : ''}" data-pack="${k}">${t('dr.pack.' + k)}</button>`).join(''));
+    $('drPacks').querySelectorAll('[data-pack]').forEach(b => b.onclick = () => { const k = b.dataset.pack; if (k === 'focus') { D.focus = null; SFX.tap(); drillNew(); return; }
+      if (!D.focus && (settings.drPack || 'mix') === k) return; D.focus = null; settings.drPack = k; save('pt_settings', settings); SFX.tap(); drillNew(); });
     setHTML($('drDesc'), rich(s.desc));
     $('drBoard').innerHTML = [0, 1, 2, 3, 4].map(i => i < s.board.length ? cardHTML(s.board[i]) : `<div class="card ghost"></div>`).join('');
     setText($('drStreet'), streetName(c.street) + ' · ' + posShort(s.pos));
@@ -1499,6 +1765,25 @@
   const LUMI_C = [[-40, -10, 44], [14, -24, 50], [50, 14, 40], [-30, 28, 38], [10, 30, 42], [0, 4, 48]];
   const blob = (fill, grow) => `<g fill="${fill}">${LUMI_C.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r + (grow || 0)}"/>`).join('')}</g>`;
   const eyes = (fill, sx) => [[12, -20], [38, -13]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="${7.5 * (sx || 1)}" ry="13.5" transform="rotate(-14 ${x} ${y})" fill="${fill}"/>`).join('');
+  /* konec ruky: VÝHRA / Prohra přes celou obrazovku, sama zmizí (~2 s), tap jen urychlí; po foldu jen malá pilulka */
+  let hrT = 0, hrT2 = 0;
+  function hideFx() {
+    const el = $('hrFx'); clearTimeout(hrT); clearTimeout(hrT2); if (!el || el.hidden) return;
+    el.classList.remove('on'); hrT2 = setTimeout(() => { el.hidden = true; }, 260);
+  }
+  function handFx(kind, amt, delay) {
+    if (FAST()) return;
+    clearTimeout(hrT); clearTimeout(hrT2);
+    if (delay) { hrT = setTimeout(() => handFx(kind, amt, 0), delay); return; }
+    let el = $('hrFx');
+    if (!el) { el = document.createElement('div'); el.id = 'hrFx'; el.hidden = true; document.body.appendChild(el); el.addEventListener('pointerdown', hideFx); }
+    if (kind === 'fold') el.innerHTML = `<div class="hr-pill">${t('hr.fold')}</div>`;
+    else el.innerHTML = `${kind === 'win' ? '<div class="hr-rays"></div>' : ''}<div class="hr-in"><div class="hr-lumi">${lumiSVG(kind === 'win' ? 'happy' : kind === 'lose' ? 'sad' : 'classic')}</div>
+      <div class="hr-t">${t('hr.' + kind)}</div>${amt ? `<div class="hr-amt">${kind === 'lose' ? '−' : '+'}${fmtNum(Math.abs(amt))}</div>` : ''}</div>`;
+    el.className = 'hr-fx ' + kind; el.hidden = false; void el.offsetWidth; el.classList.add('on');
+    hrT = setTimeout(hideFx, kind === 'fold' ? 1100 : kind === 'win' ? 2000 : 1700);
+  }
+  window.RRResult = { show: handFx, hide: hideFx };
   function lumiSVG(v, cls) {
     const id = 'lh' + (++uid);
     let body;
@@ -1506,6 +1791,8 @@
     else if (v === 'noir') body = blob('#FF2D4A', 5) + blob('#111') + eyes('#FF2D4A');
     else if (v === 'striped') body = `<defs><pattern id="${id}" width="16" height="16" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="16" height="16" fill="#d63a3a"/><rect width="4" height="16" fill="rgba(255,255,255,.22)"/></pattern></defs>` + blob(`url(#${id})`) + eyes('#fff');
     else if (v === 'shades') body = blob('#FF2D4A') + eyes('#fff') + `<g transform="rotate(-14 25 -16)" fill="#111"><rect x="-2" y="-30" width="26" height="22" rx="7"/><rect x="28" y="-30" width="26" height="22" rx="7"/><rect x="20" y="-24" width="12" height="4"/><rect x="-24" y="-25" width="24" height="4" rx="2"/></g>`;
+    else if (v === 'happy') body = blob('#FF2D4A') + [[12, -20], [38, -13]].map(([x, y]) => `<path d="M${x - 9} ${y + 4} Q${x} ${y - 13} ${x + 9} ${y + 4}" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" transform="rotate(-14 ${x} ${y})"/>`).join('') + `<path d="M12 6 Q28 24 44 9" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>`;
+    else if (v === 'sad') body = blob('#FF2D4A') + [[12, -16], [38, -9]].map(([x, y]) => `<ellipse cx="${x}" cy="${y}" rx="6.5" ry="9" fill="#fff"/>`).join('') + `<path d="M0 -32 L19 -38 M30 -35 L49 -24" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="M14 18 Q28 6 42 17" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round"/><path d="M6 -2 Q0 9 6 13 Q12 9 6 -2Z" fill="#fff"/>`;
     else if (v === 'crown') body = blob('#FF2D4A') + eyes('#fff') + `<path d="M-14 -66 L-22 -100 L-2 -82 L14 -108 L30 -82 L50 -100 L42 -66 Z" fill="#fff" stroke="#111" stroke-width="3" stroke-linejoin="round"/>`;
     else body = blob('#FF2D4A') + eyes('#fff');
     return `<svg class="lumi-svg ${cls || ''}" viewBox="-96 -112 196 190" aria-hidden="true">${body}</svg>`;
@@ -1814,5 +2101,5 @@
 
   applyLook(); loginTick(); checkAch(true); updatePts();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { loginTick(); updatePts(); if (nav.cur === 'wheel') renderWheel(); } });
-  window.__poker = { startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
+  window.__poker = { tourStart: bi => tourStart(bi), tour: () => tour, openTour, showCoach, CS: () => CS, startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
 })();

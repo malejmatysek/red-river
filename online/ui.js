@@ -121,11 +121,15 @@
       return;
     }
     store.set('rr_on_code', v.code);
-    if (v.hand && (!prev || !prev.hand || prev.hand.no !== v.hand.no)) { S.raiseOpen = false; SFX.deal(); }
+    if (v.hand && (!prev || !prev.hand || prev.hand.no !== v.hand.no)) { S.raiseOpen = false; SFX.deal(); if (window.RRResult) RRResult.hide(); }
     if (v.hand && v.hand.toAct === v.me && !v.hand.done && !(prev && prev.hand && prev.hand.toAct === v.me && prev.hand.no === v.hand.no)) { SFX.turn(); vib(20); }
     if (v.hand && v.hand.done && !(prev && prev.hand && prev.hand.done && prev.hand.no === v.hand.no)) { const w = v.hand.result && v.hand.result.won && v.hand.result.won[v.me]; if (w) SFX.win();
       /* trofeje do ligy – jen za ruku, kterou jsem viděl běžet (ne po načtení stránky) */
       const me = (v.seats || [])[v.me];
+      if (window.RRResult && me && me.inHand && prev && prev.hand && prev.hand.no === v.hand.no && nav.cur === 'ontable') try {
+        const net = (w || 0) - (me.total || 0), sd = !!v.hand.result.showdown;
+        RRResult.show(me.folded ? 'fold' : w > 0 ? 'win' : 'lose', me.folded ? 0 : w > 0 ? (net > 0 ? net : w) : me.total, me.folded ? 150 : sd ? 900 : 300);
+      } catch (e) {}
       if (window.RRLeague && me && me.inHand && prev && prev.hand && prev.hand.no === v.hand.no) try { RRLeague.hand(w > 0, !!v.hand.result.showdown, !(w > 0) && me.total > ((v.settings && v.settings.bb) || 0)); } catch (e) {}
     }
     if (v.status === 'playing' && nav.cur === 'lobby') nav.go('ontable');

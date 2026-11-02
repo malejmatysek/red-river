@@ -930,7 +930,7 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 .lg-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .lg-item{display:flex;gap:12px;align-items:flex-start;padding:10px 12px 10px 8px;border-radius:18px;background:var(--panel2);border:1px solid transparent}
 .lg-item.cur{border-color:#fff}
-.lg-item.lock .lg-ic{filter:grayscale(1) brightness(.55)}.lg-item.lock b{color:#9a99a2}
+.lg-item.lock b{color:#fff}
 .lg-it{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .lg-it b{font-size:16px}.lg-it small{color:var(--muted);font-size:12px}
 .lg-rws{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:#cfcfd4;margin-top:2px}
@@ -963,3 +963,68 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 @media (prefers-reduced-motion:reduce){.lg-rays,.lg-big,.lg-rw div{animation:none}}
 .rw-g{font-style:normal;color:#fff;font-size:15px;line-height:1}.rw-g.r{color:#FF2D4A}
 .lg-item .rw-g{font-size:12px}
+/* ---------- turnaj ---------- */
+.fr-card.to .fr-ic{background:#000;color:#fff;box-shadow:inset 0 0 0 1.5px #fff}
+.fr-card.to.run{box-shadow:inset 0 0 0 1.5px #FF2D4A}.fr-card.to.run .fr-ic{color:#FF2D4A;box-shadow:inset 0 0 0 1.5px #FF2D4A}
+.tour-bar{display:flex;align-items:center;gap:10px;margin:2px 14px 6px;padding:7px 12px;border-radius:12px;background:#0d0d10;border:1px solid #222227;font-size:12.5px;color:#cfcfd4;white-space:nowrap;overflow:hidden}
+.tour-bar[hidden]{display:none}
+.tour-bar b{color:#fff}.tour-bar .tb-k{font-weight:800;letter-spacing:.12em;text-transform:uppercase;font-size:10.5px;color:#FF2D4A}
+.tour-bar .tb-nx{margin-left:auto;color:var(--muted)}
+.to-opt.lock{opacity:.45}.to-opt b{display:inline-flex;align-items:center;gap:5px}
+.to-pay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0 4px}
+.to-pay div{background:var(--panel2);border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:3px;align-items:flex-start}
+.to-pay b{font-size:18px}.to-pay span{display:inline-flex;gap:4px;align-items:center;font-weight:700}.to-pay small{color:var(--muted);font-size:11.5px}
+.to-pay div:first-child{box-shadow:inset 0 0 0 1.5px #FF2D4A}
+.tr-place{display:flex;align-items:baseline;justify-content:center;gap:8px;margin-top:14px}
+.tr-place b{font-size:84px;line-height:1;letter-spacing:-.05em}.tr-place small{color:var(--muted);font-size:18px}
+.tr-res.win .tr-place b{color:#FF2D4A}
+.tr-lumi{width:150px;height:130px;margin:6px auto 0;animation:lgPop .7s cubic-bezier(.2,1.4,.4,1) both}
+.tr-lumi svg{width:100%;height:100%}
+.tr-res.win .lg-rays{background:repeating-conic-gradient(from 0deg,rgba(255,45,74,.09) 0 6deg,transparent 6deg 18deg)}
+.btn.ghost{background:transparent;color:#cfcfd4;margin-top:8px}
+/* ---------- Lumi kouč ---------- */
+.co-hd{display:flex;gap:14px;align-items:center;margin-bottom:6px}
+.co-hd h2{margin:2px 0 2px}.co-lumi{flex:none;width:74px;height:64px}.co-lumi svg{width:100%;height:100%}
+.co-leak{background:var(--panel2);border-radius:16px;padding:12px 14px;margin-top:8px;border-left:3px solid #FF2D4A}
+.co-leak.ok{border-left-color:#fff}
+.co-leak b{display:flex;align-items:center;gap:8px;font-size:15px}
+.co-leak b i{font-style:normal;width:20px;height:20px;border-radius:50%;background:#FF2D4A;color:#000;font-size:12px;display:grid;place-items:center;flex:none}
+.co-leak p{margin:6px 0 0;color:#cfcfd4;font-size:13.5px;line-height:1.4}
+.co-ex{display:inline-flex;gap:3px;align-items:center;margin-top:8px;color:var(--muted);font-size:12px}
+.co-drill{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;border-radius:18px;background:#000;border:1.5px solid #FF2D4A;color:#fff;font:inherit;text-align:left;margin-top:6px;cursor:pointer}
+.co-drill b{display:block;font-size:16px}.co-drill small{color:var(--muted);font-size:12.5px}.co-drill>span:nth-child(2){flex:1}
+.co-dic{width:38px;height:38px;border-radius:12px;background:#FF2D4A;display:grid;place-items:center;font-size:18px;flex:none}
+.dr-pack.lumi{border-color:#FF2D4A;color:#fff}
+/* hidden musí vyhrát nad display u komponent (např. showdown pruh) */
+.sd-strip[hidden],.hr-fx[hidden]{display:none}
+/* ---------- sheet: swipe dolů ---------- */
+.sheet{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+.sheet .grab{position:relative;touch-action:none;cursor:grab}
+.sheet .grab::before{content:'';position:absolute;left:-90px;right:-90px;top:-12px;bottom:-14px}
+.sheet.dragging{animation:none;user-select:none;-webkit-user-select:none}
+/* ligy: zamčené v plných barvách, jen zámek */
+.lg-ic{position:relative}
+.lg-lk{position:absolute;right:-3px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:#000;border:1.5px solid #fff;display:grid;place-items:center;line-height:0}
+/* ---------- konec ruky: VÝHRA / Prohra ---------- */
+.hr-fx{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(0,0,0,.9);opacity:0;transition:opacity .22s ease;overflow:hidden;-webkit-tap-highlight-color:transparent}
+.hr-fx.on{opacity:1}
+.hr-fx.win{background:radial-gradient(circle at 50% 45%,rgba(255,45,74,.38),rgba(0,0,0,.95) 62%)}
+.hr-fx.fold{background:none;pointer-events:none;place-items:end center;padding-bottom:calc(230px + env(safe-area-inset-bottom))}
+.hr-in{text-align:center;transform:scale(.8);transition:transform .38s cubic-bezier(.2,1.5,.4,1)}
+.hr-fx.on .hr-in{transform:scale(1)}
+.hr-lumi{width:150px;height:140px;margin:0 auto 6px}.hr-lumi svg{width:100%;height:100%}
+.hr-fx.win .hr-lumi{animation:hrHop .7s cubic-bezier(.3,1.6,.5,1) .1s both}
+.hr-fx.lose .hr-lumi{animation:hrSink 1.2s ease .1s both}
+.hr-t{font-size:64px;font-weight:850;letter-spacing:.02em;color:#fff;line-height:1}
+.hr-fx.win .hr-t{font-size:76px;text-shadow:0 0 28px rgba(255,45,74,.75)}
+.hr-fx.lose .hr-t,.hr-fx.split .hr-t{font-size:46px;font-weight:750;letter-spacing:-.01em;color:#d8d8dd}
+.hr-amt{margin-top:10px;font-size:34px;font-weight:800;color:#FF2D4A;font-variant-numeric:tabular-nums}
+.hr-fx.lose .hr-amt{font-size:24px;color:#9a99a2;font-weight:700}
+.hr-rays{position:absolute;left:50%;top:45%;width:180vmax;height:180vmax;margin:-90vmax 0 0 -90vmax;background:repeating-conic-gradient(rgba(255,255,255,.07) 0 6deg,transparent 6deg 18deg);animation:hrSpin 8s linear infinite;pointer-events:none}
+.hr-pill{background:rgba(28,27,33,.94);border:1px solid #3a3941;color:#cfcfd4;font-size:14px;font-weight:650;padding:8px 16px;border-radius:99px;transform:translateY(8px);transition:transform .25s ease}
+.hr-fx.on .hr-pill{transform:none}
+@keyframes hrHop{0%{transform:translateY(30px) scale(.6)}100%{transform:none}}
+@keyframes hrSink{0%{transform:translateY(-8px)}100%{transform:translateY(6px) rotate(-3deg)}}
+@keyframes hrSpin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.hr-rays,.hr-fx .hr-lumi{animation:none}}
+.fr-card.to[hidden]{display:none}
