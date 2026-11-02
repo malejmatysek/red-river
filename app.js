@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.6.1', BUILD = 'v20';
+  const APP_VERSION = '1.6.2', BUILD = 'v21';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();

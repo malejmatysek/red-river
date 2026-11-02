@@ -181,6 +181,8 @@
         .on('broadcast', { event: 'view' }, m => { const p = m && m.payload; if (p && p.view && this.code && p.view.code === this.code) { this.bcOk = true; if (p.roomId && !this.roomId) this.roomId = p.roomId; this.emit(p.view); } })
         .subscribe(st => { if (st === 'CHANNEL_ERROR' && !this.bcOk) { const c = this.uch; this.uch = null; this.noBc = true; try { this.sb.removeChannel(c); } catch (e) {} } });
     }
+    // region Edge Function přes query parametr, ne přes hlavičku x-region (tu CORS preflight funkce nepovoluje → v prohlížeči ERR_FAILED)
+    fnName() { const f = this.cfg.FUNCTION || 'table', r = this.cfg.REGION; return r ? f + '?forceFunctionRegion=' + encodeURIComponent(r) : f; }
     refresh() {                     // vyžádej si svůj pohled (sloučí rychlé po sobě jdoucí podněty)
       clearTimeout(this.t);
       this.t = setTimeout(() => {
@@ -203,7 +205,7 @@
     }
     async points() { const r = await this.call('points'); return r.points; }
     async call(op, a) {
-      const { data, error } = await this.sb.functions.invoke(this.cfg.FUNCTION || 'table', Object.assign({ body: Object.assign({ op, code: this.code }, a) }, this.cfg.REGION ? { region: this.cfg.REGION } : {}));
+      const { data, error } = await this.sb.functions.invoke(this.fnName(), { body: Object.assign({ op, code: this.code }, a) });
       if (error) { let code = 'server'; try { code = (await error.context.json()).code || code; } catch (e) {} throw err(code); }
       if (data && data.error) throw err(data.error);
       return data;

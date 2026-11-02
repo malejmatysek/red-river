@@ -5,6 +5,6 @@ window.RR_ONLINE_CONFIG = {
   SUPABASE_URL: 'https://ffrmpprhcgyfbtabhmzu.supabase.co',   // Project Settings → API → Project URL
   SUPABASE_ANON_KEY: 'sb_publishable_PRH6hx-Hf33yRRh61NRfkQ_q4dFVjLd',   // veřejný publishable klíč (sb_publishable_…) nebo starý anon JWT – Settings → API Keys. Secret/service_role klíč sem NIKDY.
   FUNCTION: 'table',       // název Edge Function (supabase/functions/table)
-  REGION: '',              // Edge Function poběží vedle databáze (Irsko) – jinak se volá nejbližší region a každý dotaz do DB letí přes oceán
+  REGION: 'eu-west-1',     // Edge Function poběží vedle databáze (Irsko) – jinak se volá nejbližší region a každý dotaz do DB letí přes oceán
   FORCE_MOCK: false        // true = vždy lokální mock (offline ukázka); totéž ?mock=1 v URL
 };
