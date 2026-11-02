@@ -722,7 +722,7 @@ const ALLOWED_ORIGINS = (Deno.env.get('RR_ALLOWED_ORIGINS') ?? 'https://malejmat
 function cors(req: Request) {
   const o = req.headers.get('origin') ?? '';
   return { 'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(o) ? o : ALLOWED_ORIGINS[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-region', 'Access-Control-Allow-Methods': 'POST, OPTIONS', Vary: 'Origin' };
 }
 class HttpErr extends Error { constructor(public code: string, public status = 400) { super(code); } }
 const CODE_RE = /^(RED-\d{4}|PUB-[A-Z0-9]{6})$/;
@@ -776,6 +776,26 @@ async function publish(roomId: string, room: any) {
   ]);
 }
 
+// ---------- práce na pozadí (po odeslání odpovědi) ----------
+// EdgeRuntime.waitUntil nechá funkci doběhnout i po vrácení odpovědi. Zápisy projekcí (rooms/seats/hole_cards/hands)
+// jednoho stolu jdou v rámci instance za sebou (fronta), aby se starší zápis nepředběhl novějším.
+// Bez EdgeRuntime (testy, starší runtime) se čeká normálně.
+// deno-lint-ignore no-explicit-any
+const ER = (globalThis as any).EdgeRuntime;
+const pubQueue = new Map<string, Promise<unknown>>();
+// deno-lint-ignore no-explicit-any
+function publishQueued(roomId: string, room: any): Promise<unknown> {
+  const prev = pubQueue.get(roomId) ?? Promise.resolve();
+  const next = prev.catch(() => {}).then(() => publish(roomId, room)).catch((e) => console.warn('publish', e));
+  pubQueue.set(roomId, next);
+  next.finally(() => { if (pubQueue.get(roomId) === next) pubQueue.delete(roomId); });
+  return next;
+}
+function background(p: Promise<unknown>): Promise<unknown> {
+  if (ER?.waitUntil) { try { ER.waitUntil(p); return Promise.resolve(); } catch (_) { /* fallback: čekat */ } }
+  return p;
+}
+
 // ---------- okamžité doručení hráčům (Realtime Broadcast, soukromý kanál rr-u-<uid>) ----------
 // Každý člověk u stolu dostane SVŮJ pohled (jen své karty) hned po uložení – bez čekání na postgres_changes
 // a bez dalšího dotazu 'state'. Kanál je privátní: číst smí jen vlastník (politika na realtime.messages),
@@ -804,8 +824,8 @@ async function create(uid: string, body: any) {
       const { data: r, error } = await admin.from('rooms').insert({ code: room.code, host: uid, status: room.status, settings: room.settings, public_state: core.view(room, null), version: room.ver }).select('id').single();
       if (error) { if (error.code === '23505') continue; throw new HttpErr('server', 500); }   // kód už existuje → jiný
       await admin.from('room_state').insert({ room_id: r.id, state: room, version: 0 });
-      await Promise.all([publish(r.id, room), push(r.id, room)]);
-      return { view: core.view(room, uid), roomId: r.id, points: await points(uid) };
+      const [, , pts] = await Promise.all([publishQueued(r.id, room), push(r.id, room), points(uid)]);
+      return { view: core.view(room, uid), roomId: r.id, points: pts };
     }
     throw new HttpErr('no_code', 500);
   } catch (e) { await credit(uid, st.buyIn, 'refund'); throw e; }
@@ -813,7 +833,7 @@ async function create(uid: string, body: any) {
 
 // ---------- všechny ostatní operace nad existujícím stolem ----------
 // deno-lint-ignore no-explicit-any
-async function mutate(uid: string, op: string, body: any) {
+async function mutate(uid: string, op: string, body: any, lim?: Promise<unknown>) {
   let code = String(body.code ?? '').toUpperCase().trim();
   if (!CODE_RE.test(code)) {                                   // bez kódu: poslední stůl, kde hráč sedí
     const { data } = await admin.from('seats').select('room_id, rooms!inner(code, status)').eq('user_id', uid).neq('rooms.status', 'closed').limit(1);
@@ -829,6 +849,7 @@ async function mutate(uid: string, op: string, body: any) {
     const st = (Array.isArray(r.room_state) ? r.room_state[0] : r.room_state) as any;
     if (!st) throw new HttpErr('no_room', 404);
     const room = st.state;
+    if (lim) { await lim; lim = undefined; }                    // limit požadavků běžel souběžně s načtením; před změnou musí projít
     let debited = 0, debitWhy = '', refund = 0, changed = true;
     // deno-lint-ignore no-explicit-any
     let reaped: any[] = [];
@@ -863,9 +884,20 @@ async function mutate(uid: string, op: string, body: any) {
         core.runBots(room);
         const { data: upd } = await admin.from('room_state').update({ state: room, version: st.version + 1 }).eq('room_id', r.id).eq('version', st.version).select('room_id');
         if (!upd?.length) { if (debited) await credit(uid, debited, 'refund', r.id); continue; }   // souběh → znovu
-        if (refund) await credit(uid, refund, 'cashback', r.id);
-        for (const x of reaped) await credit(x.uid, x.refund, 'cashback', r.id);   // zvednutí od veřejného stolu (odpojení / nečinnost)
-        await Promise.all([push(r.id, room), publish(r.id, room)]);
+        // stav je uložený (autoritativní) → hned rozeslat pohledy hráčům; vrácení bodů a projekce běží souběžně.
+        // U tahů (act/next/tick…) se na projekce nečeká (doběhnou na pozadí, ve frontě stolu) – klienti stav mají z broadcastu
+        // a 'state' čte room_state. U změn sezení/bodů (join/leave/rebuy/sitIn, vyhazov, zavření) se čeká: z tabulek seats/rooms
+        // čte quickseat a lobby.
+        const seatsChange = op === 'join' || op === 'leave' || op === 'rebuy' || op === 'sitIn' || reaped.length > 0 || room.status === 'closed' || op === 'addBot' || op === 'removeBot' || op === 'start';
+        const pub = publishQueued(r.id, room);
+        await Promise.all([
+          push(r.id, room),
+          (async () => {
+            if (refund) await credit(uid, refund, 'cashback', r.id);
+            await Promise.all(reaped.map((x) => credit(x.uid, x.refund, 'cashback', r.id)));   // zvednutí od veřejného stolu (odpojení / nečinnost)
+          })(),
+          seatsChange ? pub : background(pub),
+        ]);
       } else if (core.isPub(room) && room.status !== 'closed' && Date.now() - Date.parse(r.updated_at ?? '') > HEARTBEAT_MS) {
         // srdeční tep: čekající hráč u veřejného stolu (bez změny stavu) drží stůl „živý“ → najdou ho další hráči
         // a úklid (sweep) ho nezavře. Dřív stůl bez tahu po 10 min z výběru zmizel → kamarád dostal nový stůl.
@@ -1024,11 +1056,14 @@ Deno.serve(async (req) => {
       const [, out] = await Promise.all([lim, op === 'points' ? points(user.id).then((n) => ({ points: n })) : op === 'lobby' ? lobby() : mutate(user.id, op, body)]);
       return json(out);
     }
-    await lim;
-    if (op === 'quickseat') return json(await quickseat(user.id, body));
-    if (op === 'report') return json(await report(user.id, body));
-    if (op === 'create') return json(await create(user.id, body));
-    return json(await mutate(user.id, op, body));
+    if (op === 'quickseat' || op === 'report' || op === 'create') {
+      await lim;
+      if (op === 'quickseat') return json(await quickseat(user.id, body));
+      if (op === 'report') return json(await report(user.id, body));
+      return json(await create(user.id, body));
+    }
+    lim.catch(() => {});                                        // tahy: limit souběžně s načtením stolu, čeká se na něj před změnou
+    return json(await mutate(user.id, op, body, lim));
   } catch (e) {
     const code = e instanceof HttpErr ? e.code : 'server';
     if (!(e instanceof HttpErr)) console.error(e);
