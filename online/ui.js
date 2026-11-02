@@ -111,6 +111,9 @@
 
   function setView(v) {
     if (!v) return;
+    // pořadí doručení (odpověď / Broadcast / dotaz) není zaručené → starší verzi stejného stolu zahodit
+    if (S.view && v.code === S.view.code && typeof v.ver === 'number' && typeof S.view.ver === 'number' && v.ver < S.view.ver) return;
+    if (S.pending && (v.code !== S.pending.code || v.ver > S.pending.ver)) S.pending = null;
     const prev = S.view; S.view = v; S.clock = (v.serverNow || Date.now()) - Date.now();
     if (v.status === 'closed' || v.me < 0) {
       store.set('rr_on_code', ''); S.view = null;
@@ -266,6 +269,7 @@
     const k = 'on.a.' + a.t, name = t(k) === k ? a.t : t(k);
     return a.t === 'fold' || a.t === 'check' ? name : `${name} ${fmtPts(a.to || a.a || 0)}`;
   }
+  function pendLabel(a) { const n = t('on.a.' + a.t); return (n === 'on.a.' + a.t ? a.t : n) + (a.to ? ' ' + fmtPts(a.to) : '') + ' …'; }
   function seatOrder(v) {   // od hráče po směru: soupeři vlevo → vpravo
     const n = v.seats.length, me = v.me, out = [];
     for (let k = 1; k < n; k++) { const i = (me + k) % n; if (v.seats[i]) out.push(v.seats[i]); }
@@ -279,6 +283,8 @@
     if (won[v.me] > 0 && ids.length === 1) return t('on.youWon', { a: fmtPts(won[v.me]) }) + cat;
     return ids.map(i => t('on.won', { n: v.seats[i] ? v.seats[i].name : '?', a: fmtPts(won[i]) })).join(' · ') + cat;
   }
+  // přepis DOM jen při skutečné změně (časté aktualizace pak neblikají a nešetří baterii)
+  function setHTML(id, html) { const el = $(id); if (el && el.__h !== html) { el.innerHTML = html; el.__h = html; } }
   function renderTable() {
     const v = S.view; if (!v || !$('otOpps')) return;
     const h = v.hand, me = v.seats[v.me] || {}, L = h && h.legal;
@@ -288,26 +294,27 @@
     const opps = seatOrder(v), many = opps.length > 4;
     $('otOpps').className = 'opps' + (many ? ' compact' : '');
     $('otOpps').style.gridTemplateColumns = many ? `repeat(${Math.ceil(opps.length / 2)},1fr)` : '';
-    $('otOpps').innerHTML = opps.map(s => {
+    setHTML('otOpps', opps.map(s => {
       const cards = Array.isArray(s.cards) ? s.cards.map(c => card(c, 'sm')).join('') : s.cards === 2 ? card(null, 'sm') + card(null, 'sm') : '';
       const win = h && h.done && h.result && h.result.won && h.result.won[s.i] > 0;
       return `<div class="opp${s.folded ? ' folded' : ''}${s.turn ? ' turn' : ''}${win ? ' on-win' : ''}${s.sitOut ? ' on-out' : ''}" data-seat="${s.i}">
         <div class="avatar" style="background:${s.bot ? '#3a3941;color:#ddd' : COLORS[s.i % COLORS.length]}">${esc(s.name.slice(0, 2).toUpperCase())}${s.dealer ? '<span class="dealer">D</span>' : ''}</div>
         <div class="name">${esc(s.name)}${s.bot ? ' 🤖' : ''}</div><div class="stk">${fmtPts(s.stack)}${s.allIn ? ' <em>all-in</em>' : ''}</div>
         <div class="chip ${s.last || s.bet ? '' : 'empty'}">${esc(s.last ? actLabel(s.last) : s.bet ? fmtPts(s.bet) : '·')}</div><div class="mini">${cards}</div></div>`;
-    }).join('');
+    }).join(''));
     // board + pot
     const board = h ? h.board : [];
-    $('otBoard').innerHTML = Array.from({ length: 5 }, (_, i) => board[i] != null ? card(board[i]) : '<div class="card ghost"></div>').join('');
+    setHTML('otBoard', Array.from({ length: 5 }, (_, i) => board[i] != null ? card(board[i]) : '<div class="card ghost"></div>').join(''));
     $('otPot').textContent = fmtPts(h ? h.pot : 0);
     $('otStreet').textContent = h ? (h.done ? (h.result && h.result.showdown ? t('on.showdown') : '') : t('st.' + h.street)) : '';
     // moje karty
     const mine = Array.isArray(me.cards) ? me.cards : null;
     const myWin = h && h.done && h.result && h.result.won && h.result.won[v.me] > 0;
-    $('otHero').innerHTML = mine ? mine.map(c => card(c, 'lg' + (myWin ? ' win' : ''))).join('') : '<div class="card lg ghost"></div><div class="card lg ghost"></div>';
+    setHTML('otHero', mine ? mine.map(c => card(c, 'lg' + (myWin ? ' win' : ''))).join('') : '<div class="card lg ghost"></div><div class="card lg ghost"></div>');
     $('otHero').classList.toggle('on-folded', !!me.folded);
     const myTurn = h && !h.done && h.toAct === v.me;
-    $('otMe').innerHTML = `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${me.last ? esc(actLabel(me.last)) : ''}</div>${myTurn ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`;
+    const pend = S.pending && S.pending.code === v.code ? S.pending.a : null;
+    setHTML('otMe', `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${pend ? esc(pendLabel(pend)) : me.last ? esc(actLabel(me.last)) : ''}</div>${myTurn && !pend ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`);
     // stav + akce
     const st = $('otStatus'); let stHTML = '';
     const reap = isPubView(v) && me.sitOut ? `<div class="note pub-reap" id="otReap"></div>` : '';
@@ -333,6 +340,7 @@
   }
   function renderActions(v, L) {
     const a = $('otActions'), rz = $('otRaise');
+    if (L && S.pending && S.pending.code === v.code) { a.innerHTML = `<div class="on-pending"><span class="spin"></span>${esc(pendLabel(S.pending.a))}</div>`; rz.hidden = true; return; }
     if (!L) { a.innerHTML = ''; rz.hidden = true; S.raiseOpen = false; return; }
     const callTxt = L.canCheck ? t('on.a.check') : `${t('on.a.call')} ${fmtPts(L.toCall)}`;
     a.innerHTML = `<button class="btn" id="oaFold" ${L.canCheck ? 'disabled' : ''}>${t('on.a.fold')}</button><button class="btn" id="oaCall">${callTxt}</button>${L.canRaise ? `<button class="btn ${S.raiseOpen ? 'primary' : ''}" id="oaRaise">${L.raiseIsBet ? t('on.a.bet') : t('on.a.raise')}…</button>` : ''}`;
@@ -349,8 +357,12 @@
     $('orGo').onclick = () => send(S.raiseTo >= L.maxTo ? { t: 'allin' } : { t: 'raise', to: S.raiseTo });
   }
   function send(a) {
+    if (S.busy || S.pending) return;
     SFX[a.t === 'fold' ? 'fold' : 'chip'](); S.raiseOpen = false;
-    run(() => S.net.act(a));
+    // okamžitá odezva: tah se hned ukáže jako odeslaný (server ho potvrdí novou verzí stolu)
+    const v = S.view; S.pending = v ? { code: v.code, ver: v.ver, a } : null;
+    if (v) renderTable();
+    run(() => S.net.act(a)).finally(() => { if (S.pending && S.view && S.view.ver <= S.pending.ver) { S.pending = null; renderTable(); } });
   }
   /* rozbor ruky – po skončení: akce po ulicích, odkryté karty, kdo kolik vyhrál (bez šancí a rad během hry) */
   function openReview() {

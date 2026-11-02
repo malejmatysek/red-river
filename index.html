@@ -54,38 +54,47 @@
     <div class="ob-top"><span class="step" id="obStep">1 / 5</span><button class="skip" id="obSkip" data-i18n="ob.skip">Přeskočit</button></div>
     <div class="ob-slides" id="obSlides">
       <div class="ob-slide">
-        <div class="ob-art">
-          <img src="icons/icon.svg" class="ob-logo" alt="">
-          <div class="pill-row" data-i18n-html="ob.1t"><span class="tagp"><b>1–8</b> botů</span><span class="tagp"><b>∞</b> rozdání</span><span class="tagp">offline</span></div>
-        </div>
-        <div class="ob-text"><h1 data-i18n="ob.1h">Vítej u stolu</h1><p data-i18n="ob.1p">Red River tě naučí Texas Hold'em. Hraješ proti botům, každá ruka je nově zamíchaná – kombinace se nikdy neopakují.</p></div>
+        <div class="ob-art"><img src="icons/lumi.svg" class="ob-lumi" alt=""><div class="ob-chips" data-i18n-html="ob.1t"></div></div>
+        <div class="ob-text"><h1 data-i18n-html="ob.1h">Nauč se poker. Pak porážej lidi.</h1><p data-i18n-html="ob.1p"></p></div>
       </div>
       <div class="ob-slide">
         <div class="ob-art">
-          <div class="ob-cards"><div class="card lg"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg red"><span class="rk">K</span><span class="st">♥</span></div></div>
-          <div class="odds mock"><div class="odds-cell"><div class="lbl">Výhra</div><div class="big win">64 %</div></div><div class="odds-cell"><div class="lbl">Start. ruka</div><div class="mid" data-i18n-html="ob.2m">síla 12/20</div></div><div class="odds-sub" data-i18n="ob.2s">proti 2 soupeřům · náhodné ruce · remíza 2 %</div></div>
+          <div class="ob-tbl">
+            <div class="ob-pot"><span data-i18n="ob.pot">pot</span> <b>340</b></div>
+            <div class="ob-mid" id="obBoard2"></div>
+            <div class="ob-seat" style="left:-16px;top:70px"><div class="av">🇩🇪</div>Lena<small>1 240</small></div>
+            <div class="ob-seat" style="left:58px;top:-30px"><div class="av">🇺🇸</div>Jake<small>860</small></div>
+            <div class="ob-seat" style="left:calc(50% - 23px);top:-38px"><div class="av">🇧🇷</div>Rafa<small>2 100</small></div>
+            <div class="ob-seat" style="right:58px;top:-30px"><div class="av">🇵🇱</div>Ola<small>530</small></div>
+            <div class="ob-seat" style="right:-16px;top:70px"><div class="av">🇯🇵</div>Ken<small>1 900</small></div>
+            <div class="ob-seat" style="left:calc(50% - 23px);bottom:-40px"><div class="av me">🇨🇿</div><span data-i18n="you">Ty</span><small>1 000</small></div>
+          </div>
+          <div class="ob-chips" style="margin-top:34px" data-i18n-html="ob.2c"></div>
         </div>
-        <div class="ob-text"><h1 data-i18n="ob.2h">Šance na výhru</h1><p data-i18n="ob.2p">V každé chvíli vidíš, jak často tvoje ruka vyhraje. Počítá se z tisíců simulovaných rozdání podle toho, co soupeři hrají.</p></div>
+        <div class="ob-text"><h1 data-i18n-html="ob.2h"></h1><p data-i18n-html="ob.2p"></p></div>
       </div>
       <div class="ob-slide">
-        <div class="ob-art">
-          <div class="switch-pill demo"><span data-i18n="ui.recs">Doporučené tahy</span><span class="sw on"></span></div>
-          <div class="rec mock"><div class="rec-head"><span class="dot"></span><span data-i18n-html="ob.3d">Doporučeno: <b>Raise na 6</b></span></div><div class="rec-why" data-i18n-html="ob.3r">AKo je na pozici BTN dost silná na otevření. Navyš na 3 BB, ať získáš iniciativu a vybereš blindy.</div></div>
-          <div class="actions mock"><span class="btn">Fold</span><span class="btn">Call 2</span><span class="btn hint">Raise 6</span></div>
+        <div class="ob-art" style="gap:12px">
+          <div class="ob-mini">
+            <div class="ob-tag" data-i18n="ob.3k">Tvoje karty</div>
+            <div class="ob-q"><div class="ob-row" id="obHand3"></div><div class="ob-qt" data-i18n-html="ob.3q"></div></div>
+            <div class="ob-acts"><div class="ab">Fold</div><div class="ab sel">Call<small>8</small></div><div class="ab best">Raise<small>24</small></div></div>
+          </div>
+          <div class="cfb meh ob-fb"><div class="hd"><div class="ic">½</div><div><b data-i18n="ob.3f">Šlo to líp</b><span data-i18n="ob.3fs"></span></div></div><div class="why" data-i18n-html="ob.3w"></div></div>
         </div>
-        <div class="ob-text"><h1 data-i18n="ob.3h">Doporučené tahy</h1><p data-i18n="ob.3p">Nevíš si rady? Zapni doporučení – ukáže nejlepší akci a vysvětlí proč. Tlačítko s doporučeným tahem má zelený rámeček.</p></div>
+        <div class="ob-text"><h1 data-i18n-html="ob.3h"></h1><p data-i18n-html="ob.3p"></p></div>
       </div>
       <div class="ob-slide">
-        <div class="ob-art" style="gap:8px">
-          <div class="feedback good mock" data-i18n-html="ob.4a"><b>Správně</b>Raise s AKo z BTN – přesně tak.</div>
-          <div class="feedback meh mock" data-i18n-html="ob.4b"><b>Nepřesnost</b>Call s Q5o z CO je moc volný. Fold ušetří žetony.</div>
-          <div class="feedback bad mock" data-i18n-html="ob.4c"><b>Velká chyba</b>S 10 BB a A4o z CO patří all-in, ne fold.</div>
-        </div>
-        <div class="ob-text"><h1 data-i18n="ob.4h">Hodnocení rozhodnutí</h1><p data-i18n="ob.4p">Po každém tahu dostaneš zpětnou vazbu a po ruce rozbor. Hodnotí se rozhodnutí, ne štěstí – tak se zlepšíš nejrychleji.</p></div>
+        <div class="ob-art ob-art4"><div class="rk-mini" id="obRanks"></div></div>
+        <div class="ob-text"><h1 data-i18n-html="ob.4h"></h1><p data-i18n-html="ob.4p"></p></div>
       </div>
-      <div class="ob-slide">
-        <div class="ob-art"><div class="ob-levels" id="obLevels"></div></div>
-        <div class="ob-text"><h1 data-i18n="ob.5h">Jakou máš zkušenost?</h1><p data-i18n="ob.5p">Podle toho nastavím tempo, soupeře a nápovědu.</p></div>
+      <div class="ob-slide ob-last">
+        <div class="ob-text"><h1 data-i18n-html="ob.5h"></h1><p data-i18n="ob.5p"></p></div>
+        <div class="ob-levels" id="obLevels"></div>
+        <div class="ob-go">
+          <button class="pill-r" id="obTrain"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.6V16c1.6 1.4 3.4 2 5.5 2s3.9-.6 5.5-2v-4.4"/><path d="M21.5 9.5v5"/></svg><span data-i18n="ob.train">Začít trénink · 2 min</span></button>
+          <button class="pill-g" id="obOnline"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/></svg><span data-i18n="ob.online">Rovnou hrát online</span></button>
+        </div>
       </div>
     </div>
     <div class="ob-bottom"><div class="pdots" id="obDots"><span class="on"></span><span></span><span></span><span></span><span></span></div><button class="btn primary" id="obNext" data-i18n="ob.next">Další</button></div>
@@ -102,12 +111,13 @@
     <button class="play" id="homePublic"><span class="pl-row"><svg class="pl-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/></svg><span class="pl-t" data-i18n="pub.title">Hrát online</span></span></button>
     <button class="fr-card" id="playBtn"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.6V16c1.6 1.4 3.4 2 5.5 2s3.9-.6 5.5-2v-4.4"/><path d="M21.5 9.5v5"/></svg></span><span class="fr-t"><b id="playLbl">Trénovat</b><span data-i18n="h.trainSub">Proti botům – rady a opravy po každém tahu</span></span><span class="fr-ch">›</span></button>
     <button class="fr-card" id="homeOnline"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.3"/><path d="M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M16 14.2c2.7.1 4.4 1.7 5 4.3"/></svg></span><span class="fr-t"><b data-i18n="on.title">Hrát s kamarády</b><span data-i18n="on.tileSub">Soukromý stůl s kódem, body bez hodnoty</span></span><span class="new" data-i18n="ui.new">NOVÉ</span><span class="fr-ch">›</span></button>
+    <button class="fr-card kp" id="homeGuide"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/></svg></span><span class="fr-t"><b><span data-i18n="gd.title">Kombinace &amp; pojmy</span> <span class="new" data-i18n="ui.new">NOVÉ</span></b><span data-i18n="gd.tileSub">Co porazí co · slovníček v kostce</span><span class="kprev" id="homeGuidePrev"></span></span><span class="fr-ch">›</span></button>
     <div class="menu">
-      <button class="mi wide" id="drillBtn"><span class="ic">🎯</span><div class="mi-t"><b data-i18n="ui.drill">Trénink situací</b><span data-i18n="ui.drillSub">Push/fold, sázka na flopu, river… nekonečně</span></div><span class="new" data-i18n="ui.new">NOVÉ</span></button>
+      <button class="mi" id="drillBtn"><span class="ic">🎯</span><b data-i18n="ui.drill">Trénink situací</b><span data-i18n="ui.drillSub2">Push/fold, river…</span></button>
       <button class="mi" id="homeStats"><span class="ic">📊</span><b data-i18n="ui.stats">Statistiky</b><span data-i18n="ui.statsSub">VPIP, PFR, přesnost, zisk</span></button>
       <button class="mi" id="homeLearn"><span class="ic">📘</span><b data-i18n="ui.learn">Učení</b><span data-i18n="ui.learnSub">Úvod, pozice, síla rukou</span></button>
       <button class="mi" id="homeWheel"><span class="ic wheel-ic"><span data-ic="wheel" data-sz="22"></span><i class="dot-new" id="homeWheelBadge" hidden></i></span><b data-i18n="wh.title">Kolo štěstí</b><span id="homeWheelSub">Zdarma jednou denně</span></button>
-      <button class="mi" id="homeAch"><span class="ic"><span data-ic="dia" data-sz="20"></span></span><b data-i18n="ach.title">Úspěchy</b><span id="homeAchSub"></span></button>
+      <button class="mi wide" id="homeAch"><span class="ic"><span data-ic="dia" data-sz="20"></span></span><div class="mi-t"><b data-i18n="ach.title">Úspěchy</b><span id="homeAchSub"></span></div></button>
     </div>
   </div>
 </section>
@@ -118,10 +128,7 @@
   <header class="top">
     <button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button>
     <button class="pts-badge" id="ptsBadge" aria-label="Body"><span class="bal2"><span data-ic="pts" data-sz="14"></span><b id="ptsV">0</b><span data-ic="dia" data-sz="14"></span><b id="diaV" class="dia">0</b></span><small id="ptsTable" hidden></small></button>
-    <label class="switch-pill" id="recPill" title="Doporučené tahy">
-      <span data-i18n="ui.recsShort">Rady</span>
-      <input type="checkbox" id="recToggle"><i></i>
-    </label>
+    <button class="kbtn" id="kombiBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/></svg><span data-i18n="gd.short">Kombinace</span></button>
     <button class="icon-btn help-btn" id="gameHelp" aria-label="Nápověda" data-i18n-aria="hv.btn">?</button>
     <button class="icon-btn" id="gameMenu" aria-label="Menu" data-i18n-aria="ui.menu">
       <svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
@@ -141,12 +148,21 @@
     <div class="odds-sub" id="eqSub">&nbsp;</div>
   </section>
 
-  <section class="rec idle" id="rec">
-    <div class="rec-head"><span class="dot"></span><span><span data-i18n="ui.recommended">Doporučeno:</span> <b id="recAct"></b></span></div>
-    <div class="rec-why" id="recWhy"></div>
+  <section class="coach idle" id="coach">
+    <div class="cq" id="coachQ">
+      <div class="ctag" id="cqTag"></div><h3 id="cqH"></h3><p id="cqP"></p>
+      <div class="rec" id="rec"><div class="rec-head"><span class="dot"></span><span><span data-i18n="ui.recommended">Doporučeno:</span> <b id="recAct"></b></span></div><div class="rec-why" id="recWhy"></div></div>
+      <button class="lock" id="hintBtn"><i>🔒</i><span id="hintTxt"></span></button>
+    </div>
+    <div class="cfb" id="feedback">
+      <div class="hd"><div class="ic" id="fbIc"></div><div><b id="fbTitle"></b><span id="fbSub"></span></div></div>
+      <div class="cmp" id="fbCmp"></div>
+      <div class="why" id="fbTxt"></div>
+      <div class="nums" id="fbNums"></div>
+      <div id="fbBar"></div>
+      <div class="streak" id="fbStreak"></div>
+    </div>
   </section>
-
-  <section class="feedback idle" id="feedback"><b id="fbTitle"></b><div class="txt" id="fbTxt"></div></section>
 
   <section class="actions" id="actions"></section>
 
@@ -182,6 +198,9 @@
 <section class="screen" id="scr-wheel" data-title="Kolo štěstí"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="wh.title">Kolo štěstí</span></div><div class="set" id="wheelBody"></div></div></section>
 <section class="screen" id="scr-ach" data-title="Úspěchy"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ach.title">Úspěchy</span></div><div class="set" id="achBody"></div></div></section>
 <section class="screen" id="scr-learn" data-title="Učení"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.learn">Učení</span></div><div class="set" id="learnBody"></div></div></section>
+<section class="screen" id="scr-guide" data-title="Kombinace &amp; pojmy"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="gd.title">Kombinace &amp; pojmy</span></div>
+  <div class="seg full gd-seg" id="gdSeg"><button data-gt="ranks" class="on" data-i18n="gd.t.ranks">Kombinace</button><button data-gt="terms" data-i18n="gd.t.terms">Pojmy</button><button data-gt="quiz" data-i18n="gd.t.quiz">Kvíz</button></div>
+  <div class="set" id="guideBody"></div></div></section>
 
 <!-- ONLINE: soukromé stoly (online/ui.js) -->
 <section class="screen" id="scr-public" data-title="Hrát online"><div class="page"><div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="pub.title">Hrát online</span></div><div class="set" id="pubBody"></div></div></section>

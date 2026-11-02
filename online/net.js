@@ -158,9 +158,36 @@
 
   /* ---------- klient proti Supabase (Edge Function + Realtime) ----------
      Všechny zápisy jdou přes Edge Function `table` (service role na serveru), klient do tabulek nikdy nepíše.
-     Realtime posílá jen signál „stůl se změnil“ (rooms.version / hole_cards s RLS) → klient si vyžádá svůj pohled. */
+     Doručení změn (od nejrychlejšího):
+       1) Realtime Broadcast na soukromém kanálu rr-u-<uid>: server po každé změně pošle každému hráči JEHO pohled
+          (číst smí jen vlastník – politika v red-river-realtime.sql, posílat jen server) → vykreslí se hned, bez dalšího dotazu;
+       2) postgres_changes (rooms.version / hole_cards s RLS) → signál, klient si vyžádá svůj pohled (jen když je novější);
+       3) pojistka: když nic nepřijde, klient se sám zeptá ('state') – Realtime události se občas ztrácejí.
+     Starší pohledy (nižší ver) se zahazují, takže pořadí doručení nevadí. */
   class SupabaseNet {
-    constructor(cfg) { this.kind = 'supabase'; this.cfg = cfg; this.code = null; this.roomId = null; this.fns = new Set(); this.ch = null; this.sb = null; this.uid = null; }
+    constructor(cfg) { this.kind = 'supabase'; this.cfg = cfg; this.code = null; this.roomId = null; this.fns = new Set(); this.ch = null; this.sb = null; this.uid = null;
+      this.ver = -1; this.vcode = null; this.lastAt = 0; this.cardsHand = -1; this.bcOk = false; this.uch = null; this.poll = null; this.inflight = false; }
+    seen(v) {                       // zapamatuj si nejnovější pohled; vrací false pro zastaralý
+      if (!v) return false;
+      if (v.code === this.vcode && typeof v.ver === 'number' && v.ver < this.ver) return false;
+      this.vcode = v.code; this.ver = v.ver; this.lastAt = Date.now();
+      const me = v.seats && v.seats[v.me]; this.cardsHand = v.hand && me && Array.isArray(me.cards) ? v.hand.no : -1;
+      return true;
+    }
+    emit(v) { if (this.seen(v)) this.fns.forEach(f => f(v)); }
+    listenMine() {                  // soukromý kanál s mým pohledem (Broadcast) – bez SQL politiky se nepřipojí a jede se postaru
+      if (this.uch || !this.uid) return;
+      this.uch = this.sb.channel('rr-u-' + this.uid, { config: { private: true } })
+        .on('broadcast', { event: 'view' }, m => { const p = m && m.payload; if (p && p.view && this.code && p.view.code === this.code) { this.bcOk = true; if (p.roomId && !this.roomId) this.roomId = p.roomId; this.emit(p.view); } })
+        .subscribe(st => { if (st === 'CHANNEL_ERROR' && !this.bcOk) { const c = this.uch; this.uch = null; this.noBc = true; try { this.sb.removeChannel(c); } catch (e) {} } });
+    }
+    refresh() {                     // vyžádej si svůj pohled (sloučí rychlé po sobě jdoucí podněty)
+      clearTimeout(this.t);
+      this.t = setTimeout(() => {
+        if (this.inflight || !this.code) return; this.inflight = true; const code = this.code;
+        this.call('state').then(r => { if (r.view && r.view.code === this.code && code === this.code) this.emit(r.view); }).catch(() => {}).finally(() => { this.inflight = false; });
+      }, 40);
+    }
     async ready() {
       if (!this.sb) {
         let mod; try { mod = await import('https://esm.sh/@supabase/supabase-js@2'); } catch (e) { throw err('offline'); }
@@ -169,6 +196,7 @@
       let { data } = await this.sb.auth.getSession();
       if (!data.session) { const r = await this.sb.auth.signInAnonymously(); if (r.error) throw err('auth'); data = { session: r.data.session }; }
       this.uid = data.session.user.id;
+      if (!this.noBc) { try { this.listenMine(); } catch (e) {} }
       let points;
       try { points = await this.points(); } catch (e) { throw err(e.code === 'auth' ? 'auth' : 'offline'); }   // funkce `table` nenasazená / nedostupná
       return { uid: this.uid, points };
@@ -180,17 +208,33 @@
       if (data && data.error) throw err(data.error);
       return data;
     }
-    async op(op, a) { const r = await this.call(op, a); if (r.view) await this.bind(r.view.code, r.roomId); return r.view; }
+    async op(op, a) {
+      const r = await this.call(op, a);
+      if (r.view) { await this.bind(r.view.code, r.roomId); if (!this.seen(r.view)) return null; }   // mezitím dorazil novější pohled
+      return r.view;
+    }
     async bind(code, roomId) {
       if (this.code === code && this.ch) return;
       if (this.ch) { await this.sb.removeChannel(this.ch); this.ch = null; }
+      clearInterval(this.poll); this.poll = null;
       this.code = code; this.roomId = roomId || null;
       if (!code || !roomId) return;
-      const refresh = () => { clearTimeout(this.t); this.t = setTimeout(() => this.call('state').then(r => r.view && this.fns.forEach(f => f(r.view))).catch(() => {}), 60); };
       this.ch = this.sb.channel('room-' + roomId)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, refresh)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'hole_cards', filter: 'user_id=eq.' + this.uid }, refresh)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, p => {
+          const n = p && p.new; if (n && typeof n.version === 'number' && this.vcode === code && n.version <= this.ver) return;   // už to mám (Broadcast)
+          this.refresh();
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'hole_cards', filter: 'user_id=eq.' + this.uid }, p => {
+          const n = p && p.new; if (n && typeof n.hand_no === 'number' && n.hand_no <= this.cardsHand) return;
+          this.refresh();
+        })
         .subscribe();
+      // pojistka proti ztraceným událostem: při tichu se zeptej sám (s fungujícím Broadcastem zřídka)
+      this.poll = setInterval(() => {
+        if (!this.code || this.inflight) return;
+        try { if (typeof document !== 'undefined' && document.hidden) return; } catch (e) {}
+        if (Date.now() - this.lastAt > (this.bcOk ? 6000 : 2500)) { this.lastAt = Date.now(); this.refresh(); }
+      }, 500);
     }
     create(settings, name) { return this.op('create', { settings, name }); }
     join(code, name) { return this.op('join', { code: String(code).toUpperCase().trim(), name }); }

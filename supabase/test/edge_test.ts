@@ -1,5 +1,5 @@
 // deno-lint-ignore-file
-import { DB } from './fake.ts';
+import { DB, OPT, BROADCASTS } from './fake.ts';
 let H: any; (Deno as any).serve = (h: any) => { H = h; };
 Deno.env.set('SUPABASE_URL', 'http://x'); Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test');
 await import('../functions/table/index.ts');
@@ -16,6 +16,10 @@ const room = () => DB.rooms.find(x => x.code === code);
 ok(room().is_public && room().tier === 'micro' && room().seated === 1, 'rooms row: is_public, tier, seated=1');
 r = await call('ub', { op: 'quickseat', tier: 'micro', name: 'Bob' });
 ok(r.view.code === code && r.view.hand && !r.view.hand.done && room().seated === 2, 'B matched to same table, hand auto-starts');
+{ const last = BROADCASTS[BROADCASTS.length - 1]; const toA = last?.messages.find((m: any) => m.topic === 'rr-u-ua');
+  ok(last && last.url.endsWith('/realtime/v1/api/broadcast') && toA && toA.private === true && toA.payload.view.code === code && Array.isArray(toA.payload.view.seats[toA.payload.view.me].cards), 'broadcast: private per-user view with own cards');
+  const other = toA.payload.view.seats.find((s: any, i: number) => s && i !== toA.payload.view.me);
+  ok(!Array.isArray(other.cards), 'broadcast to A does not contain B cards'); }
 r = await call('ua', { op: 'quickseat', tier: 'micro', name: 'Ada' }); ok(r.view.code === code && pts('ua') === 800, 'repeat quick-seat → same seat, no second buy-in');
 r = await call('uc', { op: 'quickseat', tier: 'micro', name: 'Cyril' }); ok(r.view.code === code && !r.view.seats[r.view.me].inHand, 'C joins mid-hand, sits out this hand');
 ok(!JSON.stringify(room().public_state).includes('"deck"') && room().public_state.seats.every((s: any) => !s || !Array.isArray(s.cards)), 'public_state has no deck / hole cards');
@@ -53,6 +57,27 @@ ok(pubMicro.length === 2 && pubMicro.some(x => x.seated === 6), '6 max → overf
   const left = v.seats.filter((s: any) => s).length;
   ok(left === 1 && DB.point_ledger.slice(ledger0).some(l => l.reason === 'cashback' && l.delta > 0), 'idle player reaped with chip refund (' + humans() + ')');
   Date.now = dn; }
+// souběh: dva kamarádi zvolí stejnou úroveň skoro současně → musí skončit u stejného stolu
+for (let trial = 0; trial < 6; trial++) {
+  OPT.delay = 4; const n0 = DB.rooms.filter(x => x.tier === 'mid').length;
+  const [ra, rb] = await Promise.all([call('ra' + trial, { op: 'quickseat', tier: 'mid', name: 'Ra' }), call('rb' + trial, { op: 'quickseat', tier: 'mid', name: 'Rb' })]);
+  OPT.delay = 0; console.log('     rooms created in trial:', DB.rooms.filter(x => x.tier === 'mid').length - n0);
+  const fa = (await call('ra' + trial, { op: 'quickseat', tier: 'mid', name: 'Ra' })).view, fb = (await call('rb' + trial, { op: 'quickseat', tier: 'mid', name: 'Rb' })).view;
+  ok(ra.view && rb.view && fa.code === fb.code, 'simultaneous quickseat → same table (trial ' + trial + ': ' + ra.view?.code + '/' + rb.view?.code + ' → ' + fa.code + ')');
+  const p0 = DB.profiles.find(x => x.id === 'ra' + trial).points; ok(p0 === 1000 - 500, 'no double buy-in after merge (' + p0 + ')');
+  await call('ra' + trial, { op: 'leave', code: fa.code }); await call('rb' + trial, { op: 'leave', code: fb.code });
+  await call('ud', { op: 'leave' });
+}
+// čekající hráč sám u stolu 15 min (jen ticky) → kamarád ho stále najde
+{ let off = 0; const dn = Date.now.bind(Date); Date.now = () => dn() + off;
+  const w = (await call('w1', { op: 'quickseat', tier: 'mid', name: 'Wait' })).view;
+  for (let k = 0; k < 15; k++) { off += 60000; await call('w1', { op: 'tick', code: w.code }); }
+  const f = (await call('w2', { op: 'quickseat', tier: 'mid', name: 'Friend' })).view;
+  ok(f.code === w.code, 'friend finds a table where someone waits alone for 15 min');
+  Date.now = dn; }
+// jiný stůl jiné úrovně → přesazení podle volby
+{ const a = (await call('t1', { op: 'quickseat', tier: 'micro', name: 'Tia' })).view; const b = (await call('t1', { op: 'quickseat', tier: 'mid', name: 'Tia' })).view;
+  ok(a.code !== b.code && DB.rooms.find(x => x.code === b.code).tier === 'mid' && !DB.seats.some(s => s.user_id === 't1' && DB.rooms.find(x => x.id === s.room_id).code === a.code), 'seated at other tier → moved to the chosen tier'); }
 // private table still works
 r = await call('p1', { op: 'create', settings: { max: 2, sb: 1, bb: 2, buyInBB: 100 }, name: 'Host' }); ok(/^RED-\d{4}$/.test(r.view.code) && r.view.isHost && !DB.rooms.find(x => x.code === r.view.code).is_public, 'private create works');
 const pc = r.view.code; r = await call('p2', { op: 'join', code: pc, name: 'Eva' }); r = await call('p1', { op: 'start', code: pc }); ok(r.view.hand, 'private start works');

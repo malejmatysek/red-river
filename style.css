@@ -744,3 +744,143 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 /* v1.5.1: Hrát online jako hlavní červené tlačítko */
 #scr-home .play .pl-row{display:flex;align-items:center;gap:11px}
 #scr-home .play .pl-ic{flex:none;color:#fff}
+
+/* online: odeslaný tah (než ho server potvrdí) */
+.on-pending{display:flex;align-items:center;justify-content:center;gap:10px;height:52px;border-radius:999px;border:1.5px solid #2c2b33;color:var(--muted);font-weight:700}
+.on-pending .spin{width:14px;height:14px;border-radius:50%;border:2px solid #3a3941;border-top-color:var(--red);animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== v1.6: úvod, trénink „nejdřív se rozhodni“, Kombinace & pojmy ===== */
+.card.dim{opacity:.28}
+.card.xs{width:24px;height:34px;border-radius:6px}.card.xs .rk{font-size:12.5px;left:4px;top:2px}.card.xs .st{font-size:10.5px;left:4px;bottom:2px}
+.card.md{width:44px;height:62px;border-radius:9px}.card.md .rk{font-size:21px;left:6px;top:4px}.card.md .st{font-size:16px;left:6px;bottom:5px}
+.ob-text h1 em,.ob-text h1 i{font-style:normal;color:#FF2D4A}
+.ob-text p b{color:#fff}
+.ob-lumi{width:200px;height:200px}
+.ob-chips{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.ob-chips span{background:#1c1b21;border-radius:999px;padding:7px 13px;font-size:13.5px;color:#d6d5dc;font-weight:500}.ob-chips b{color:#fff}
+.ob-chips span.r{box-shadow:inset 0 0 0 1px rgba(255,45,74,.55)}
+.ob-tbl{position:relative;width:min(330px,82vw);height:200px;border-radius:120px;background:radial-gradient(ellipse at 50% 40%,#1d1c22,#0f0e12 70%);box-shadow:inset 0 0 0 1.5px #2e2d35,0 0 0 10px #0a0a0c;margin-top:40px}
+.ob-seat{position:absolute;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:11.5px;font-weight:600;color:#d6d5dc}
+.ob-seat .av{width:46px;height:46px;border-radius:50%;background:#24232a;display:grid;place-items:center;font-size:22px;box-shadow:inset 0 0 0 2px #2e2d35}
+.ob-seat .av.me{box-shadow:inset 0 0 0 2px #FF2D4A}
+.ob-seat small{color:#8e8d96;font-weight:500;font-size:10.5px}
+.ob-mid{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;gap:4px}
+.ob-pot{position:absolute;left:50%;top:38px;transform:translateX(-50%);font-size:12px;color:#8e8d96}.ob-pot b{color:#fff}
+.ob-mini{background:#141317;border-radius:22px;padding:16px;width:100%;box-shadow:inset 0 0 0 1px #24232a}
+.ob-tag,.ctag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8e8d96}
+.ctag{color:#FF2D4A}
+.ob-q{display:flex;align-items:center;gap:12px;margin:8px 0 12px}.ob-row{display:flex;gap:4px}
+.ob-qt{font-size:13.5px;color:#b9b8c0;line-height:1.35}.ob-qt b{color:#fff}
+.ob-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.ob-acts .ab{height:52px;border-radius:16px;background:#24232a;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#fff}
+.ob-acts .ab small{font-size:11px;color:#8e8d96;font-weight:600}
+.ob-acts .ab.sel{box-shadow:inset 0 0 0 2px #fff}.ob-acts .ab.best{box-shadow:inset 0 0 0 2px #4fe3a0}
+.ob-fb{width:100%;margin:0}
+.ob-art4{justify-content:flex-start}
+.rk-mini{display:flex;flex-direction:column;gap:5px;width:100%}
+.rkm{display:flex;align-items:center;gap:10px;background:#141317;border-radius:14px;padding:5px 10px 5px 8px}
+.rkm .n{width:22px;font-size:13px;font-weight:800;color:#55545c;text-align:center}
+.rkm b{flex:1;font-size:14px;font-weight:650}
+.rkm.top .n{color:#FF2D4A}
+.rc,.cb-c,.gv-c{display:flex;gap:3px}
+.ob-last{gap:0}
+.ob-last .ob-text{margin-top:18px}.ob-last .ob-text p{margin-bottom:18px}
+.ob-levels{display:flex;flex-direction:column;gap:8px;width:100%}
+.lv{display:flex;align-items:center;gap:12px;background:#141317;border-radius:18px;padding:14px;box-shadow:inset 0 0 0 1px #24232a;text-align:left;width:100%;color:#fff}
+.lv.on{box-shadow:inset 0 0 0 2px #fff}
+.lv .e{font-size:24px;width:42px;height:42px;border-radius:13px;background:#1f1e24;display:grid;place-items:center;flex:none}
+.lv-t{flex:1;min-width:0}.lv b{display:block;font-size:16px}.lv-t span{font-size:13px;color:#8e8d96}
+.rad{margin-left:auto;width:22px;height:22px;border-radius:50%;box-shadow:inset 0 0 0 2px #3a3941;flex:none}.lv.on .rad{box-shadow:inset 0 0 0 7px #fff}
+.ob-go{margin-top:auto;padding-top:18px}
+.pill-r{background:#FF2D4A;color:#fff;font-weight:800;font-size:19px;border-radius:999px;height:62px;display:flex;align-items:center;justify-content:center;gap:10px;width:100%;box-shadow:0 10px 30px rgba(255,45,74,.25)}
+.pill-g{background:#1c1b21;color:#fff;font-weight:650;font-size:16px;border-radius:999px;height:54px;display:flex;align-items:center;justify-content:center;gap:9px;width:100%;margin-top:10px}
+.pill-r:active,.pill-g:active{transform:scale(.98)}
+/* tlačítko Kombinace u stolu */
+.kbtn{display:flex;align-items:center;gap:6px;background:#1c1b21;border-radius:999px;padding:8px 12px;font-size:13px;font-weight:650;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,45,74,.5);flex:none}
+.kbtn svg{width:16px;height:16px;color:#FF2D4A}
+/* trénink: otázka + zpětná vazba */
+.coach{transition:opacity .2s}
+.coach.idle{visibility:hidden;opacity:0}
+.cq{background:#141317;border-radius:22px;padding:14px 16px;box-shadow:inset 0 0 0 1px #24232a}
+.cq h3{margin:4px 0 4px;font-size:18px;letter-spacing:-.02em}
+.cq p{margin:0;font-size:14px;line-height:1.45;color:#b9b8c0}
+.cq .rec{margin-top:10px;background:#1c1b21;border:0;border-radius:14px}
+.lock{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:12.5px;color:#8e8d96;background:none;padding:0;text-align:left}
+.lock i{font-style:normal;width:22px;height:22px;border-radius:7px;background:#1f1e24;display:grid;place-items:center;font-size:12px;flex:none}
+.lock b{color:#fff;font-weight:600}
+.coach .cfb{display:none}
+.coach.fbk .cq{display:none}.coach.fbk .cfb{display:block}
+.cfb{border-radius:24px;padding:16px;background:#141317;box-shadow:inset 0 0 0 1.5px #3a3941}
+.cfb.good,.cfb.ok{box-shadow:inset 0 0 0 1.5px rgba(79,227,160,.55)}
+.cfb.meh{box-shadow:inset 0 0 0 1.5px rgba(245,196,81,.5)}
+.cfb.bad{box-shadow:inset 0 0 0 1.5px rgba(255,45,74,.6)}
+.cfb .hd{display:flex;align-items:center;gap:12px}
+.cfb .ic{width:44px;height:44px;border-radius:15px;display:grid;place-items:center;flex:none;font-size:21px;font-weight:800}
+.cfb.good .ic,.cfb.ok .ic{background:rgba(79,227,160,.14);color:#4fe3a0}
+.cfb.meh .ic{background:rgba(245,196,81,.14);color:#f5c451}
+.cfb.bad .ic{background:rgba(255,45,74,.14);color:#FF2D4A}
+.cfb .hd b{display:block;font-size:20px;letter-spacing:-.02em}.cfb .hd span{font-size:13px;color:#8e8d96}
+.cfb .why{font-size:14px;line-height:1.45;color:#d6d5dc;margin-top:10px}
+.cmp{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.cmp:empty{display:none}
+.cmp div{background:#1c1b21;border-radius:14px;padding:9px 12px}
+.cmp small{display:block;font-size:11.5px;color:#8e8d96;font-weight:600}.cmp b{font-size:16px}
+.cmp .yes b{color:#4fe3a0}.cmp .no b{color:#FF2D4A}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.nums div{background:#1c1b21;border-radius:14px;padding:9px 6px;text-align:center}
+.nums small{display:block;font-size:11px;color:#8e8d96;font-weight:600}.nums b{font-size:18px;font-variant-numeric:tabular-nums}
+.nums b.g{color:#4fe3a0}.nums b.r{color:#FF2D4A}
+.ebar{height:8px;border-radius:9px;background:#24232a;margin-top:12px;position:relative}
+.ebar i{position:absolute;left:0;top:0;bottom:0;border-radius:9px;background:#FF2D4A}.ebar i.g{background:#4fe3a0}
+.ebar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:#fff;border-radius:2px}
+.ebar-l{display:flex;justify-content:space-between;font-size:11.5px;color:#8e8d96;margin-top:6px}
+.streak{text-align:center;font-size:13px;color:#8e8d96;margin-top:10px}.streak:empty{display:none}
+.odds.cf-hide{display:none!important}
+.why-p{color:#d6d5dc;font-size:15px;line-height:1.5;margin:10px 0 0}
+/* pojmy v textu: výrazné podtržení */
+.cq .gl,.cfb .gl,.why-p .gl,#made .gl,.ob-text .gl{text-decoration:underline dashed;text-decoration-color:#FF2D4A;text-decoration-thickness:1.5px;text-underline-offset:3px;cursor:pointer}
+#made .gl{color:#fff}
+.gx{background:#1c1b21;border-radius:16px;padding:12px 14px;margin:12px 0 4px;font-size:14px;line-height:1.45;color:#d6d5dc}.gx b{color:#fff}
+/* Domů: dlaždice Kombinace & pojmy */
+.fr-card.kp{background:linear-gradient(135deg,#1f0a0f,#141317 65%);box-shadow:inset 0 0 0 1.5px rgba(255,45,74,.6)}
+.fr-card.kp .fr-ic{background:#FF2D4A;color:#000}
+.fr-card.kp .new{display:inline-block;vertical-align:2px;margin-left:4px}
+.kprev{display:flex;gap:3px;margin-top:6px}
+/* průvodce */
+.gd-seg{margin-bottom:14px}
+.rkl{display:flex;flex-direction:column;gap:7px}
+.rkr{background:#141317;border-radius:18px;padding:10px 12px;display:flex;align-items:center;gap:10px;width:100%;text-align:left;color:#fff}
+.rkr .n{width:24px;height:24px;border-radius:8px;background:#1f1e24;display:grid;place-items:center;font-size:12.5px;font-weight:800;color:#8e8d96;flex:none}
+.rkr.t .n{background:rgba(255,45,74,.16);color:#FF2D4A}
+.rkr .tx{flex:1;min-width:0}.rkr .tx b{display:block;font-size:15.5px;letter-spacing:-.01em}.rkr .tx span{font-size:11.5px;color:#8e8d96;line-height:1.3;display:block}
+.rkl.sm{gap:5px;margin-top:12px}.rkl.sm .rkr{padding:7px 10px}.rkl.sm .rkr.me{box-shadow:inset 0 0 0 1.5px #FF2D4A}.rkl.sm .rkr.fade{opacity:.55}
+.gd-note{font-size:11.5px;color:#6d6c75;margin-top:10px;text-align:center}
+.srch{display:flex;align-items:center;gap:8px;background:#141317;border-radius:14px;padding:4px 14px;color:#8e8d96;margin-bottom:12px}
+.srch input{flex:1;background:none;border:0;outline:0;color:#fff;font:inherit;font-size:15px;padding:9px 0;min-width:0}
+.cats{display:flex;gap:7px;margin-bottom:12px;flex-wrap:wrap}.cats button{background:#141317;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;color:#b9b8c0}.cats button.on{background:#fff;color:#000}
+.gll{display:flex;flex-direction:column;gap:7px}
+.gli{background:#141317;border-radius:18px;padding:12px 14px;display:flex;gap:12px;align-items:center;width:100%;text-align:left;color:#fff}
+.gli .vis{flex:none;width:84px;display:flex;justify-content:center}
+.gli .gtx{flex:1;min-width:0}.gli b{display:block;font-size:16px}.gli .gtx span{font-size:13px;color:#a3a2ab;line-height:1.35;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.gchip{background:#1c1b21;border-radius:999px;padding:5px 10px;font-size:12px;font-weight:650;white-space:nowrap}.gchip.r{box-shadow:inset 0 0 0 1px rgba(255,45,74,.6)}
+.qz-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}.qz-h b{font-size:19px}.qz-h span{font-size:13px;color:#8e8d96}
+.qz{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;background:#141317;border-radius:20px;padding:16px;margin-bottom:10px;box-shadow:inset 0 0 0 1px #24232a;color:#fff}
+.qz-c{display:flex;gap:5px}.qz .card.sm{width:40px;height:56px;border-radius:8px}.qz .card.sm .rk{font-size:19px;left:5px;top:3px}.qz .card.sm .st{font-size:15px;left:5px;bottom:4px}
+.qz-n{font-weight:700;font-size:15px}
+.qz.win{box-shadow:inset 0 0 0 2px #4fe3a0}.qz.lose{box-shadow:inset 0 0 0 2px #FF2D4A}
+.qz-fb{background:#1c1b21;border-radius:14px;padding:12px 14px;margin-bottom:10px;font-size:14px;color:#d6d5dc}.qz-fb.good b{color:#4fe3a0}.qz-fb.bad b{color:#FF2D4A}
+.cb-c{margin-top:10px;gap:6px}
+.ob-art.ob-art4{flex:none;min-height:0;margin-top:10px}
+.ob-pot{top:auto;bottom:44px}
+@media (max-height:740px){
+  .rk-mini{gap:3px}.rkm{padding:2px 8px}.rkm b{font-size:13px}
+  .rk-mini .card.xs{width:18px;height:25px;border-radius:4px}.rk-mini .card.xs .rk{font-size:10px;left:3px;top:1px}.rk-mini .card.xs .st{font-size:8.5px;left:3px;bottom:1px}
+  .ob-art4 + .ob-text h1{font-size:26px;margin-bottom:6px}.ob-art4 + .ob-text p{font-size:14px}
+  .cq{padding:11px 14px}.cq h3{font-size:16px}.cq p{font-size:13px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .cfb{padding:12px 14px;border-radius:20px}.cfb .ic{width:36px;height:36px;border-radius:12px;font-size:18px}.cfb .hd b{font-size:17px}
+  .cfb .cmp,.cfb .ebar,.cfb .ebar-l,.cfb .streak{display:none}
+  .cfb .why{font-size:13px;margin-top:8px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;cursor:pointer}.cfb .why.open{-webkit-line-clamp:unset}
+  .nums{margin-top:8px}.nums div{padding:6px 4px}.nums b{font-size:16px}
+}
+.ob-art4 + .ob-text h1{margin-top:12px}

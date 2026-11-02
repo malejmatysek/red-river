@@ -726,6 +726,7 @@ function cors(req: Request) {
 }
 class HttpErr extends Error { constructor(public code: string, public status = 400) { super(code); } }
 const CODE_RE = /^(RED-\d{4}|PUB-[A-Z0-9]{6})$/;
+const HEARTBEAT_MS = 60e3, FRESH_MS = 3 * 60e3;               // veřejný stůl je „živý“, pokud se ho někdo dotkl za poslední 3 min
 
 // ---------- limity požadavků (tabulka rate_limits + funkce rr_hit z migrace public_tables) ----------
 const LIMITS: Record<string, [number, number]> = { all: [240, 60], quickseat: [12, 60], report: [5, 600] };
@@ -757,18 +758,39 @@ async function credit(uid: string, n: number, why: string, room?: string) {
 // ---------- zveřejnění bezpečných projekcí ----------
 // deno-lint-ignore no-explicit-any
 async function publish(roomId: string, room: any) {
-  const base = { status: room.status, host: room.host, public_state: core.view(room, null), version: room.ver, updated_at: new Date().toISOString() };
-  const { error } = await admin.from('rooms').update({ ...base, is_public: core.isPub(room), tier: room.settings.tier ?? null, seated: core.humans(room).length }).eq('id', roomId);
-  if (error) await admin.from('rooms').update(base).eq('id', roomId);   // sloupce is_public/tier/seated chybí (stará databáze)
-  await admin.from('seats').delete().eq('room_id', roomId);
+  const base = { status: room.status, host: room.host, public_state: core.view(room, null), version: room.ver, updated_at: new Date(Date.now()).toISOString() };
   // deno-lint-ignore no-explicit-any
   const seats = room.seats.map((s: any, i: number) => s && { room_id: roomId, seat_no: i, user_id: s.bot ? null : s.uid, is_bot: !!s.bot, name: s.name, stack: s.stack, sit_out: !!s.sitOut }).filter(Boolean);
-  if (seats.length) await admin.from('seats').insert(seats);
   // deno-lint-ignore no-explicit-any
   const holes = core.privateCards(room).map((p: any) => ({ room_id: roomId, hand_no: p.hand, user_id: p.uid, cards: p.cards }));
-  if (holes.length) await admin.from('hole_cards').upsert(holes, { onConflict: 'room_id,hand_no,user_id', ignoreDuplicates: true });
-  if (room.handNo > 30) await admin.from('hole_cards').delete().eq('room_id', roomId).lt('hand_no', room.handNo - 30);
-  if (room.last) await admin.from('hands').upsert({ room_id: roomId, hand_no: room.last.no, review: room.last }, { onConflict: 'room_id,hand_no', ignoreDuplicates: true });
+  // zápisy běží souběžně (dřív 6 dotazů za sebou); rooms se nepřepíše starší verzí (.lte version)
+  await Promise.all([
+    (async () => {
+      const { error } = await admin.from('rooms').update({ ...base, is_public: core.isPub(room), tier: room.settings.tier ?? null, seated: core.humans(room).length }).eq('id', roomId).lte('version', room.ver);
+      if (error) await admin.from('rooms').update(base).eq('id', roomId).lte('version', room.ver);   // sloupce is_public/tier/seated chybí (stará databáze)
+    })(),
+    (async () => { await admin.from('seats').delete().eq('room_id', roomId); if (seats.length) await admin.from('seats').insert(seats); })(),
+    holes.length ? admin.from('hole_cards').upsert(holes, { onConflict: 'room_id,hand_no,user_id', ignoreDuplicates: true }) : null,
+    room.handNo > 30 ? admin.from('hole_cards').delete().eq('room_id', roomId).lt('hand_no', room.handNo - 30) : null,
+    room.last ? admin.from('hands').upsert({ room_id: roomId, hand_no: room.last.no, review: room.last }, { onConflict: 'room_id,hand_no', ignoreDuplicates: true }) : null,
+  ]);
+}
+
+// ---------- okamžité doručení hráčům (Realtime Broadcast, soukromý kanál rr-u-<uid>) ----------
+// Každý člověk u stolu dostane SVŮJ pohled (jen své karty) hned po uložení – bez čekání na postgres_changes
+// a bez dalšího dotazu 'state'. Kanál je privátní: číst smí jen vlastník (politika na realtime.messages),
+// posílat jen server (klienti nemají insert politiku) → podvržení stavu není možné.
+// deno-lint-ignore no-explicit-any
+async function push(roomId: string, room: any) {
+  // deno-lint-ignore no-explicit-any
+  const messages = core.humans(room).filter((s: any) => s.uid).map((s: any) => ({ topic: 'rr-u-' + s.uid, event: 'view', private: true, payload: { roomId, view: core.view(room, s.uid) } }));
+  if (!messages.length) return;
+  const headers: Record<string, string> = { apikey: SERVICE_KEY, 'Content-Type': 'application/json' };
+  if (SERVICE_KEY.startsWith('eyJ')) headers.Authorization = 'Bearer ' + SERVICE_KEY;     // legacy service_role JWT
+  try {
+    const r = await fetch(SUPABASE_URL + '/realtime/v1/api/broadcast', { method: 'POST', headers, body: JSON.stringify({ messages }) });
+    if (!r.ok) console.warn('broadcast', r.status, (await r.text()).slice(0, 200));
+  } catch (e) { console.warn('broadcast', e); }
 }
 
 // ---------- založení stolu ----------
@@ -782,7 +804,7 @@ async function create(uid: string, body: any) {
       const { data: r, error } = await admin.from('rooms').insert({ code: room.code, host: uid, status: room.status, settings: room.settings, public_state: core.view(room, null), version: room.ver }).select('id').single();
       if (error) { if (error.code === '23505') continue; throw new HttpErr('server', 500); }   // kód už existuje → jiný
       await admin.from('room_state').insert({ room_id: r.id, state: room, version: 0 });
-      await publish(r.id, room);
+      await Promise.all([publish(r.id, room), push(r.id, room)]);
       return { view: core.view(room, uid), roomId: r.id, points: await points(uid) };
     }
     throw new HttpErr('no_code', 500);
@@ -800,9 +822,11 @@ async function mutate(uid: string, op: string, body: any) {
     if (!code) throw new HttpErr('no_room', 404);
   }
   for (let attempt = 0; attempt < 6; attempt++) {
-    const { data: r } = await admin.from('rooms').select('id').eq('code', code).maybeSingle();
+    // jeden dotaz místo dvou: rooms + vnořený room_state (1:1 přes room_id)
+    const { data: r } = await admin.from('rooms').select('id, updated_at, room_state(state, version)').eq('code', code).maybeSingle();
     if (!r) throw new HttpErr('no_room', 404);
-    const { data: st } = await admin.from('room_state').select('state, version').eq('room_id', r.id).single();
+    // deno-lint-ignore no-explicit-any
+    const st = (Array.isArray(r.room_state) ? r.room_state[0] : r.room_state) as any;
     if (!st) throw new HttpErr('no_room', 404);
     const room = st.state;
     let debited = 0, debitWhy = '', refund = 0, changed = true;
@@ -841,9 +865,14 @@ async function mutate(uid: string, op: string, body: any) {
         if (!upd?.length) { if (debited) await credit(uid, debited, 'refund', r.id); continue; }   // souběh → znovu
         if (refund) await credit(uid, refund, 'cashback', r.id);
         for (const x of reaped) await credit(x.uid, x.refund, 'cashback', r.id);   // zvednutí od veřejného stolu (odpojení / nečinnost)
-        await publish(r.id, room);
+        await Promise.all([push(r.id, room), publish(r.id, room)]);
+      } else if (core.isPub(room) && room.status !== 'closed' && Date.now() - Date.parse(r.updated_at ?? '') > HEARTBEAT_MS) {
+        // srdeční tep: čekající hráč u veřejného stolu (bez změny stavu) drží stůl „živý“ → najdou ho další hráči
+        // a úklid (sweep) ho nezavře. Dřív stůl bez tahu po 10 min z výběru zmizel → kamarád dostal nový stůl.
+        await admin.from('rooms').update({ updated_at: new Date(Date.now()).toISOString() }).eq('id', r.id);
       }
-      return { view: core.view(room, uid), roomId: r.id, points: await points(uid) };
+      const money = op === 'join' || op === 'leave' || op === 'rebuy';     // body jen tam, kde se mění (ušetří dotaz)
+      return { view: core.view(room, uid), roomId: r.id, ...(money ? { points: await points(uid) } : {}) };
     } catch (e) {
       if (debited) await credit(uid, debited, 'refund', r.id);
       // deno-lint-ignore no-explicit-any
@@ -864,30 +893,60 @@ async function quickseat(uid: string, body: any) {
   const T = core.TIERS.find((x: any) => x.id === String(body.tier ?? ''));
   if (!T) throw new HttpErr('bad_tier');
   if (core.badName(body.name)) throw new HttpErr('bad_name');
-  const { data: mine } = await admin.from('seats').select('room_id, rooms!inner(code, status, is_public)').eq('user_id', uid).eq('rooms.is_public', true).neq('rooms.status', 'closed').limit(1);
+  const { data: mine } = await admin.from('seats').select('room_id, rooms!inner(code, status, is_public, tier)').eq('user_id', uid).eq('rooms.is_public', true).neq('rooms.status', 'closed').limit(3);
   // deno-lint-ignore no-explicit-any
-  const have = (mine?.[0] as any)?.rooms?.code;
-  if (have) return await mutate(uid, 'state', { code: have });
+  for (const m of (mine ?? []) as any[]) {
+    if (m.rooms?.tier === T.id) return await mutate(uid, 'state', { code: m.rooms.code });
+    // sedí u jiné úrovně (např. zapomenutý stůl) → zvednout (žetony zpět) a usadit podle volby
+    try { await mutate(uid, 'leave', { code: m.rooms.code }); } catch (e) { console.warn('qs leave', e); }
+  }
   if (await points(uid) < T.bb * T.buyInBB) throw new HttpErr('points');
-  const fresh = new Date(Date.now() - 10 * 60e3).toISOString();
-  const { data: open } = await admin.from('rooms').select('code, seated').eq('is_public', true).eq('tier', T.id).eq('status', 'playing')
-    .lt('seated', core.PUB_MAX).gt('updated_at', fresh).order('seated', { ascending: false }).order('updated_at', { ascending: false }).limit(5);
-  for (const r of open ?? []) {
-    try { return await mutate(uid, 'join', { code: r.code, name: body.name }); }
+  const join = async (code: string) => {
+    for (let k = 0; k < 3; k++) {                                // 'busy' (souběh) → zkusit znovu, ne přeskočit stůl
+      try { return await mutate(uid, 'join', { code, name: body.name }); }
+      catch (e) { if (e instanceof HttpErr && e.code === 'busy' && k < 2) { await new Promise((r) => setTimeout(r, 80 + Math.random() * 120)); continue; } throw e; }
+    }
+  };
+  const openTables = async (exceptCode = '') => {
+    const fresh = new Date(Date.now() - FRESH_MS).toISOString();
+    let q = admin.from('rooms').select('code, seated, created_at').eq('is_public', true).eq('tier', T.id).eq('status', 'playing')
+      .lt('seated', core.PUB_MAX).gt('updated_at', fresh);
+    if (exceptCode) q = q.neq('code', exceptCode);
+    const { data } = await q.order('seated', { ascending: false }).order('created_at', { ascending: true }).limit(8);
+    return data ?? [];
+  };
+  for (const r of await openTables()) {
+    try { return await join(r.code); }
     catch (e) { if (e instanceof HttpErr && ['full', 'closed', 'no_room', 'busy'].includes(e.code)) continue; throw e; }
   }
   for (let k = 0; k < 10; k++) {                                  // žádný volný → nový stůl
     const room = core.createPublic({ tier: T.id });
     const { data: r, error } = await admin.from('rooms').insert({ code: room.code, host: null, status: room.status, settings: room.settings,
-      public_state: core.view(room, null), version: room.ver, is_public: true, tier: T.id, seated: 0 }).select('id').single();
+      public_state: core.view(room, null), version: room.ver, is_public: true, tier: T.id, seated: 0 }).select('id, created_at').single();
     if (error) { if (error.code === '23505') continue; console.error(error); throw new HttpErr('server', 500); }
     await admin.from('room_state').insert({ room_id: r.id, state: room, version: 0 });
-    return await mutate(uid, 'join', { code: room.code, name: body.name });
+    const res = await join(room.code);
+    // souběh: dva hráči přišli skoro současně, oba nic nenašli a oba založili stůl. Deterministické sloučení:
+    // kdo má MLADŠÍ stůl, přesedne ke staršímu (created_at, pak kód) – starší stůl zůstane, mladší se zavře.
+    // deno-lint-ignore no-explicit-any
+    const older = (await openTables(room.code)).filter((o: any) => o.created_at < r.created_at || (o.created_at === r.created_at && o.code < room.code))
+      // deno-lint-ignore no-explicit-any
+      .sort((a: any, b: any) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0));
+    for (const o of older) {
+      try {
+        await mutate(uid, 'leave', { code: room.code });           // prázdný stůl se zavře, žetony zpět
+        return await join(o.code);
+      } catch (e) {
+        if (e instanceof HttpErr && ['full', 'closed', 'no_room', 'busy'].includes(e.code)) { try { return await join(room.code); } catch (_) { /* zkusit další */ } continue; }
+        throw e;
+      }
+    }
+    return res;
   }
   throw new HttpErr('no_code', 500);
 }
 async function lobby() {
-  const fresh = new Date(Date.now() - 10 * 60e3).toISOString();
+  const fresh = new Date(Date.now() - FRESH_MS).toISOString();
   const { data } = await admin.from('rooms').select('tier, seated').eq('is_public', true).eq('status', 'playing').gt('updated_at', fresh).limit(1000);
   // deno-lint-ignore no-explicit-any
   return { tiers: core.TIERS.map((T: any) => { const rs = (data ?? []).filter((r: any) => r.tier === T.id && r.seated > 0);
@@ -933,6 +992,20 @@ async function sweep() {
   return { closed: n };
 }
 
+// ověření JWT: výsledek getUser si pamatujeme do vypršení tokenu (max 5 min) → o 1 síťový dotaz méně na každý tah
+const userCache = new Map<string, { id: string; exp: number }>();
+async function userOf(jwt: string): Promise<string | null> {
+  if (!jwt) return null;
+  const c = userCache.get(jwt); if (c && c.exp > Date.now()) return c.id;
+  const { data } = await admin.auth.getUser(jwt);
+  const id = data?.user?.id; if (!id) return null;
+  let exp = Date.now() + 5 * 60e3;
+  try { const p = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); if (p.exp) exp = Math.min(exp, p.exp * 1000 - 5000); } catch (_) { /* neprůhledný token */ }
+  if (userCache.size > 2000) userCache.clear();
+  userCache.set(jwt, { id, exp });
+  return id;
+}
+
 Deno.serve(async (req) => {
   const h = cors(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: h });
@@ -943,11 +1016,15 @@ Deno.serve(async (req) => {
     const op = String(body.op ?? '');
     if (op === 'sweep') { if (!SWEEP_SECRET || req.headers.get('x-sweep-secret') !== SWEEP_SECRET) throw new HttpErr('forbidden', 403); return json(await sweep()); }
     const jwt = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
-    const { data: { user } } = await admin.auth.getUser(jwt);
-    if (!user) throw new HttpErr('auth', 401);
-    await limit(user.id, 'all');
-    if (op === 'points') return json({ points: await points(user.id) });
-    if (op === 'lobby') return json(await lobby());
+    const uid = await userOf(jwt);
+    if (!uid) throw new HttpErr('auth', 401);
+    const user = { id: uid };
+    const lim = limit(user.id, 'all');
+    if (op === 'points' || op === 'lobby' || op === 'state' || op === 'tick') {   // čtení: limit souběžně (o dotaz rychlejší)
+      const [, out] = await Promise.all([lim, op === 'points' ? points(user.id).then((n) => ({ points: n })) : op === 'lobby' ? lobby() : mutate(user.id, op, body)]);
+      return json(out);
+    }
+    await lim;
     if (op === 'quickseat') return json(await quickseat(user.id, body));
     if (op === 'report') return json(await report(user.id, body));
     if (op === 'create') return json(await create(user.id, body));

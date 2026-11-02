@@ -47,7 +47,7 @@ const { chromium } = require(process.env.PW || 'playwright-core');
     for (let s = 0; s < 300; s++) {
       const st = await page.evaluate(() => ({ over: __G.over, turn: __G.turn }));
       if (st.over) break;
-      if (st.turn === 0) await page.evaluate(() => { const G = __G; __poker.heroAct(G.rec ? G.rec.action : (G.ctx.toCall ? 'call' : 'check'), G.rec && G.rec.to); });
+      if (st.turn === 0) await page.evaluate(() => { const G = __G; __poker.heroAct(G.rec ? G.rec.action : (G.ctx.toCall ? 'call' : 'check'), G.rec && G.rec.to); if (__G.hold) __poker.coachGo(); });
       else await page.waitForTimeout(4);
     }
     await page.evaluate(() => { document.getElementById('scrim').click(); __poker.startHand(); });
@@ -68,8 +68,8 @@ const { chromium } = require(process.env.PW || 'playwright-core');
   const hv = await page.evaluate(() => ({ open: !document.getElementById('helpOv').hidden, labs: document.querySelectorAll('.hv-lab').length, dealer: [...document.querySelectorAll('.hv-lab')].some(b => /dealer/i.test(b.textContent)) }));
   ok(hv.open && hv.labs >= 6 && hv.dealer, 'help overlay opens with labels incl. dealer ' + JSON.stringify(hv));
   await page.click('#hvRanks'); await page.waitForTimeout(150);
-  ok(await page.evaluate(() => document.querySelectorAll('.rk-row').length === 10 && document.getElementById('helpOv').hidden), 'hand rankings sheet (10 rows)');
-  await page.evaluate(() => document.getElementById('scrim').click());
+  ok(await page.evaluate(() => document.querySelectorAll('#guideBody .rkr').length === 10 && document.getElementById('helpOv').hidden && __poker.nav.cur === 'guide'), 'hand rankings guide (10 rows)');
+  await page.evaluate(() => history.back()); await page.waitForTimeout(400);
   ok(await page.evaluate(() => [...document.querySelectorAll('#opps .dealer')].every(d => d.dataset.g === 'dealer')), 'opponent D badges tappable');
   await page.evaluate(() => { const d = [...document.querySelectorAll('#opps .dealer, #heroDealer')][0]; d.click(); }); await page.waitForTimeout(150);
   ok(await page.evaluate(() => /dealer/i.test(document.body.innerText) && !document.getElementById('glSheet') || true), 'dealer popup');

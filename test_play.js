@@ -5,7 +5,7 @@ const { chromium } = require(process.env.PW || 'playwright-core');
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.addInitScript(([L, LV]) => { window.__FAST = true; if (L && !localStorage.getItem('pt_settings')) localStorage.setItem('pt_settings', JSON.stringify({ lang: L, level: +LV || 0, adv: +LV === 2, recs: +LV !== 2, odds: +LV !== 2, learn: +LV !== 2 })); if (!localStorage.getItem('pt_wallet')) localStorage.setItem('pt_wallet', JSON.stringify({ points: 1e9, lastDaily: '', lessons: {} })); }, [process.env.TLANG || '', process.env.LEVEL || '0']);
+  await page.addInitScript(([L, LV]) => { window.__FAST = true; if (L && !localStorage.getItem('pt_settings')) localStorage.setItem('pt_settings', JSON.stringify({ v: 4, lang: L, level: +LV || 0, adv: +LV === 2, recs: +LV !== 2, odds: +LV !== 2, learn: +LV !== 2 })); if (!localStorage.getItem('pt_wallet')) localStorage.setItem('pt_wallet', JSON.stringify({ points: 1e9, lastDaily: '', lessons: {} })); }, [process.env.TLANG || '', process.env.LEVEL || '0']);
   await page.goto('file://' + __dirname + '/index.html');
   const HANDS = +process.env.HANDS || 200;
   let rawNot = 0, rawEx = ''; let chipErr = 0, showdowns = 0, decisions = 0, allins = 0, heroAllin = 0; const tables = {};
@@ -25,6 +25,7 @@ const { chromium } = require(process.env.PW || 'playwright-core');
         const RAW = /\b[2-9TJQKA]{2}[os]\b|\b(BTN|UTG|HJ|LJ)\b|\d BB\b/;
         if (process.env.LEVEL !== '2' && RAW.test(txt)) { rawNot++; if (!rawEx) rawEx = txt; }
         decisions++;
+        await page.evaluate(() => { if (__G.hold) __poker.coachGo(); });
       } else await page.waitForTimeout(5);
     }
     const res = await page.evaluate(() => ({ over: __G.over, sum: __G.players.reduce((s, p) => s + p.stack, 0), start: __G.players.reduce((s, p) => s + p.start, 0), n: __G.players.length, sd: __G.players.filter(p => !p.folded).length > 1, allin: __G.players.some(p => p.allIn) }));
@@ -37,7 +38,7 @@ const { chromium } = require(process.env.PW || 'playwright-core');
     if (h === 2 * third - 1) await page.evaluate(() => { __poker.settings.opps = 8; __poker.settings.bankroll = false; __poker.settings.randomDepth = true; });
     await page.evaluate(() => __poker.startHand());
   }
-  if (process.env.LEVEL === '2') { const vis = await page.evaluate(() => ['rec', 'odds', 'feedback', 'recPill'].filter(id => getComputedStyle(document.getElementById(id)).display !== 'none'));
+  if (process.env.LEVEL === '2') { const vis = await page.evaluate(() => ['coach', 'odds', 'kombiBtn'].filter(id => getComputedStyle(document.getElementById(id)).display !== 'none'));
     if (vis.length) errors.push('expert shows help: ' + vis.join(',')); else console.log('expert: help hidden OK'); }
   const extra = await page.evaluate(() => ({ session: JSON.parse(localStorage.getItem('pt_session')), names: __G.players.map(p => p.name).join(',') }));
   // ekonomika: bez bodů se ke stolu nesedne

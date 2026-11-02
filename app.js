@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.5.2', BUILD = 'v18';
+  const APP_VERSION = '1.6.0', BUILD = 'v19';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -36,21 +36,21 @@
   const load = (k, d) => { try { return Object.assign({}, d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return Object.assign({}, d); } };
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const navLang = ((navigator.languages && navigator.languages[0]) || navigator.language || 'cs').toLowerCase();
-  const SETTINGS0 = { recs: true, odds: true, learn: true, opps: 5, shortStacks: true, v: 3, diff: 1, blinds: 0, depth: 100, randomDepth: false,
+  const SETTINGS0 = { recs: false, odds: true, learn: true, opps: 5, shortStacks: true, v: 4, diff: 1, blinds: 0, depth: 100, randomDepth: false,
     bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true };
   const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 4,
     br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [], histP: [], playSec: 0, days: {} };
   const fresh = o => JSON.parse(JSON.stringify(o));
   /* úrovně hráče: předvolby (jednotlivá nastavení jde pak změnit) */
   const LEVELS = [
-    { speed: 0, diff: 0, recs: true, odds: true, learn: true, adv: false, gloss: true },
+    { speed: 0, diff: 0, recs: false, odds: true, learn: true, adv: false, gloss: true },
     { speed: 1, diff: 1, recs: false, odds: true, learn: true, adv: false, gloss: true },
     { speed: 2, diff: 2, recs: false, odds: false, learn: false, adv: true, gloss: false }];
   const expert = () => settings.level === 2;
   const helpOn = k => !expert() && !!settings[k];
   const DRILL0 = { n: 0, good: 0, ok: 0, meh: 0, bad: 0, streak: 0, best: 0 };
   const settings = load('pt_settings', SETTINGS0);
-  if (settings.v !== 3) { if (settings.v !== 2) { settings.opps = 5; settings.shortStacks = true; } settings.v = 3; save('pt_settings', settings); }
+  if (settings.v !== 4) { if (settings.v !== 3 && settings.v !== 2) { settings.opps = 5; settings.shortStacks = true; } settings.recs = false; settings.v = 4; save('pt_settings', settings); }   // v1.6: nejdřív se rozhodni, rada jen za body
   settings.opps = Math.max(1, Math.min(8, settings.opps | 0 || 5));
   if (!I18N.has(settings.lang)) settings.lang = 'cs';
   I18N.set(settings.lang);
@@ -60,7 +60,7 @@
   stats.playSec = +stats.playSec || 0; stats.days = Object.assign({}, stats.days); stats.types = Object.assign({}, stats.types); stats.hist = (stats.hist || []).slice(); stats.bestCards = (stats.bestCards || []).slice();
   if (!Array.isArray(stats.histP)) stats.histP = stats.hands ? [0, stats.profit] : [];   // v1.3: zisk z rukou zvlášť od zůstatku
   /* body: virtuální měna (žádné skutečné platby, žádný výběr) */
-  const PTS = { start: 1000, daily: 500, refillMin: 200, refillTo: 1000, good: 5, ok: 2, streak: 50, lesson: 100, diaRate: 500, login7: 3 };
+  const PTS = { hint: 5, start: 1000, daily: 500, refillMin: 200, refillTo: 1000, good: 5, ok: 2, streak: 50, lesson: 100, diaRate: 500, login7: 3 };
   const wallet = load('pt_wallet', { points: PTS.start, lastDaily: '', lessons: {}, v: 1 });
   wallet.lessons = Object.assign({}, wallet.lessons);
   /* v1.3: diamanty, úspěchy, vzhled, kolo štěstí, série dní, výzvy dne */
@@ -171,11 +171,12 @@
   }
   document.addEventListener('visibilitychange', () => playClock(nav.cur === 'game'));
   function onShow(id, prev) {
-    if (id === 'home') renderHome();
+    if (id === 'home') { renderHome(); renderHomeGuide(); }
     if (id === 'profile') renderProfile();
     if (id === 'settings') renderSettings();
     if (id === 'stats') renderStats();
     if (id === 'learn') renderLearn();
+    if (id === 'guide') renderGuide();
     if (id === 'shop') renderShop();
     if (id === 'wheel') renderWheel();
     if (id === 'ach') renderAch();
@@ -242,15 +243,16 @@
   /* vysvětlení pojmu (nad ostatními panely) */
   function glossInfo(k) {
     if (k.startsWith('pos.')) { const c = k.slice(4); return { title: t('ps.' + c) + ' (' + c + ')', text: t('gp.' + c) }; }
-    return { title: t('gl.' + k + '.t'), text: t('gl.' + k + '.d') };
+    const x = t('gl.' + k + '.x');
+    return { title: t('gl.' + k + '.t'), text: t('gl.' + k + '.d'), ex: x !== 'gl.' + k + '.x' ? x : '' };
   }
   function openGloss(k) {
     const g = glossInfo(k);
-    $('gloss').innerHTML = `<div class="grab"></div><div class="gl-k">${t('gl.title')}</div><h2>${g.title}</h2><p>${g.text}</p>
+    $('gloss').innerHTML = `<div class="grab"></div><div class="gl-k">${t('gl.title')}</div><h2>${g.title}</h2><p>${g.text}</p>${g.ex ? `<div class="gx"><b>${t('gl.ex')}</b> ${rich(g.ex, { nolink: true })}</div>` : ''}
       <div class="gl-btns"><button class="btn primary" id="glOk">${t('gl.ok')}</button><button class="btn ghostbtn" id="glAll">${t('gl.all')}</button></div>`;
     $('gloss').hidden = false; $('glossScrim').hidden = false; SFX.tap();
     $('glOk').onclick = closeGloss;
-    $('glAll').onclick = () => { closeGloss(); closeSheet(); if (nav.cur !== 'learn') nav.go('learn'); setTimeout(() => { const x = $('glossary'); if (x) x.scrollIntoView({ block: 'start' }); }, 60); };
+    $('glAll').onclick = () => { closeGloss(); closeSheet(); gdTab = 'terms'; if (nav.cur === 'guide') renderGuide(); else nav.go('guide'); };
   }
   function closeGloss() { $('gloss').hidden = true; $('glossScrim').hidden = true; }
   $('glossScrim').onclick = closeGloss;
@@ -366,7 +368,7 @@
     const prevShown = G.players.map(p => p.cards && !p.folded ? 2 : 0);
     G.handNo++;
     G.dealer = (G.dealer + 1) % n();
-    G.deck = newDeck(); G.board = []; G.street = 0; G.over = false; G.decisions = []; G.feedback = null; G.lastDec = null;
+    G.deck = newDeck(); G.board = []; G.street = 0; G.over = false; G.decisions = []; G.feedback = null; G.lastDec = null; G.coach = null; G.hold = false; G.hint = false; G.retry = false;
     G.heroVpip = G.heroPfr = G.heroFlop = false; G.winners = null; G.eq = null; G.eqStreet = -1; G.ctx = null; G.rec = null;
     assignStacks();
     G.players.forEach((p, i) => Object.assign(p, { bet: 0, total: 0, folded: false, allIn: false, acted: false, last: '', pf: '', cards: [G.deck.pop(), G.deck.pop()], show: false, seen: noAnim() ? 2 : prevShown[i] }));
@@ -405,12 +407,12 @@
     setTimeout(() => { G.players.forEach(p => p.seen = 2); G.revealed = true; render(); SFX.flip(); setTimeout(done, 380 * spd()); }, (order.length - 1) * gap + dur + 60);
   }
   function loop() {
-    if (G.over || G.dealing) return;
+    if (G.over || G.dealing || G.hold) return;
     if (alive().length === 1) return finish();
     if (G.turn < 0) return nextStreet();
     const p = G.players[G.turn];
     if (p.hero) {
-      G.ctx = ctxFor(0, heroIters(alive().length - 1)); G.eq = G.ctx.eqr; G.rec = PE.recommend(G.ctx);
+      G.ctx = ctxFor(0, heroIters(alive().length - 1)); G.eq = G.ctx.eqr; G.rec = PE.recommend(G.ctx); G.hint = false; G.retry = false;
       render(); SFX.turn(); vib(12);
     } else {
       G.ctx = null; G.rec = null;
@@ -461,18 +463,101 @@
     if ((action === 'bet' || action === 'raise') && to >= h.stack + h.bet) action = 'allin';
     if (action === 'allin') to = h.stack + h.bet;
     const gr = PE.grade(rec, action, ctx);
+    const retry = !!G.retry, coach = coachOn();
+    const snap = coach ? snapG() : null, recTxt = recLabel(rec);
     const dec = { street: G.street, action, to, ctx, grade: gr, eq: ctx.eq };
     G.decisions.push(dec);
-    stats.decisions++; stats[gr.level]++;
-    if (helpOn('recs')) { stats.recN++; if (gr.level === 'good') stats.recAgree++; }
-    if (G.street > 0) { if (action === 'bet' || action === 'raise' || (action === 'allin' && ctx.toCall < h.stack)) stats.br++; else if (action === 'call' || action === 'allin') stats.calls++; }
-    if (gr.level === 'good') addPts(PTS.good); else if (gr.level === 'ok') addPts(PTS.ok);
+    if (!retry) {                                  // opakovaný pokus se do statistik ani bodů nepočítá
+      stats.decisions++; stats[gr.level]++;
+      if (helpOn('recs') || G.hint) { stats.recN++; if (gr.level === 'good') stats.recAgree++; }
+      if (G.street > 0) { if (action === 'bet' || action === 'raise' || (action === 'allin' && ctx.toCall < h.stack)) stats.br++; else if (action === 'call' || action === 'allin') stats.calls++; }
+      if (gr.level === 'good') addPts(PTS.good); else if (gr.level === 'ok') addPts(PTS.ok);
+      coachStreak = gr.level === 'good' || gr.level === 'ok' ? coachStreak + 1 : 0;
+    }
+    G.retry = false;
+    if (coach) { G.coach = { fb: gr, ctx, rec, recTxt, action, to, snap, retry, street: G.street, hint: !!G.hint, streak: coachStreak }; G.hold = true; }
     if (G.street === 0 && action !== 'fold' && !(action === 'check')) G.heroVpip = true;
     if (G.street === 0 && (action === 'raise' || action === 'bet' || action === 'allin')) G.heroPfr = true;
     G.lastDec = dec;
     G.feedback = helpOn('learn') ? Object.assign({ street: G.street, act: action }, gr) : null;
     act(0, action, to);
+    if (G.coach) render();
   }
+  /* ---------- v1.6: trénink „nejdřív se rozhodni“ ---------- */
+  let coachStreak = 0;
+  const coachOn = () => helpOn('learn');
+  const SNAP_SKIP = new Set(['paused', 'coach', 'hold', 'winners']);
+  function snapG() { const o = {}; for (const k in G) if (!SNAP_SKIP.has(k) && typeof G[k] !== 'function') o[k] = G[k]; return JSON.stringify(o); }
+  function coachGo() {
+    if (!G.hold) return;
+    G.coach = null; G.hold = false; lastActions = ''; SFX.tap();
+    if (G.over) { render(); return; }
+    loop(); render();
+  }
+  function coachRetry() {
+    const c = G.coach; if (!c || !c.snap) return;
+    Object.assign(G, JSON.parse(c.snap)); G.coach = null; G.hold = false; G.retry = true; lastActions = ''; SFX.tap();
+    render();
+  }
+  function buyHint() {
+    if (G.hint || !G.rec) return;
+    if (wallet.points < PTS.hint) { toast(t('co.noPts')); return; }
+    addPts(-PTS.hint); G.hint = true; lastActions = ''; SFX.chip(); render();
+  }
+  const ACT_NAME = a => ({ fold: 'Fold', check: 'Check', call: 'Call', bet: 'Bet', raise: 'Raise', allin: 'All-in' })[a] || a;
+  function whyNot(c) {
+    // „Proč ne X?“ – ohodnocení doporučené akce (nebo nejbližší alternativy) stejným enginem
+    const alt = c.fb.level === 'good' ? (c.action === 'fold' ? (c.ctx.toCall ? 'call' : 'check') : 'fold') : c.rec.action;
+    const g = PE.grade(c.rec, alt, c.ctx);
+    openSheet(`<h2>${t('co.whyNot', { a: ACT_NAME(alt) })}</h2><div class="sub">${g.title}</div><p class="why-p">${rich(g.text)}</p>
+      <button class="btn primary wide" id="wnOk">${t('gl.ok')}</button>`);
+    $('wnOk').onclick = closeSheet;
+  }
+  const pct = x => Math.round(x * 100) + ' %';
+  function handHTML() {
+    const h = hero();
+    if (!G.revealed) return '–';
+    if (!G.board.length) return rich(`[[st:${h.cards[0]},${h.cards[1]}]]`);
+    return `<span class="gl" data-combo="1">${PE.handName(h.cards.concat(G.board))}</span>`;
+  }
+  function renderCoach() {
+    const box = $('coach'), on = coachOn() || helpOn('recs');
+    box.style.display = on ? '' : 'none';
+    if (!on) return;
+    const c = G.coach;
+    const myTurn = G.turn === 0 && G.ctx && G.rec && !G.over && !G.dealing && !G.hold;
+    box.classList.toggle('idle', !c && !myTurn);
+    box.classList.toggle('fbk', !!c);
+    $('odds').classList.toggle('cf-hide', !!c);
+    if (c) {
+      const f = c.fb, lv = f.level, x = c.ctx;
+      $('feedback').className = 'cfb ' + lv;
+      $('fbIc').textContent = lv === 'good' || lv === 'ok' ? '✓' : lv === 'meh' ? '½' : '✕';
+      setText($('fbTitle'), t('co.t.' + lv));
+      const mine = hero().last || ACT_NAME(c.action);
+      setHTML($('fbSub'), c.retry ? t('co.s.retry', { a: mine }) : lv === 'good' ? t('co.s.good', { a: mine, n: PTS.good }) : lv === 'ok' ? t('co.s.ok', { a: mine, n: PTS.ok, r: c.recTxt }) : t('co.s.bad', { a: mine, r: c.recTxt }));
+      setHTML($('fbCmp'), lv === 'good' ? '' : `<div class="no"><small>${t('co.yours')}</small><b>${mine}</b></div><div class="yes"><small>${t('co.better')}</small><b>${c.recTxt}</b></div>`);
+      setHTML($('fbTxt'), rich(settings.level === 1 ? shortTxt(f.text) : f.text));
+      const need = x.toCall ? x.toCall / (x.pot + x.toCall) : 0, ev = x.toCall ? Math.round(x.eq * (x.pot + x.toCall) - x.toCall) : 0;
+      const cells = [[t('co.win'), pct(x.eq), x.eq >= Math.max(need, .5) ? 'g' : x.eq < need ? 'r' : '']];
+      if (x.toCall) { cells.push([gl('ev', t('co.evCall')), (ev > 0 ? '+' : ev < 0 ? '−' : '') + Math.abs(ev), ev >= 0 ? 'g' : 'r']); cells.push([gl('potodds', t('co.potOdds')), pct(need), '']); }
+      else cells.push([gl('pot', t('co.pot')), x.pot, '']);
+      setHTML($('fbNums'), cells.map(([l, v, k]) => `<div><small>${l}</small><b class="${k}">${v}</b></div>`).join(''));
+      setHTML($('fbBar'), x.toCall ? `<div class="ebar"><i class="${x.eq >= need ? 'g' : ''}" style="width:${Math.round(x.eq * 100)}%"></i><u style="left:${Math.round(need * 100)}%"></u></div><div class="ebar-l"><span>${t('co.need', { n: pct(need) })}</span><span>${t('co.have', { n: pct(x.eq) })}</span></div>` : '');
+      setHTML($('fbStreak'), !c.retry && c.streak >= 2 ? `🔥 ${t('co.streak', { n: c.streak })}` : '');
+      return;
+    }
+    if (!myTurn) return;
+    const x = G.ctx, show = helpOn('recs') || G.hint;
+    setText($('cqTag'), streetName(G.street) + ' · ' + t('co.turn'));
+    setText($('cqH'), x.toCall ? t('co.qCall', { n: x.toCall }) : t('co.qFree'));
+    setHTML($('cqP'), (G.board.length ? t('co.pPost', { h: handHTML() }) : t('co.pPre', { h: handHTML() })) + (coachOn() && !show ? ' ' + t('co.decide') : ''));
+    $('rec').style.display = show ? '' : 'none';
+    if (show) { setText($('recAct'), recLabel(G.rec)); setHTML($('recWhy'), rich(G.rec.why)); }
+    $('hintBtn').style.display = show || !coachOn() ? 'none' : '';
+    setHTML($('hintTxt'), t('co.lock', { n: PTS.hint }));
+  }
+  $('hintBtn').onclick = buyHint;
   function nextStreet() {
     G.players.forEach(p => { p.bet = 0; p.acted = false; if (!p.folded && !p.allIn) p.last = ''; });
     G.currentBet = 0; G.minRaise = BB; G.raises = 0;
@@ -600,7 +685,6 @@
   }
   function render() {
     if (!G.players.length) return;
-    $('recToggle').checked = settings.recs;
     if (oppEls.length !== n() - 1) buildOpps();
     // soupeři
     G.players.slice(1).forEach((p, i) => {
@@ -630,7 +714,7 @@
     setText($('heroLast'), h.last || '');
     // šance
     $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() ? 'none' : '';
-    $('recPill').style.display = expert() ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert()); updatePts();
+    $('kombiBtn').style.display = expert() ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert()); updatePts();
     const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll; setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded && G.revealed) {
@@ -638,17 +722,8 @@
       setText($('eqSub'), live ? t('g.eqSub', { n: live, vs: t(live === 1 ? 'g.opp1' : 'g.oppN'), r: t(G.players.slice(1).some(q => !q.folded && rangeOf(q)) ? 'g.rangeEst' : 'g.rangeRnd'), tie: Math.round(G.eq.tie * 100) }) : '\u00a0');
     } else { setText($('eqWin'), '–'); setText($('eqSub'), h.folded ? t('g.folded') : '\u00a0'); }
     setText($('madeLbl'), G.street === 0 ? t('g.startHand') : t('g.hand'));
-    setHTML($('made'), !G.revealed ? '–' : G.street === 0 && G.board.length === 0 ? rich(`[[st:${h.cards[0]},${h.cards[1]}]]`) : PE.handName(h.cards.concat(G.board)));
-    // doporučení (místo zůstává rezervované → nic neposkakuje)
-    $('rec').style.display = helpOn('recs') ? '' : 'none';
-    const showRec = helpOn('recs') && G.turn === 0 && G.rec && G.ctx && !G.over && !G.dealing;
-    $('rec').classList.toggle('idle', !showRec);
-    if (showRec) { setText($('recAct'), recLabel(G.rec)); setHTML($('recWhy'), rich(G.rec.why)); }
-    // zpětná vazba
-    const fb = G.feedback;
-    $('feedback').style.display = helpOn('learn') ? '' : 'none';
-    $('feedback').className = 'feedback ' + (fb ? fb.level : '') + (!fb || G.over ? ' idle' : '');
-    if (fb) { $('fbTitle').innerHTML = `${fb.title} <span class="fb-sub">· ${t('g.yourAct', { a: fb.act, s: streetName(fb.street).toLowerCase() })}</span>`; setHTML($('fbTxt'), rich(settings.level === 1 ? shortTxt(fb.text) : fb.text)); }
+    setHTML($('made'), handHTML());
+    renderCoach();
     renderActions();
   }
   function recLabel(r) {
@@ -657,17 +732,22 @@
   }
   function defaultSize() {
     const c = G.ctx;
-    if (helpOn('recs') && G.rec && G.rec.to && (G.rec.action === 'bet' || G.rec.action === 'raise' || G.rec.action === 'allin')) return G.rec.to;
+    if ((helpOn('recs') || G.hint) && G.rec && G.rec.to && (G.rec.action === 'bet' || G.rec.action === 'raise' || G.rec.action === 'allin')) return G.rec.to;
     if (G.street === 0) return Math.max(c.minRaiseTo, Math.min(c.stack + c.myBet, G.raises ? G.currentBet * 3 : 3 * BB));
     return Math.max(c.minRaiseTo, Math.min(c.stack + c.myBet, c.toCall ? G.currentBet * 3 : Math.round(c.pot * 0.66)));
   }
   let lastActions = '';
   function renderActions() {
     const el2 = $('actions'); let html;
-    if (G.over) html = (expert() ? `<button class="btn" id="revBtn">${t('m.review')}</button>` : '') + `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
+    if (G.coach) {
+      const c = G.coach, bad = c.fb.level === 'meh' || c.fb.level === 'bad';
+      html = (bad ? `<button class="btn" id="retryBtn">↺ ${t('co.retry')}</button>` : `<button class="btn" id="whyBtn">${t('co.whyNot', { a: ACT_NAME(c.fb.level === 'good' ? (c.action === 'fold' ? (c.ctx.toCall ? 'call' : 'check') : 'fold') : c.rec.action) })}</button>`)
+        + `<button class="btn primary" id="goBtn">${G.over ? t('co.seeEnd') : t('co.go')}</button>`;
+    }
+    else if (G.over) html = (expert() ? `<button class="btn" id="revBtn">${t('m.review')}</button>` : '') + `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
     else if (G.turn !== 0 || G.dealing || !G.ctx || !G.rec) html = `<div class="waiting">${G.dealing ? t('g.dealing') + '…' : hero().folded ? t('g.foldedWait') : G.turn > 0 ? t('g.thinking', { a: G.players[G.turn].name }) : t('g.dealing') + '…'}</div>`;
     else {
-      const c = G.ctx, h = hero(), r = helpOn('recs') ? G.rec.action : '';
+      const c = G.ctx, h = hero(), r = helpOn('recs') || G.hint ? G.rec.action : '';
       const canRaise = h.stack > c.toCall, size = defaultSize(), allin = size >= h.stack + h.bet;
       html = `<button class="btn ${r === 'fold' ? 'hint' : ''}" data-a="fold" ${c.toCall === 0 ? 'disabled' : ''}>Fold</button>
       <button class="btn ${r === 'check' || r === 'call' ? 'hint' : ''} ${c.toCall >= h.stack ? 'allin' : ''}" data-a="${c.toCall ? 'call' : 'check'}">${c.toCall ? (c.toCall >= h.stack ? 'All-in ' + c.toCall : 'Call ' + c.toCall) : 'Check'}</button>
@@ -678,6 +758,9 @@
     lastActions = html; el2.innerHTML = html;
     if ($('nextBtn')) $('nextBtn').onclick = () => { SFX.unlock(); startHand(); };
     if ($('revBtn')) $('revBtn').onclick = showSummary;
+    if ($('goBtn')) $('goBtn').onclick = coachGo;
+    if ($('retryBtn')) $('retryBtn').onclick = coachRetry;
+    if ($('whyBtn')) $('whyBtn').onclick = () => whyNot(G.coach);
     el2.querySelectorAll('[data-a]').forEach(b => b.onclick = () => heroAct(b.dataset.a, +b.dataset.to || undefined));
     if ($('sizeBtn')) $('sizeBtn').onclick = showSizes;
   }
@@ -751,11 +834,12 @@
     if (rfOk) $('npRefill').onclick = () => { refill(); closeSheet(); };
   }
   $('ptsBadge').onclick = () => nav.go('shop');
-  $('recToggle').onchange = e => { settings.recs = e.target.checked; save('pt_settings', settings); lastActions = ''; render(); };
+  $('kombiBtn').onclick = () => { SFX.tap(); openGuide('ranks'); };
+  document.addEventListener('click', e => { if (e.target.closest('[data-combo]')) { e.preventDefault(); openCombo(); } });
   $('gameMenu').onclick = showGameMenu;
   $('gameHelp').onclick = openHelpOverlay;
   $('homeHelp').onclick = () => openScreenHelp('home');
-  document.addEventListener('click', e => { const x = e.target.closest('.rec-why,.feedback .txt'); if (x) x.classList.toggle('open'); });
+  document.addEventListener('click', e => { const x = e.target.closest('.rec-why,.feedback .txt,.cfb .why'); if (x) x.classList.toggle('open'); });
 
   /* ---------- domovská obrazovka ---------- */
   function renderHome() {
@@ -1110,11 +1194,131 @@
     renderDrill(); checkAch();
   }
 
+  const RANK_EX = { 9: 'Ah Kh Qh Jh Th', 8: '9s 8s 7s 6s 5s', 7: 'Qc Qd Qh Qs 7d', 6: 'Kh Kd Ks 4c 4h', 5: 'Ad Jd 8d 5d 2d', 4: 'Ts 9h 8d 7c 6s', 3: '7h 7c 7s Kd 2c', 2: 'Jc Jd 4s 4h Ad', 1: 'Ah Ad 9c 6s 3h', 0: 'Ad Jc 8h 5s 2d' };
+  /* ---------- v1.6: Kombinace & pojmy (průvodce), kombinace u stolu, kvíz ---------- */
+  const RK_ORDER = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
+  const RK_HL = { 9: 5, 8: 5, 7: 4, 6: 5, 5: 5, 4: 5, 3: 3, 2: 4, 1: 2, 0: 1 };   // kolik prvních karet příkladu tvoří kombinaci
+  const RK_FREQ = { 9: '0,003', 8: '0,03', 7: '0,17', 6: '2,6', 5: '3', 4: '4,6', 3: '4,8', 2: '23,5', 1: '43,8', 0: '17,4' };
+  const freqTxt = i => (I18N.lang === 'en' ? RK_FREQ[i].replace(',', '.') : RK_FREQ[i]) + ' %';
+  const cardsRow = (cs, size, hl) => cs.map((c, k) => cardHTML(c, size).replace('class="card', `class="card${hl != null && k >= hl ? ' dim' : ''}`)).join('');
+  const GL_CATS = [['base', ['cards', 'preflop', 'flop', 'turn', 'river', 'suited', 'offsuit']], ['acts', ['fold', 'check', 'call', 'raise', 'allin', '3bet', 'pushfold']],
+    ['table', ['dealer', 'blind', 'bb', 'pos', 'stack', 'pot', 'showdown']], ['nums', ['equity', 'potodds', 'ev', 'spr', 'range', 'strength']]];
+  const GL_VIS = { cards: 'As Kd', preflop: 'As Kd', flop: 'Kh 7c 2d', turn: '9s', river: '3c', suited: 'Ah Kh', offsuit: 'Ah Kd',
+    fold: 'Fold', check: 'Check', call: 'Call', raise: '!Raise', allin: '!All-in', '3bet': '3-bet', pushfold: 'Push/Fold', dealer: 'D', blind: 'SB · BB', bb: 'BB', pos: 'BTN',
+    stack: '1 000', pot: 'Pot 24', showdown: '👀', equity: '62 %', potodds: '25 %', ev: '+11', spr: 'SPR 4', range: '22+', strength: '12/20' };
+  function glVis(k) {
+    const v = GL_VIS[k] || '';
+    if (/^[2-9TJQKA][shdc]( |$)/.test(v)) return `<div class="gv-c">${cardsRow(PE.parseCards(v), 'xs')}</div>`;
+    return `<span class="gchip${v[0] === '!' ? ' r' : ''}">${v.replace(/^!/, '')}</span>`;
+  }
+  let gdTab = 'ranks', gdCat = 'base', gdQ = '', quiz = null;
+  function openGuide(tab) { closeSheet(); closeGloss(); gdTab = tab || gdTab; if (nav.cur === 'guide') renderGuide(); else nav.go('guide'); }
+  function renderGuide() {
+    document.querySelectorAll('#gdSeg [data-gt]').forEach(b => b.classList.toggle('on', b.dataset.gt === gdTab));
+    const body = $('guideBody');
+    if (gdTab === 'ranks') {
+      body.innerHTML = `<div class="rkl">${RK_ORDER.map((i, n) => `<button class="rkr ${n < 3 ? 't' : ''}" data-rk="${i}"><span class="n">${n + 1}</span><span class="tx"><b>${t('rk.' + i)}</b><span>${t('rk.' + i + 'd')} · ${freqTxt(i)}</span></span><span class="rc">${cardsRow(PE.parseCards(RANK_EX[i]), 'xs', RK_HL[i])}</span></button>`).join('')}</div>
+        <div class="gd-note">${t('gd.note')}</div><button class="btn wide" id="gdToQuiz" style="margin-top:12px">${t('gd.tryQuiz')}</button>`;
+      $('gdToQuiz').onclick = () => { gdTab = 'quiz'; renderGuide(); };
+    } else if (gdTab === 'terms') {
+      body.innerHTML = `<label class="srch"><span>🔍</span><input id="gdSearch" type="search" placeholder="${t('gd.search')}" value="${gdQ.replace(/"/g, '&quot;')}"></label>
+        <div class="cats">${GL_CATS.map(([c]) => `<button data-gc="${c}" class="${!gdQ && gdCat === c ? 'on' : ''}">${t('gd.c.' + c)}</button>`).join('')}</div><div class="gll" id="gdList"></div>`;
+      const list = () => {
+        const q = gdQ.trim().toLowerCase();
+        const keys = q ? I18N.GLOSS.filter(k => (t('gl.' + k + '.t') + ' ' + t('gl.' + k + '.d')).toLowerCase().includes(q)) : GL_CATS.find(c => c[0] === gdCat)[1];
+        $('gdList').innerHTML = keys.length ? keys.map(k => `<button class="gli" data-gk="${k}"><span class="vis">${glVis(k)}</span><span class="gtx"><b>${t('gl.' + k + '.t')}</b><span>${plain(t('gl.' + k + '.d'))}</span></span></button>`).join('') : `<div class="gd-note">${t('gd.none')}</div>`;
+        body.querySelectorAll('[data-gc]').forEach(b => b.classList.toggle('on', !q && b.dataset.gc === gdCat));
+      };
+      list();
+      $('gdSearch').oninput = e => { gdQ = e.target.value; list(); };
+    } else {
+      if (!quiz) quiz = { n: 0, ok: 0, streak: 0 };
+      if (!quiz.cur) quiz.cur = quizDeal();
+      const q = quiz.cur;
+      body.innerHTML = `<div class="qz-h"><b>${t('gd.qTitle')}</b><span>${t('gd.qScore', { a: quiz.ok, b: quiz.n })}${quiz.streak > 1 ? ' · 🔥' + quiz.streak : ''}</span></div>
+        ${q.hands.map((h, k) => `<button class="qz ${q.pick != null ? (k === q.win ? 'win' : k === q.pick ? 'lose' : '') : ''}" data-qz="${k}" ${q.pick != null ? 'disabled' : ''}><span class="qz-c">${cardsRow(h.cards, 'sm')}</span>${q.pick != null ? `<span class="qz-n">${t('rk.' + h.cat)}</span>` : `<span class="qz-n">${t(k ? 'gd.qB' : 'gd.qA')}</span>`}</button>`).join('')}
+        ${q.pick != null ? `<div class="qz-fb ${q.pick === q.win ? 'good' : 'bad'}"><b>${q.pick === q.win ? t('gd.qOk') : t('gd.qBad')}</b> ${t('gd.qWhy', { a: t('rk.' + q.hands[q.win].cat), b: t('rk.' + q.hands[1 - q.win].cat).toLowerCase() })}</div><button class="btn primary wide" id="qzNext">${t('gd.qNext')}</button>` : ''}`;
+      body.querySelectorAll('[data-qz]').forEach(b => b.onclick = () => { if (q.pick != null) return; q.pick = +b.dataset.qz; quiz.n++; if (q.pick === q.win) { quiz.ok++; quiz.streak++; SFX.chip(); vib(10); } else { quiz.streak = 0; SFX.fold(); vib([30, 40, 30]); } renderGuide(); });
+      if ($('qzNext')) $('qzNext').onclick = () => { quiz.cur = quizDeal(); renderGuide(); };
+    }
+  }
+  // kvíz: dvě 5karetní ruce různých kategorií (každá kategorie stejně často, ať to není pořád pár)
+  function dealCat(want) {
+    for (let tries = 0; tries < 4000; tries++) {
+      const d = newDeck(); const cs = [];
+      for (let i = 0; i < 5; i++) cs.push(d.splice(Math.floor(rnd() * d.length), 1)[0]);
+      if (cat5(cs) === want) return cs;
+    }
+    return PE.parseCards(RANK_EX[want]);
+  }
+  function cat5(cs) { const sc = PE.evaluate(cs), c = PE.handCategory(sc); return c === 8 && Math.max(...cs.map(x => x >> 2)) === 12 && Math.min(...cs.map(x => x >> 2)) === 8 ? 9 : c; }
+  function quizDeal() {
+    const a = Math.floor(rnd() * 9); let b; do { b = Math.floor(rnd() * 9); } while (b === a);
+    const ca = a >= 6 ? PE.parseCards(RANK_EX[a]).slice().sort(() => rnd() - .5) : dealCat(a), cb = b >= 6 ? PE.parseCards(RANK_EX[b]).slice().sort(() => rnd() - .5) : dealCat(b);
+    const hands = [{ cards: ca, cat: a }, { cards: cb, cat: b }];
+    return { hands, win: a > b ? 0 : 1, pick: null };
+  }
+  document.querySelectorAll('#gdSeg [data-gt]').forEach(b => b.onclick = () => { SFX.tap(); gdTab = b.dataset.gt; renderGuide(); });
+  $('guideBody').addEventListener('click', e => {
+    const g = e.target.closest('[data-gk]'); if (g) { openGloss(g.dataset.gk); return; }
+    const c = e.target.closest('[data-gc]'); if (c) { gdCat = c.dataset.gc; gdQ = ''; renderGuide(); return; }
+    const r = e.target.closest('[data-rk]'); if (r) openRankInfo(+r.dataset.rk);
+  });
+  function openRankInfo(i) {
+    SFX.tap();
+    const n = RK_ORDER.indexOf(i);
+    openSheet(`<div class="gl-k">${t('gd.rankN', { n: n + 1 })}</div><h2>${t('rk.' + i)}</h2><div class="cb-c">${cardsRow(PE.parseCards(RANK_EX[i]), 'md', RK_HL[i])}</div>
+      <p class="why-p">${t('rk.' + i + 'd')} ${t('gd.freq', { p: freqTxt(i) })}</p>${rankNeighbours(i)}
+      <button class="btn primary wide" id="riOk" style="margin-top:14px">${t('gl.ok')}</button>`);
+    $('riOk').onclick = closeSheet;
+  }
+  function rankNeighbours(i) {
+    const n = RK_ORDER.indexOf(i), from = Math.max(0, Math.min(7, n - 1));
+    return `<div class="rkl sm">${RK_ORDER.slice(from, from + 3).map((k, j) => `<div class="rkr ${k === i ? 'me' : 'fade'}"><span class="n">${from + j + 1}</span><span class="tx"><b>${t('rk.' + k)}</b></span><span class="rc">${cardsRow(PE.parseCards(RANK_EX[k]), 'xs', RK_HL[k])}</span></div>`).join('')}</div>`;
+  }
+  // klepnutí na „Tvoje ruka“ u stolu → jaká je to kombinace a kde je v žebříčku
+  function best5(cs) {
+    let best = null, bs = -1;
+    const n = cs.length;
+    for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {
+      const five = cs.filter((_, k) => k !== a && k !== b);
+      if (n === 5) { return { cards: cs.slice(), sc: PE.evaluate(cs) }; }
+      const sc = PE.evaluate(five); if (sc > bs) { bs = sc; best = five; }
+    }
+    if (n === 6) { cs.forEach((_, k) => { const f = cs.filter((_, j) => j !== k), sc = PE.evaluate(f); if (sc > bs) { bs = sc; best = f; } }); }
+    return { cards: best, sc: bs };
+  }
+  function orderBest(cs, cat) {
+    // nejdřív karty, které kombinaci tvoří, pak kickery (od nejvyšší)
+    const cnt = {}; cs.forEach(c => { cnt[c >> 2] = (cnt[c >> 2] || 0) + 1; });
+    const sorted = cs.slice().sort((x, y) => (cnt[y >> 2] - cnt[x >> 2]) || ((y >> 2) - (x >> 2)));
+    const core = [1, 2, 3, 7].includes(cat) ? sorted.filter(c => cnt[c >> 2] >= 2).length : cat === 0 ? 1 : 5;
+    return { cards: sorted, hl: core };
+  }
+  function openCombo() {
+    if (!G.players.length || !G.revealed || !G.board.length) { openGuide('ranks'); return; }
+    SFX.tap();
+    const h = hero(), all = h.cards.concat(G.board), b = best5(all), cat = cat5(b.cards), o = orderBest(b.cards, cat), n = RK_ORDER.indexOf(cat);
+    const beats = n > 0 ? t('rk.' + RK_ORDER[n - 1]) : '';
+    openSheet(`<div class="gl-k">${t('gd.yours', { n: n + 1 })}</div><h2>${t('rk.' + cat)}</h2><div class="cb-c">${cardsRow(o.cards, 'md', o.hl)}</div>
+      <p class="why-p">${n === 0 ? t('gd.top') : cat === 0 ? t('gd.bottom', { a: beats }) : t('gd.beats', { a: beats.toLowerCase(), b: t('rk.' + RK_ORDER[n + 1]).toLowerCase() })}</p>${rankNeighbours(cat)}
+      <div class="gl-btns" style="margin-top:14px"><button class="btn" id="cbAll">${t('gd.all')}</button><button class="btn primary" id="cbOk">${t('gd.back')}</button></div>`);
+    $('cbOk').onclick = closeSheet; $('cbAll').onclick = () => openGuide('ranks');
+  }
+  function renderHomeGuide() { const e = $('homeGuidePrev'); if (e) setHTML(e, cardsRow(PE.parseCards(RANK_EX[9]), 'xs')); }
+  $('homeGuide').onclick = () => { SFX.tap(); try { localStorage.setItem('pt_guideSeen', '1'); } catch (e) {} openGuide('ranks'); };
+
   /* ---------- úvod (onboarding) ---------- */
   let obStep = 0, obReturn = false;
   const OB_N = 5;
   $('obLevels').innerHTML = '';
-  [0, 1, 2].forEach(l => { const b = el('button', 'lvl'); b.dataset.ol = l; b.innerHTML = `<b data-i18n="lv.${l}">${t('lv.' + l)}</b><span data-i18n="lv.${l}d">${t('lv.' + l + 'd')}</span>`; $('obLevels').appendChild(b); });
+  [0, 1, 2].forEach(l => { const b = el('button', 'lv'); b.dataset.ol = l; b.innerHTML = `<span class="e">${['🌱', '🃏', '🔥'][l]}</span><span class="lv-t"><b data-i18n="ob.l${l}">${t('ob.l' + l)}</b><span data-i18n="ob.l${l}d">${t('ob.l' + l + 'd')}</span></span><i class="rad"></i>`; $('obLevels').appendChild(b); });
+  // ukázkové karty v úvodu (kreslí se stejně jako ve hře)
+  $('obBoard2').innerHTML = cardsRow(PE.parseCards('Kh 7c 2d'), 'xs');
+  $('obHand3').innerHTML = cardsRow(PE.parseCards('As Kd'), 'md');
+  function obRanks() { setHTML($('obRanks'), RK_ORDER.map((i, n) => `<div class="rkm ${n < 3 ? 'top' : ''}"><span class="n">${n + 1}</span><b>${t('rk.' + i)}</b><span class="rc">${cardsRow(PE.parseCards(RANK_EX[i]), 'xs', RK_HL[i])}</span></div>`).join('')); }
+  $('obTrain').onclick = () => { SFX.unlock(); SFX.tap(); obDone(); if (!obReturn) setTimeout(() => nav.go('game'), 30); };
+  $('obOnline').onclick = () => { SFX.unlock(); SFX.tap(); obDone(); if (!obReturn) setTimeout(() => nav.go('public'), 30); };
   $('obLevels').onclick = e => { const b = e.target.closest('[data-ol]'); if (!b) return; SFX.tap(); applyLevel(+b.dataset.ol); setLang(I18N.lang); };
   function obRender(dir) {
     const sl = $('obSlides').children;
@@ -1123,6 +1327,8 @@
     [...$('obLevels').children].forEach(b => b.classList.toggle('on', +b.dataset.ol === settings.level));
     [...$('obDots').children].forEach((d, i) => d.classList.toggle('on', i === obStep));
     setText($('obNext'), obStep === OB_N - 1 ? t('ob.start') : t('ob.next'));
+    $('obNext').style.visibility = obStep === OB_N - 1 ? 'hidden' : '';
+    obRanks();
   }
   function openOnboarding(fromSettings) { obStep = 0; obReturn = !!fromSettings; obRender(0); if (fromSettings) nav.go('onboarding'); else show('onboarding'); }
   function obDone() {
@@ -1308,7 +1514,7 @@
       case 'pot': return document.querySelector('#scr-game .pot-row');
       case 'board': return $('board');
       case 'win': return $('odds');
-      case 'rec': return $('rec');
+      case 'rec': return $('coach');
       case 'pos': return $('heroPos');
       case 'cards': return $('heroCards');
       case 'actions': return $('actions');
@@ -1349,14 +1555,8 @@
   }
   window.addEventListener('resize', () => { if (!$('helpOv').hidden) hvLayout(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('helpOv').hidden) closeHelpOverlay(); });
-  function toGlossary() { closeSheet(); closeGloss(); if (nav.cur !== 'learn') nav.go('learn'); setTimeout(() => { const x = $('glossary'); if (x) x.scrollIntoView({ block: 'start' }); }, 60); }
-  const RANK_EX = { 9: 'Ah Kh Qh Jh Th', 8: '9s 8s 7s 6s 5s', 7: 'Qc Qd Qh Qs 7d', 6: 'Kh Kd Ks 4c 4h', 5: 'Ad Jd 8d 5d 2d', 4: 'Ts 9h 8d 7c 6s', 3: '7h 7c 7s Kd 2c', 2: 'Jc Jd 4s 4h Ad', 1: 'Ah Ad 9c 6s 3h', 0: 'Ad Jc 8h 5s 2d' };
-  function openRanks() {
-    SFX.tap();
-    openSheet(`<h2>${t('rk.title')}</h2><div class="sub">${t('rk.sub')}</div><div class="ranks">${[9, 8, 7, 6, 5, 4, 3, 2, 1, 0].map((i, n) => `<div class="rk-row"><span class="rk-n">${n + 1}</span><div class="rk-t"><b>${t('rk.' + i)}</b><small>${t('rk.' + i + 'd')}</small></div><span class="rk-c">${PE.parseCards(RANK_EX[i]).map(c => cardHTML(c, 'sm')).join('')}</span></div>`).join('')}</div>
-      <div class="gl-btns"><button class="btn primary" id="rkOk">${t('gl.ok')}</button><button class="btn" id="rkGl">${t('hv.gloss')}</button></div>`);
-    $('rkOk').onclick = closeSheet; $('rkGl').onclick = toGlossary;
-  }
+  function toGlossary() { openGuide('terms'); }
+  function openRanks() { openGuide('ranks'); }
   const SCREEN_HELP = { home: 4, stats: 3, drill: 2, settings: 2, shop: 2, wheel: 1, ach: 2, learn: 1 };
   function openScreenHelp(id) {
     if (id === 'game') return openHelpOverlay();
@@ -1431,6 +1631,7 @@
   function setLang(l) {
     I18N.set(l); applyStatic(); lastActions = '';
     if (G.ctx && G.turn === 0) G.rec = PE.recommend(G.ctx);
+    if (G.coach) G.coach.fb = PE.grade(G.coach.rec, G.coach.action, G.coach.ctx);
     if (G.lastDec && G.feedback) G.feedback = Object.assign({ street: G.lastDec.street, act: G.lastDec.action }, gradeOf(G.lastDec));
     if (G.players.length) render();
     obRender(0); renderHome(); if (D.spot) renderDrill();
@@ -1462,5 +1663,5 @@
 
   applyLook(); loginTick(); checkAch(true); updatePts();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { loginTick(); updatePts(); if (nav.cur === 'wheel') renderWheel(); } });
-  window.__poker = { startHand, heroAct, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
+  window.__poker = { startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
 })();

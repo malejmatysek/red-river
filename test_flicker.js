@@ -17,7 +17,7 @@ const dir = process.argv[2] || __dirname, shotDir = process.argv[3] || '';
   for (let t = 0; t < 3; t++) {
     // počkej, až je hráč na tahu, pak složí → konec ruky
     await p.waitForFunction(() => (__G.turn === 0 && !__G.dealing && __G.ctx) || __G.over, null, { timeout: 30000 });
-    if (!(await p.evaluate(() => __G.over))) await p.evaluate(() => __poker.heroAct(__G.ctx.toCall ? 'fold' : 'check'));
+    if (!(await p.evaluate(() => __G.over))) await p.evaluate(() => { __poker.heroAct(__G.ctx.toCall ? 'fold' : 'check'); if (__G.hold) __poker.coachGo(); });
     await p.waitForFunction(() => __G.over, null, { timeout: 60000 });
     await p.waitForTimeout(1200);
     await p.evaluate(() => { const s = document.getElementById('sheet'); if (s) s.hidden = true; const sc = document.getElementById('scrim'); if (sc) sc.hidden = true; });
