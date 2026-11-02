@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.8.3', BUILD = 'v26';
+  const APP_VERSION = '1.8.4', BUILD = 'v27';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -252,7 +252,7 @@
     const g = glossInfo(k);
     $('gloss').innerHTML = `<div class="grab"></div><div class="gl-k">${t('gl.title')}</div><h2>${g.title}</h2><p>${g.text}</p>${g.ex ? `<div class="gx"><b>${t('gl.ex')}</b> ${rich(g.ex, { nolink: true })}</div>` : ''}
       <div class="gl-btns"><button class="btn primary" id="glOk">${t('gl.ok')}</button><button class="btn ghostbtn" id="glAll">${t('gl.all')}</button></div>`;
-    $('gloss').hidden = false; $('glossScrim').hidden = false; SFX.tap();
+    $('gloss').classList.remove('dragging'); $('gloss').style.transform = ''; $('glossScrim').style.opacity = ''; $('gloss').hidden = false; $('glossScrim').hidden = false; SFX.tap();
     $('glOk').onclick = closeGloss;
     $('glAll').onclick = () => { closeGloss(); closeSheet(); gdTab = 'terms'; if (nav.cur === 'guide') renderGuide(); else nav.go('guide'); };
   }
@@ -1026,7 +1026,7 @@
   }
 
   /* ---------- spodní panely ---------- */
-  function openSheet(html) { $('sheet').innerHTML = '<div class="grab"></div>' + html; $('sheet').hidden = false; $('scrim').hidden = false; }
+  function openSheet(html) { $('sheet').classList.remove('dragging'); $('sheet').style.transform = ''; $('scrim').style.opacity = ''; $('sheet').innerHTML = '<div class="grab"></div>' + html; $('sheet').hidden = false; $('scrim').hidden = false; }
   function closeSheet() { $('sheet').hidden = true; $('scrim').hidden = true; }
   $('scrim').onclick = closeSheet;
   /* swipe dolů zavírá sheet: za úchyt/hlavičku kdykoli, za obsah když je odrolovaný nahoře (jako iOS) */
@@ -1064,12 +1064,13 @@
     function end() {
       if (!st) return; const S = st; st = null; clearTimeout(S.wd);
       if (!S.drag) return;
-      sh.classList.remove('dragging');
+      // třídu 'dragging' (animation:none) nechat – jejím odebráním by se znovu spustila animace otevření a sheet by skočil nahoru
       const a = S.pts[0], b = S.pts[S.pts.length - 1], v = (b[1] - a[1]) / Math.max(1, b[0] - a[0]);   // px/ms
       if (S.d > Math.min(150, sh.offsetHeight * 0.3) || (v > 0.4 && S.d > 24)) {
         set(sh.offsetHeight + 40, true);
-        setTimeout(() => { close(); set(0, false); requestAnimationFrame(() => { sh.style.transition = ''; if (scrim) scrim.style.transition = ''; }); }, 210);
-      } else { set(0, true); setTimeout(() => { if (!st) { sh.style.transition = ''; sh.style.transform = ''; if (scrim) { scrim.style.transition = ''; scrim.style.opacity = ''; } } }, 260); }
+        let done = false; const fin = () => { if (done) return; done = true; sh.removeEventListener('transitionend', fin); close(); sh.classList.remove('dragging'); sh.style.transition = sh.style.transform = ''; if (scrim) scrim.style.transition = scrim.style.opacity = ''; };
+        sh.addEventListener('transitionend', fin); setTimeout(fin, 320);
+      } else { set(0, true); setTimeout(() => { if (!st) { sh.style.transition = ''; if (scrim) scrim.style.transition = ''; } }, 260); }
     }
     sh.addEventListener('touchstart', e => { if (e.touches.length === 1) begin(e.touches[0].clientX, e.touches[0].clientY, e.target); else st = null; }, { passive: true });
     sh.addEventListener('touchmove', e => { if (e.touches.length === 1) move(e.touches[0].clientX, e.touches[0].clientY, e); }, { passive: false });
