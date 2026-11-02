@@ -314,7 +314,7 @@
     $('otHero').classList.toggle('on-folded', !!me.folded);
     const myTurn = h && !h.done && h.toAct === v.me;
     const pend = S.pending && S.pending.code === v.code ? S.pending.a : null;
-    setHTML('otMe', `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${pend ? esc(pendLabel(pend)) : me.last ? esc(actLabel(me.last)) : ''}</div>${myTurn && !pend ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`);
+    setHTML('otMe', `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${pend ? esc(pendLabel(pend)) : me.last ? esc(actLabel(me.last)) : ''}</div>${mine && !me.folded && window.RRMeter && window.RRMeter.on() ? `<div class="hsm">${window.RRMeter.html(mine, board)}</div>` : ''}${myTurn && !pend ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`);
     // stav + akce
     const st = $('otStatus'); let stHTML = '';
     const reap = isPubView(v) && me.sitOut ? `<div class="note pub-reap" id="otReap"></div>` : '';

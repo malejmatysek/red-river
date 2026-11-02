@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.6.2', BUILD = 'v21';
+  const APP_VERSION = '1.7.0', BUILD = 'v22';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -37,20 +37,22 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const navLang = ((navigator.languages && navigator.languages[0]) || navigator.language || 'cs').toLowerCase();
   const SETTINGS0 = { recs: false, odds: true, learn: true, opps: 5, shortStacks: true, v: 4, diff: 1, blinds: 0, depth: 100, randomDepth: false,
-    bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true };
+    bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true, cDiff: 1, cMeter: false };
   const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 4,
     br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [], histP: [], playSec: 0, days: {} };
   const fresh = o => JSON.parse(JSON.stringify(o));
   /* úrovně hráče: předvolby (jednotlivá nastavení jde pak změnit) */
   const LEVELS = [
-    { speed: 0, diff: 0, recs: false, odds: true, learn: true, adv: false, gloss: true },
-    { speed: 1, diff: 1, recs: false, odds: true, learn: true, adv: false, gloss: true },
-    { speed: 2, diff: 2, recs: false, odds: false, learn: false, adv: true, gloss: false }];
+    { speed: 0, meter: true, recs: false, odds: true, learn: true, adv: false, gloss: true },
+    { speed: 1, meter: false, recs: false, odds: true, learn: true, adv: false, gloss: true },
+    { speed: 2, meter: false, recs: false, odds: false, learn: false, adv: true, gloss: false }];
   const expert = () => settings.level === 2;
-  const helpOn = k => !expert() && !!settings[k];
+  let classic = false;                            // Klasická hra: proti botům úplně bez nápověd
+  const helpOn = k => !classic && !expert() && !!settings[k];
   const DRILL0 = { n: 0, good: 0, ok: 0, meh: 0, bad: 0, streak: 0, best: 0 };
   const settings = load('pt_settings', SETTINGS0);
   if (settings.v !== 4) { if (settings.v !== 3 && settings.v !== 2) { settings.opps = 5; settings.shortStacks = true; } settings.recs = false; settings.v = 4; save('pt_settings', settings); }   // v1.6: nejdřív se rozhodni, rada jen za body
+  if (settings.meter == null) settings.meter = settings.level === 0;          // ukazatel síly: výchozí zapnutý pro začátečníky
   settings.opps = Math.max(1, Math.min(8, settings.opps | 0 || 5));
   if (!I18N.has(settings.lang)) settings.lang = 'cs';
   I18N.set(settings.lang);
@@ -227,7 +229,7 @@
   }
   function rich(str, o) {
     str = String(str == null ? '' : str);
-    const link = settings.gloss && !(o && o.nolink), used = new Set(), ph = [];
+    const link = settings.gloss && !(classic && nav.cur === 'game') && !(o && o.nolink), used = new Set(), ph = [];
     const out = str.split(/(<[^>]+>|\[\[[^\]]+\]\])/).map(part => {
       if (!part) return '';
       if (part[0] === '<') return part;
@@ -256,7 +258,7 @@
   }
   function closeGloss() { $('gloss').hidden = true; $('glossScrim').hidden = true; }
   $('glossScrim').onclick = closeGloss;
-  document.addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (!g || g.closest('#gloss')) return; e.stopPropagation(); e.preventDefault(); openGloss(g.dataset.g); }, true);
+  document.addEventListener('click', e => { const g = e.target.closest('[data-g]'); if (!g || g.closest('#gloss') || (classic && g.closest('#scr-game'))) return; e.stopPropagation(); e.preventDefault(); openGloss(g.dataset.g); }, true);
 
   /* ---------- pomocné ---------- */
   const n = () => G.players.length;
@@ -281,24 +283,17 @@
     const eff = Math.min(p.stack + p.bet, Math.max(0, ...opps.map(q => q.stack + q.bet)));
     return { street: G.street, hole: p.cards, board: G.board.slice(), pot: pot(), toCall, currentBet: G.currentBet, myBet: p.bet,
       stack: p.stack, minRaiseTo: Math.min(G.currentBet + G.minRaise, p.bet + p.stack), bb: BB, position: posLabel(seat),
-      numOpp: opps.length, raisesThisStreet: G.raises, limpers, eq: eqr.equity, eqr, eff };
+      numOpp: opps.length, raisesThisStreet: G.raises, limpers, eq: eqr.equity, eqr, eff,
+      pfAgg: G.pfAgg === seat, ip: G.players.every((q, i) => i === seat || q.folded || postOrder(i) < postOrder(seat)),
+      oppArch: opps.map(q => q.style && q.style.arch).filter(Boolean) };
   }
+  const postOrder = s => (s - G.dealer - 1 + n()) % n();                     // pořadí po flopu
 
   /* ---------- boti: náhodná jména, styly podle obtížnosti ---------- */
-  function makeStyle() {
-    const j = a => (rnd() * 2 - 1) * a;
-    const arche = pick(['tight', 'loose', 'aggro', 'station', 'normal', 'normal']);
-    const s = [
-      { loose: 0.06, aggr: -0.07, bluff: 0.05, noise: 0.26, fish: 0.32 },
-      { loose: 0.02, aggr: 0.0, bluff: 0.08, noise: 0.12, fish: 0.12 },
-      { loose: -0.02, aggr: 0.08, bluff: 0.11, noise: 0.05, fish: 0.04 }][settings.diff] || {};
-    const st = { loose: s.loose + j(0.03), aggr: s.aggr + j(0.04), bluff: Math.max(0.01, s.bluff + j(0.03)), noise: s.noise, fish: s.fish };
-    if (arche === 'tight') { st.loose -= 0.04; st.fish *= 0.5; }
-    if (arche === 'loose') { st.loose += 0.05; st.fish += 0.08; }
-    if (arche === 'aggro') { st.aggr += 0.08; st.bluff += 0.05; }
-    if (arche === 'station') { st.aggr -= 0.08; st.fish += 0.1; }
-    return st;
-  }
+  /* boti: lidská AI (engine.js → PE.makeBot / PE.botDecide) – styl (tight, agresivní, blafař, dorovnávač…) + úroveň botů */
+  const botLvl = () => Math.max(0, Math.min(2, (classic ? settings.cDiff : settings.diff) | 0));
+  function makeStyle() { return PE.makeBot(botLvl(), rnd); }
+  function syncBotLvl() { const L = botLvl(); G.players.forEach(p => { if (!p.hero && p.style) { p.style = PE.botOf(p.style, rnd); p.style.skill = L; } }); }
   function newBot(stack) {
     const used = new Set(G.players.map(p => p.name));
     const name = pick(NAME_POOL.filter(x => !used.has(x)));
@@ -324,7 +319,7 @@
     if (resume) G.players[0].stack = session.hero;
     for (let i = 0; i < settings.opps; i++) {
       const sb = resume && session.bots[i];
-      G.players.push(sb ? { name: sb.name, color: sb.color, style: sb.style, stack: sb.stack > 0 ? sb.stack : START } : newBot());
+      G.players.push(sb ? { name: sb.name, color: sb.color, style: PE.botOf(sb.style, rnd), stack: sb.stack > 0 ? sb.stack : START } : newBot());
     }
     if (!resume) { session = { key: skey, hero: START, bots: [], hands: 0, netBB: 0, dealer: -1, bank: settings.bankroll }; if (settings.bankroll) { wallet.points -= START; saveW(); } save('pt_session', session); }
     G.dealer = resume && session.dealer >= 0 && session.dealer < n() ? session.dealer : randInt(n()) - 1;
@@ -369,6 +364,7 @@
     G.handNo++;
     G.dealer = (G.dealer + 1) % n();
     G.deck = newDeck(); G.board = []; G.street = 0; G.over = false; G.decisions = []; G.feedback = null; G.lastDec = null; G.coach = null; G.hold = false; G.hint = false; G.retry = false;
+    G.pfAgg = -1; G.read = G.read || session.read || {}; G.players.forEach(p => p.chk = false);
     G.heroVpip = G.heroPfr = G.heroFlop = false; G.winners = null; G.eq = null; G.eqStreet = -1; G.ctx = null; G.rec = null;
     assignStacks();
     G.players.forEach((p, i) => Object.assign(p, { bet: 0, total: 0, folded: false, allIn: false, acted: false, last: '', pf: '', cards: [G.deck.pop(), G.deck.pop()], show: false, seen: noAnim() ? 2 : prevShown[i] }));
@@ -422,8 +418,10 @@
       const go = () => {
         const seat = G.turn; if (G.over || seat < 0 || G.players[seat].hero || hand !== G.handNo) return;
         if (!FAST() && nav.cur !== 'game') { G.paused = go; return; }
-        const c = ctxFor(seat, n() > 5 ? 300 : 500);
-        const d = PE.botDecide(c, G.players[seat].style, rnd);
+        const c = ctxFor(seat, n() > 5 ? 300 : 500), me = G.players[seat];
+        c.checked = !!me.chk;
+        c.read = hero().folded ? null : G.read;
+        const d = PE.botDecide(c, me.style, rnd);
         act(seat, d.action, d.to);
       };
       setTimeout(go, delay());
@@ -436,6 +434,8 @@
     if (action === 'call' && toCall === 0) action = 'check';
     if (action === 'allin') { if (p.stack <= toCall) action = 'call'; else { action = 'raise'; to = p.bet + p.stack; } }
     if ((action === 'bet' || action === 'raise') && p.stack <= toCall) action = 'call';
+    if (p.hero) PE.readNote(G.read || (G.read = {}), G.street, action, toCall > 0, true);   // boti si všímají tvých zvyků
+    if (action === 'check') p.chk = true;
     if (action === 'fold') { p.folded = true; p.last = 'Fold'; SFX.fold(); }
     else if (action === 'check') p.last = 'Check';
     else if (action === 'call') { put(p, toCall); p.last = p.allIn ? 'All-in' : 'Call ' + p.bet; if (G.street === 0 && !p.pf) p.pf = G.raises ? 'call' : 'limp'; SFX.chip(); }
@@ -447,7 +447,7 @@
       const inc = to - G.currentBet;
       if (inc >= G.minRaise) G.minRaise = inc;
       G.currentBet = Math.max(G.currentBet, to);
-      G.raises++;
+      G.raises++; if (G.street === 0) G.pfAgg = seat;
       if (G.street === 0) p.pf = p.allIn && p.start <= 15 * BB ? 'shove' : G.raises >= 2 ? 'raise3' : 'raise';
       G.players.forEach((q, i) => { if (i !== seat) q.acted = false; });
       p.last = (p.allIn ? 'All-in ' : (action === 'bet' ? 'Bet ' : 'Raise ')) + to;
@@ -467,7 +467,7 @@
     const snap = coach ? snapG() : null, recTxt = recLabel(rec);
     const dec = { street: G.street, action, to, ctx, grade: gr, eq: ctx.eq };
     G.decisions.push(dec);
-    if (!retry) {                                  // opakovaný pokus se do statistik ani bodů nepočítá
+    if (!retry && !classic) {                      // opakovaný pokus (a Klasická hra) se do hodnocení ani bodů nepočítá
       stats.decisions++; stats[gr.level]++;
       if (helpOn('recs') || G.hint) { stats.recN++; if (gr.level === 'good') stats.recAgree++; }
       if (G.street > 0) { if (action === 'bet' || action === 'raise' || (action === 'allin' && ctx.toCall < h.stack)) stats.br++; else if (action === 'call' || action === 'allin') stats.calls++; }
@@ -559,7 +559,7 @@
   }
   $('hintBtn').onclick = buyHint;
   function nextStreet() {
-    G.players.forEach(p => { p.bet = 0; p.acted = false; if (!p.folded && !p.allIn) p.last = ''; });
+    G.players.forEach(p => { p.bet = 0; p.acted = false; p.chk = false; if (!p.folded && !p.allIn) p.last = ''; });
     G.currentBet = 0; G.minRaise = BB; G.raises = 0;
     if (G.street === 3) return finish();
     G.street++;
@@ -619,13 +619,45 @@
     save('pt_stats', stats);
     session.hands++; session.netBB = Math.round((session.netBB + net / BB) * 10) / 10;
     session.hero = hero().stack; session.dealer = G.dealer; session.bank = settings.bankroll;
+    PE.readHand(G.read || (G.read = {})); session.read = G.read;
     session.bots = G.players.slice(1).map(p => ({ name: p.name, color: p.color, style: p.style, stack: p.stack }));
     save('pt_session', session);
     if (net > 0) { SFX.win(); vib([20, 40, 30]); }
     checkAch();
     render();
     const shown = G.players.filter(p => p.show && !p.hero).length;
-    if (!expert()) setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : (1000 + shown * 450) * spd());
+    if (!expert() && !classic) setTimeout(() => { if (G.over && nav.cur === 'game') showSummary(); }, FAST() ? 0 : (1000 + shown * 450) * spd());
+  }
+
+  /* ---------- ukazatel síly ruky (jen vlastní karty + board; bez informací o soupeřích) ---------- */
+  const meterOn = () => !!(classic ? settings.cMeter : settings.meter);
+  const meterCache = { k: '', r: null };
+  function meterHTML(hole, board) {
+    const k = hole.join(',') + '|' + board.join(',');
+    if (meterCache.k !== k) { meterCache.k = k; meterCache.r = PE.strength(hole, board, 500); }
+    const r = meterCache.r;
+    return `<span class="hsm-bar t${r.tier}">${[0, 1, 2, 3, 4].map(i => `<i class="${i <= r.tier ? 'f' : ''}"></i>`).join('')}</span><b>${t('hm.' + r.tier)}</b>`;
+  }
+  window.RRMeter = { html: meterHTML, on: () => !!settings.meter };
+  function renderMeter() {
+    const el = $('hsm'), h = hero(); if (!el) return;
+    const show = meterOn() && h && h.cards && G.revealed && !h.folded && nav.cur === 'game';
+    el.hidden = !show; if (show) setHTML(el, meterHTML(h.cards, G.board));
+  }
+  /* ---------- před hrou: úroveň botů (+ ukazatel síly) pro Trénovat i Klasickou hru ---------- */
+  function openSetup(mode) {
+    const cl = mode === 'classic', dk = cl ? 'cDiff' : 'diff', mk = cl ? 'cMeter' : 'meter';
+    const draw = () => {
+      openSheet(`<h2>${t(cl ? 'cl.title' : 'h.train')}</h2><div class="sub">${t(cl ? 'cl.setSub' : 'tr.setSub')}</div>
+        <h3>${t('bl.title')}</h3><div class="bl-opts">${[0, 1, 2].map(v => `<button class="bl-opt ${(settings[dk] | 0) === v ? 'on' : ''}" data-bl="${v}"><b>${t('diff.' + v)}</b><small>${t('set.diffSub.' + v)}</small><span class="bl-dots">${'●'.repeat(v + 1)}${'○'.repeat(2 - v)}</span></button>`).join('')}</div>
+        <div class="row setup-tg"><div>${t('hm.set')}<small>${t('hm.setSub')}</small></div><label class="tg"><input type="checkbox" id="setupMeter" ${settings[mk] ? 'checked' : ''}><i></i></label></div>
+        ${cl ? `<div class="sub cl-note">${t('cl.note')}</div>` : ''}
+        <button class="btn primary wide" id="setupGo">${t('cl.go')}</button>`);
+      $('sheet').querySelectorAll('[data-bl]').forEach(b => b.onclick = () => { settings[dk] = +b.dataset.bl; save('pt_settings', settings); SFX.tap(); draw(); });
+      $('setupMeter').onchange = e => { settings[mk] = e.target.checked; save('pt_settings', settings); };
+      $('setupGo').onclick = () => { SFX.unlock(); classic = cl; closeSheet(); syncBotLvl(); lastActions = ''; nav.go('game'); };
+    };
+    draw();
   }
 
   /* ---------- vykreslení: trvalé DOM prvky, mění se jen obsah (žádné blikání) ---------- */
@@ -713,8 +745,9 @@
     setHTML($('heroPos'), settings.adv ? `${gl('pos.' + hp, hp)}${dmk} · ${gl('bb', hbb + ' BB')}` : `${gl('pos.' + hp, t('ps.' + hp))} <small>${hp}</small>${dmk}<br>${gl('bb', bbWords(hbb))}`);
     setText($('heroLast'), h.last || '');
     // šance
-    $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() ? 'none' : '';
-    $('kombiBtn').style.display = expert() ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert()); updatePts();
+    $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() || classic ? 'none' : '';
+    $('kombiBtn').style.display = expert() || classic ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert() || classic); updatePts();
+    $('app').classList.toggle('classic', classic); renderMeter();
     const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll; setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded && G.revealed) {
@@ -855,7 +888,8 @@
     setText($('homeAchSub'), t('ui.achSub', { n: Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length, m: ACH.length }));
   }
   const fmtNum = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  $('playBtn').onclick = () => { SFX.unlock(); nav.go('game'); };
+  $('playBtn').onclick = () => { SFX.unlock(); SFX.tap(); openSetup('train'); };
+  $('homeClassic').onclick = () => { SFX.unlock(); SFX.tap(); openSetup('classic'); };
   $('drillBtn').onclick = () => { SFX.unlock(); nav.go('drill'); };
   $('homeStats').onclick = () => nav.go('stats');
   $('homeLearn').onclick = () => nav.go('learn');
@@ -887,6 +921,7 @@
         <div class="note">${t('set.nextHand')}</div>
       </div>
       <h3>${t('set.help')}</h3><div class="grp">
+        ${tg('meter', t('hm.set'), t('hm.setSub'))}
         ${expert() ? `<div class="note">${t('set.expertOff')}</div>` : tg('recs', t('set.recs'), t('set.recsSub')) + tg('odds', t('set.odds'), t('set.oddsSub')) + tg('learn', t('set.learn'), t('set.learnSub'))}
         ${tg('adv', t('set.adv'), t('set.advSub'))}${tg('gloss', t('set.gloss'), t('set.glossSub'))}
       </div>
@@ -909,7 +944,7 @@
       const k = b.dataset.s, v = k === 'lang' ? b.dataset.v : +b.dataset.v;
       settings[k] = v; save('pt_settings', settings); SFX.tap();
       if (k === 'lang') setLang(v);
-      if (k === 'diff') G.players.slice(1).forEach(p => p.style = makeStyle());
+      if (k === 'diff' || k === 'cDiff') syncBotLvl();
       renderSettings();
     });
     $('setIntro').onclick = () => openOnboarding(true);
@@ -1078,7 +1113,7 @@
   function preOrder(N) { const P = POSITIONS[N]; return N === 2 ? ['BTN', 'BB'] : P.slice(3).concat(['BTN', 'SB', 'BB']); }
   function drillNew() {
     const types = ['push', 'push', 'vsOpen', 'vsShove', 'flopBet', 'flopBet', 'checked', 'checked', 'turnBet', 'riverBet', 'lowSpr'];
-    const type = pick(types), deck = newDeck();
+    const type = settings.drPack === 'bluff' ? 'bluff' : pick(types), deck = newDeck();
     const hole = [deck.pop(), deck.pop()];
     let N = 2 + randInt(8);
     const s = { type, hole, board: [], street: 0, N, opps: [] };
@@ -1108,6 +1143,25 @@
         c = { street: 0, pot: 3 + sh * DBB - blindOf(vpos), toCall: sh * DBB - my, currentBet: sh * DBB, myBet: my, stack: heff * DBB - my, raisesThisStreet: 1, numOpp: 1, eff: heff * DBB };
         s.desc = t('dr.shove', { v: `[[pn:${vpos}]]`, x: `[[bb:${sh}]]`, pos: `[[p:${pos}]]`, h: `[[bb:${heff}]]` });
       }
+    } else if (type === 'bluff') {
+      // blafování: slabá ruka / tah, checknuto k tobě (občas malá sázka), různí soupeři → blafovat, nebo ne?
+      const street = 1 + randInt(3);
+      deal(street === 1 ? 3 : street === 2 ? 4 : 5);
+      const r = rnd(), nOpp = r < 0.1 ? 3 : r < 0.3 ? 2 : 1;
+      const ARCHS = ['station', 'rock', 'tag', 'lag', 'maniac'], NAMES = ['Hana', 'Jakub', 'Eva'];
+      s.arch = Array.from({ length: nOpp }, () => pick(ARCHS));
+      s.opps = s.arch.map(a => ({ minChen: a === 'station' || a === 'maniac' ? 3 : a === 'rock' ? 8 : 6 }));
+      s.pfAgg = rnd() < 0.65; s.pos = pick(['BTN', 'CO', 'BB', 'SB', 'HJ']); s.ip = s.pos === 'BTN' || s.pos === 'CO';
+      const eq0 = PE.equity(hole, s.board, s.opps, 800).equity;
+      if (eq0 >= 0.45) return drillNew();                       // chceme slabou ruku nebo tah
+      let base = Math.round((6 * nOpp + 7) * (street === 1 ? 1 : street === 2 ? 1.6 : 2.4) * (0.8 + rnd() * 0.6));
+      const stack = Math.round(200 - base / (nOpp + 1)), facing = nOpp === 1 && rnd() < 0.2;
+      const bet = facing ? Math.max(DBB, Math.round(base * pick([0.33, 0.5]))) : 0;
+      c = { street, pot: base + bet, toCall: bet, currentBet: bet, myBet: 0, stack, raisesThisStreet: facing ? 1 : 0, numOpp: nOpp, eff: stack,
+        pfAgg: s.pfAgg, ip: s.ip, oppArch: s.arch.slice(), bluffDrill: true };
+      s.desc = (facing ? t('dr.bBet', { st: streetName(street).toLowerCase(), b: bet, p: base, pct: Math.round(bet / base * 100) }) : t(nOpp > 1 ? 'dr.bChkN' : 'dr.bChk', { st: streetName(street).toLowerCase(), n: nOpp }))
+        + ' ' + t(s.pfAgg ? 'dr.pfAgg' : 'dr.pfCall') + ' ' + s.arch.map((a, i) => t('dr.opp.' + a, { n: NAMES[i] })).join(', ') + '.';
+      s.street = street;
     } else {
       // postflop: preflop navýšení + dorovnání, soupeř(i) s odhadnutým rozsahem
       const street = type === 'turnBet' ? 2 : type === 'riverBet' ? 3 : type === 'checked' ? 1 + randInt(3) : 1;
@@ -1143,7 +1197,9 @@
     const s = D.spot; if (!s) return;
     const c = s.ctx, rec = PE.recommend(c), A = D.answered;
     setText($('drScore'), `${drillSt.good + drillSt.ok} / ${drillSt.n}` + (drillSt.streak > 1 ? ` · 🔥${drillSt.streak}` : ''));
-    setText($('drKind'), t('drk.' + s.type) + ' · ' + t('dr.players', { n: s.N }));
+    setText($('drKind'), t('drk.' + s.type) + ' · ' + t('dr.players', { n: s.type === 'bluff' ? c.numOpp + 1 : s.N }));
+    setHTML($('drPacks'), ['mix', 'bluff'].map(k => `<button class="dr-pack ${(settings.drPack || 'mix') === k ? 'on' : ''}" data-pack="${k}">${t('dr.pack.' + k)}</button>`).join(''));
+    $('drPacks').querySelectorAll('[data-pack]').forEach(b => b.onclick = () => { if ((settings.drPack || 'mix') === b.dataset.pack) return; settings.drPack = b.dataset.pack; save('pt_settings', settings); SFX.tap(); drillNew(); });
     setHTML($('drDesc'), rich(s.desc));
     $('drBoard').innerHTML = [0, 1, 2, 3, 4].map(i => i < s.board.length ? cardHTML(s.board[i]) : `<div class="card ghost"></div>`).join('');
     setText($('drStreet'), streetName(c.street) + ' · ' + posShort(s.pos));

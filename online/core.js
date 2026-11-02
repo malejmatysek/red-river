@@ -64,7 +64,8 @@
       const max = Math.round(+s.max || 6); if (max < 2 || max > 9) fail('bad_settings');
       const bl = BLINDS.find(b => b[0] === +s.sb && b[1] === +s.bb) || (s.sb == null ? BLINDS[0] : null); if (!bl) fail('bad_settings');
       const bbs = +s.buyInBB || 100; if (!BUYIN_BB.includes(bbs)) fail('bad_settings');
-      return { max, sb: bl[0], bb: bl[1], buyInBB: bbs, buyIn: bbs * bl[1], bots: !!s.bots, turnMs: TURN_MS };
+      const botLvl = [0, 1, 2].includes(+s.botLvl) ? +s.botLvl : 1;
+      return { max, sb: bl[0], bb: bl[1], buyInBB: bbs, buyIn: bbs * bl[1], bots: !!s.bots, turnMs: TURN_MS, botLvl };
     }
 
     /* ---------- místnost ---------- */
@@ -117,7 +118,7 @@
       const i = room.seats.findIndex(s => !s); if (i < 0) fail('full');
       room.botN = (room.botN || 0) + 1;
       const names = ['Bot Ada', 'Bot Bára', 'Bot Cyril', 'Bot Dan', 'Bot Ema', 'Bot Filip', 'Bot Gita', 'Bot Hugo', 'Bot Ivo'];
-      room.seats[i] = { uid: null, name: names[(room.botN - 1) % names.length], bot: true, stack: room.settings.buyIn, sitOut: false, style: [0.1, 0, -0.08][room.botN % 3] };
+      room.seats[i] = { uid: null, name: names[(room.botN - 1) % names.length], bot: true, stack: room.settings.buyIn, sitOut: false, style: PE.makeBot(room.settings.botLvl != null ? room.settings.botLvl : 1, rng) };
       touch(room); return { seat: i };
     }
     function removeBot(room, uid, i) {
@@ -209,6 +210,7 @@
     function apply(room, i, a, auto) {
       const h = room.hand, p = P(h, i), s = room.seats[i], L = legal(room, i);
       let t = String(a.t || a.type || ''); if (t === 'bet') t = 'raise';
+      if (!s.bot && s.uid && L) { room.reads = room.reads || {}; const r = room.reads[s.uid] || (room.reads[s.uid] = {}); PE.readNote(r, h.street, t === 'raise' && L.raiseIsBet ? 'bet' : t, L.toCall > 0, true); }
       let to = Math.floor(+a.to);
       if (t === 'allin') { to = L.maxTo; t = to > h.curBet && L.canRaise ? 'raise' : 'call'; if (t === 'call' && L.toCall === 0) t = 'check'; }
       if (t === 'fold') { if (L.canCheck) t = 'check'; else { p.folded = true; log(h, i, 'fold'); } }
@@ -248,6 +250,7 @@
     }
     function finish(room, showdown) {
       const h = room.hand, live = h.players.filter(p => !p.folded);
+      if (room.reads) h.players.forEach(p => { if (!p.bot && p.uid && room.reads[p.uid]) PE.readHand(room.reads[p.uid]); });
       const levels = [...new Set(h.players.map(p => p.total).filter(x => x > 0))].sort((a, b) => a - b);
       let prev = 0; const pots = [];
       for (const lv of levels) {
@@ -279,25 +282,38 @@
     }
 
     /* ---------- boti a čas ---------- */
+    /* bot: stejná „lidská“ AI jako v aplikaci (engine.js → PE.botDecide): styl, úroveň, blafy, check-raise, slowplay, přizpůsobení hráčům */
     function botDecide(room, i) {
-      const h = room.hand, L = legal(room, i), hole = h.holes[i], st = room.seats[i].style || 0;
-      const opp = h.players.filter(p => !p.folded && p.seat !== i).length;
-      if (h.street === 0) {
-        const c = PE.chen(hole[0], hole[1]) + st * 10 + (rng() - 0.5) * 2;
-        if (c >= 11 && L.canRaise) return { t: 'raise', to: Math.min(L.maxTo, Math.max(L.minTo, h.curBet * 3)) };
-        if (L.canCheck) return { t: 'check' };
-        if (c >= 7 || (c >= 5 && L.toCall <= room.settings.bb)) return { t: 'call' };
-        return { t: 'fold' };
+      const h = room.hand, L = legal(room, i), hole = h.holes[i], me = P(h, i), s = room.seats[i];
+      const live = h.players.filter(p => !p.folded), opps = live.filter(p => p.seat !== i);
+      const N = room.seats.length, offD = seat => (seat - h.dealer - 1 + N) % N;      // pořadí po flopu (0 = první po dealerovi)
+      let raises = 0, top = 0, st = 0, limpers = 0, pfAgg = -1, checked = false;
+      for (const a of h.actions) {
+        if (a.st !== st) { st = a.st; top = 0; }
+        if (a.t === 'sb' || a.t === 'bb') { top = Math.max(top, a.a); continue; }
+        const isR = a.t === 'bet' || a.t === 'raise' || (a.t === 'allin' && a.to > top);
+        if (a.to) top = Math.max(top, a.to);
+        if (a.st === 0 && isR) pfAgg = a.seat;
+        if (a.st === h.street) { if (h.street === 0 && !raises && a.t === 'call') limpers++; if (isR) raises++; if (a.seat === i && a.t === 'check') checked = true; }
       }
-      const eq = PE.equity(hole, h.board, Array.from({ length: opp }, () => ({})), 250, rng).equity + st + (rng() - 0.5) * 0.1;
-      const need = L.toCall / (L.pot + L.toCall || 1);
-      if (L.canCheck) {
-        if (eq > 0.62 && L.canRaise) return { t: 'raise', to: Math.min(L.maxTo, Math.max(L.minTo, Math.round(L.pot * 0.66))) };
-        return { t: 'check' };
-      }
-      if (eq > 0.8 && L.canRaise) return { t: 'raise', to: Math.min(L.maxTo, Math.max(L.minTo, h.curBet * 3)) };
-      if (eq > need + 0.04) return { t: 'call' };
-      return { t: 'fold' };
+      const wasR = new Set(h.actions.filter(a => a.st === 0 && (a.t === 'raise' || a.t === 'bet' || a.t === 'allin')).map(a => a.seat));
+      const idx = h.players.findIndex(p => p.seat === i), position = PE.posName((idx + 1) % h.players.length, h.players.length);   // h.players začíná hráčem po dealerovi
+      const ip = opps.every(p => offD(p.seat) < offD(i));
+      const allInCall = L.toCall > 0 && L.toCall >= s.stack;
+      const eq = h.street > 0 || allInCall ? PE.equity(hole, h.board, opps.map(p => ({ minChen: wasR.has(p.seat) ? 8 : 0 })), h.street > 0 ? 300 : 400, rng).equity : 0.5;
+      let read = null;                                    // čtení lidí v ruce (součet)
+      const rs = opps.filter(p => !p.bot && p.uid && room.reads && room.reads[p.uid]).map(p => room.reads[p.uid]);
+      if (rs.length) { read = {}; rs.forEach(r => { for (const k in r) read[k] = (read[k] || 0) + (+r[k] || 0); }); read.n = Math.round(read.n / rs.length); }
+      const ctx = { street: h.street, hole, board: h.board.slice(), pot: L.pot, toCall: L.toCall, currentBet: h.curBet, myBet: me.bet, stack: s.stack,
+        minRaiseTo: L.minTo, bb: room.settings.bb, position, numOpp: opps.length, raisesThisStreet: raises, limpers, eq,
+        eff: Math.min(L.maxTo, Math.max(0, ...opps.map(p => room.seats[p.seat].stack + p.bet))), pfAgg: pfAgg === i, checked, ip, read };
+      const d = PE.botDecide(ctx, s.style, rng);
+      if (d.action === 'fold') return L.canCheck ? { t: 'check' } : { t: 'fold' };
+      if (d.action === 'check') return L.canCheck ? { t: 'check' } : { t: 'fold' };
+      if (d.action === 'call') return L.canCheck ? { t: 'check' } : { t: 'call' };
+      if (!L.canRaise) return L.canCheck ? { t: 'check' } : { t: 'call' };
+      if (d.action === 'allin') return { t: 'raise', to: L.maxTo };
+      return { t: 'raise', to: Math.min(L.maxTo, Math.max(L.minTo, Math.round(d.to || L.minTo))) };
     }
     function runBots(room) {
       let n = 0;

@@ -1,14 +1,29 @@
 <!doctype html>
-<html lang="cs">
+<html lang="cs" style="background:#000">
 <head>
+<style>html,body{background:#000;color:#fff}</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#000000">
+<meta name="color-scheme" content="dark">
 <meta name="description" content="Red River – poker trenér: šance na výhru, doporučené tahy a zpětná vazba.">
 <title>Red River</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1260x2736.png" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-1242x2208.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
+<link rel="apple-touch-startup-image" href="icons/splash/black-640x1136.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -39,7 +54,7 @@
 })();
 </script>
 </head>
-<body>
+<body style="background:#000">
 <!-- úvodní obrazovka -->
 <div class="splash" id="splash">
   <img src="icons/icon.svg" alt="">
@@ -110,6 +125,7 @@
     <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><span class="lumi" id="homeLumi"></span></div>
     <button class="play" id="homePublic"><span class="pl-row"><svg class="pl-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/></svg><span class="pl-t" data-i18n="pub.title">Hrát online</span></span></button>
     <button class="fr-card" id="playBtn"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 9.5 12 5l9.5 4.5L12 14z"/><path d="M6.5 11.6V16c1.6 1.4 3.4 2 5.5 2s3.9-.6 5.5-2v-4.4"/><path d="M21.5 9.5v5"/></svg></span><span class="fr-t"><b id="playLbl">Trénovat</b><span data-i18n="h.trainSub">Proti botům – rady a opravy po každém tahu</span></span><span class="fr-ch">›</span></button>
+    <button class="fr-card cl" id="homeClassic"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="10.5" height="14.5" rx="2" transform="rotate(-12 8.25 12.75)"/><rect x="9.5" y="3.5" width="11" height="15" rx="2" transform="rotate(9 15 11)"/><path d="M15.2 7.6c-1.6 1.5-2.9 2.6-2.9 3.9 0 .9.7 1.5 1.5 1.5.6 0 1-.3 1.3-.7l-.4 2h1.6l-.4-2c.3.4.8.7 1.3.7.8 0 1.5-.6 1.5-1.5 0-1.3-1.3-2.4-2.9-3.9z" fill="currentColor" stroke="none" transform="rotate(9 15 11)"/></svg></span><span class="fr-t"><b data-i18n="cl.title">Klasická hra</b><span data-i18n="cl.tileSub">Proti botům bez nápověd – jako u skutečného stolu</span></span><span class="new" data-i18n="ui.new">NOVÉ</span><span class="fr-ch">›</span></button>
     <button class="fr-card" id="homeOnline"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.3"/><path d="M3 19c.6-3.3 3-5 6-5s5.4 1.7 6 5"/><circle cx="16.5" cy="9.5" r="2.6"/><path d="M16 14.2c2.7.1 4.4 1.7 5 4.3"/></svg></span><span class="fr-t"><b data-i18n="on.title">Hrát s kamarády</b><span data-i18n="on.tileSub">Soukromý stůl s kódem, body bez hodnoty</span></span><span class="new" data-i18n="ui.new">NOVÉ</span><span class="fr-ch">›</span></button>
     <button class="fr-card kp" id="homeGuide"><span class="fr-ic"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5z"/><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v15h5.5c.8 0 1.5.7 1.5 1.5z"/></svg></span><span class="fr-t"><b><span data-i18n="gd.title">Kombinace &amp; pojmy</span> <span class="new" data-i18n="ui.new">NOVÉ</span></b><span data-i18n="gd.tileSub">Co porazí co · slovníček v kostce</span><span class="kprev" id="homeGuidePrev"></span></span><span class="fr-ch">›</span></button>
     <div class="menu">
@@ -173,6 +189,7 @@
       <div class="avatar me">TY<span class="me-lumi" id="meLumi"></span></div>
       <div class="stack" id="heroStack">–</div>
       <div class="hero-last" id="heroLast"></div>
+      <div class="hsm" id="hsm" hidden></div>
     </div>
   </section>
 </div>
@@ -182,6 +199,7 @@
 <section class="screen" id="scr-drill" data-title="Trénink situací">
   <div class="page drill">
     <div class="nav"><button class="bk" data-back aria-label="Zpět" data-i18n-aria="ui.back">‹</button><span class="t" data-i18n="ui.drillT">Trénink</span><span class="score" id="drScore">0 / 0</span></div>
+    <div class="dr-packs" id="drPacks"></div>
     <div class="dr-spot" id="drSpot"><div class="dr-kind" id="drKind"></div><div class="dr-desc" id="drDesc"></div></div>
     <div class="table"><div class="board" id="drBoard"></div><div class="pot-row"><span class="street" id="drStreet"></span><span class="pot" id="drPot"></span></div></div>
     <div class="dr-hero"><div class="hero-cards" id="drHero"></div><div class="dr-info" id="drInfo"></div></div>
