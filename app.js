@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.7.0', BUILD = 'v22';
+  const APP_VERSION = '1.8.0', BUILD = 'v23';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -19,7 +19,7 @@
 
   /* ---------- konstanty ---------- */
   let BB = 2, SB = 1, START = 200;
-  const BLINDS = [[1, 2], [5, 10], [25, 50]];
+  const BLINDS = [[1, 2], [5, 10], [25, 50], [50, 100], [100, 200]];   // vyšší sázky odemykají ligy (leagues.js)
   const DEPTHS = [20, 50, 100, 200];
   const NAME_POOL = ['Jana', 'Petr', 'Eva', 'Tomáš', 'Lucie', 'Martin', 'Kateřina', 'Ondřej', 'Pavel', 'Tereza', 'Jakub', 'Veronika', 'Lukáš', 'Klára', 'Marek', 'Barbora', 'Adam', 'Zuzana', 'Filip', 'Monika', 'David', 'Alena', 'Vojta', 'Hana'];
   const COLORS = ['#ffd3b5', '#bfe3ff', '#d9c8ff', '#c8f0d4', '#ffc9d9', '#fde9a9', '#c9e6f0', '#e3d5c8', '#f7c6a3', '#b8f0e6', '#e6c8f7', '#d7f0b5'];
@@ -598,6 +598,7 @@
     stats.hands++; stats.netBB = Math.round((stats.netBB + net / BB) * 10) / 10; if (heroWon) stats.won++;
     if (G.heroVpip) stats.vpip++; if (G.heroPfr) stats.pfr++;
     if (G.heroFlop) stats.sawFlop++;
+    trophiesForHand(heroWon && net > 0, sdHand, !heroWon && G.heroVpip && net < 0, classic ? LG.TROPHY.classicX : 1);
     if (sdHand && !h0.folded) { stats.sd++; if (heroWon) stats.sdWon++; }
     if (h0.allIn) stats.allins++;
     if (heroWon) stats.bigPot = Math.max(stats.bigPot, pot());
@@ -883,15 +884,92 @@
   $('homeHelp').onclick = () => openScreenHelp('home');
   document.addEventListener('click', e => { const x = e.target.closest('.rec-why,.feedback .txt,.cfb .why'); if (x) x.classList.toggle('open'); });
 
+  /* ---------- ligy (jako arény v Clash Royale): trofeje, odměny, obrazovka odemčení ---------- */
+  const LG = window.RR_LEAGUES, LGS = LG.LEAGUES;
+  let homeBank = null;
+  const lgName = i => LGS[i].name[I18N.lang] || LGS[i].name.cs;
+  function grantLeague(i, silent) {
+    const r = LGS[i].reward || {};
+    if (r.look) { const [k, id] = r.look; wallet.owned[k][id] = 1; if (!silent && (k !== 'lumi' || r.crown)) wallet.equip[k] = id; }
+    if (r.badge) wallet.badges[LGS[i].id] = 1;
+    if (r.pts && !silent) wallet.points = Math.round(wallet.points + r.pts);
+  }
+  if (wallet.trophies == null) {             // první spuštění s ligami: start podle dosavadních výher, odměny za prošlé ligy bez bodů
+    wallet.badges = {}; wallet.trophies = Math.min(LGS[4].min, (stats.won || 0) * 2); wallet.league = LG.leagueOf(wallet.trophies);
+    for (let i = 1; i <= wallet.league; i++) grantLeague(i, true);
+    saveW();
+  }
+  wallet.badges = wallet.badges || {};
+  const maxBlinds = () => LGS.slice(0, wallet.league + 1).reduce((m, l) => Math.max(m, l.reward.blinds || 0), 0);
+  const lgQueue = [];
+  function addTrophies(d) {
+    if (!d) return;
+    const floor = LGS[wallet.league].min;
+    wallet.trophies = Math.max(floor, Math.round(wallet.trophies + d));
+    while (wallet.league < LGS.length - 1 && wallet.trophies >= LGS[wallet.league + 1].min) { wallet.league++; grantLeague(wallet.league); lgQueue.push(wallet.league); }
+    saveW(); applyLook(); renderLeagueRow();
+    if (lgQueue.length) setTimeout(showLeagueUp, FAST() ? 0 : 1600);
+  }
+  /* trofeje za ruku: výhra +3 (+2 na showdownu), prohra po dobrovolném vstupu −1; Klasická hra a online ×2 */
+  function trophiesForHand(won, sd, lost, mult) {
+    const T = LG.TROPHY, d = won ? T.win + (sd ? T.sdWin : 0) : lost ? T.loss : 0;
+    addTrophies(d * (mult || 1));
+  }
+  window.RRLeague = { hand: (won, sd, lost) => trophiesForHand(won, sd, lost, LG.TROPHY.onlineX), state: () => ({ trophies: wallet.trophies, league: wallet.league }), add: addTrophies };
+  function lgProgress() {
+    const i = wallet.league, cur = LGS[i], nx = LGS[i + 1];
+    return { i, cur, nx, f: nx ? (wallet.trophies - cur.min) / (nx.min - cur.min) : 1 };
+  }
+  function renderLeagueRow() {
+    const P = lgProgress(), ic = $('lgIc'); if (!ic) return;
+    if (ic.dataset.i !== String(P.i)) { ic.innerHTML = LG.logo(P.i, 52, 'h'); ic.dataset.i = P.i; }
+    setText($('lgName'), lgName(P.i));
+    $('lgBar').style.width = Math.round(Math.min(1, P.f) * 100) + '%';
+    setText($('lgSub'), P.nx ? t('lg.next', { n: fmtNum(P.nx.min - wallet.trophies), l: lgName(P.i + 1) }) : t('lg.top'));
+    setHTML($('lgTr'), `${TROPHY_IC}<b>${fmtNum(wallet.trophies)}</b>`);
+    $('homeLeague').classList.toggle('top', !P.nx);
+    $('homeLeague').dataset.t = P.i < 2 ? 0 : P.i < 4 ? 1 : 2;
+  }
+  const TROPHY_IC = '<svg class="tr-ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 14v5M8 20h8"/></svg>';
+  function rewardList(i) {
+    const r = LGS[i].reward || {}, out = [];
+    if (r.pts) out.push([ICON.pts(18), t('lg.rPts', { n: fmtNum(r.pts) })]);
+    if (r.look) out.push(['<i class="rw-g">◐</i>', t('lg.rLook', { n: t(`lk.${r.look[0]}.${r.look[1]}`) })]);
+    if (r.blinds) out.push(['<i class="rw-g">▲</i>', t('lg.rStakes', { b: BLINDS[r.blinds].join('/') })]);
+    if (r.badge) out.push(['<i class="rw-g">★</i>', t('lg.rBadge')]);
+    if (r.crown) out.push(['<i class="rw-g r">♛</i>', t('lg.rCrown')]);
+    return out;
+  }
+  function showLeagueUp() {
+    if (!lgQueue.length || !$('lgUp').hidden) return;
+    const i = lgQueue.shift(), el = $('lgUp');
+    el.className = 'lg-up l' + i;
+    el.innerHTML = `<div class="lg-rays"></div><div class="lg-in"><div class="lg-kick">${t('lg.unlocked')}</div><div class="lg-big">${LG.logo(i, 210, 'u')}</div>
+      <h1>${lgName(i)}</h1><div class="lg-tro">${TROPHY_IC} ${fmtNum(LGS[i].min)}</div>
+      <div class="lg-rw">${rewardList(i).map(([ic, tx]) => `<div><span>${ic}</span>${tx}</div>`).join('')}</div>
+      <button class="btn primary wide" id="lgOk">${t('lg.ok')}</button></div>`;
+    el.hidden = false; SFX.win(); vib([20, 40, 20, 40, 60]);
+    $('lgOk').onclick = () => { el.hidden = true; SFX.tap(); renderHome(); if (lgQueue.length) setTimeout(showLeagueUp, 300); };
+  }
+  function openLeagues() {
+    const P = lgProgress();
+    openSheet(`<h2>${t('lg.title')}</h2><div class="sub">${t('lg.how')}</div><div class="lg-list">${LGS.map((l, i) => {
+      const st = i < P.i ? 'done' : i === P.i ? 'cur' : 'lock';
+      return `<div class="lg-item ${st}" data-t="${i < 2 ? 0 : i < 4 ? 1 : 2}"><span class="lg-ic">${LG.logo(i, 56, 's' + i)}</span><div class="lg-it"><b>${lgName(i)}</b><small>${TROPHY_IC} ${fmtNum(l.min)}${st === 'done' ? ' · ✓' : st === 'cur' ? ' · ' + fmtNum(wallet.trophies) + (P.nx ? ' / ' + fmtNum(P.nx.min) : '') : ''}</small>
+        ${i === P.i && P.nx ? `<span class="lg-bar"><i style="width:${Math.round(P.f * 100)}%"></i></span>` : ''}
+        <div class="lg-rws">${rewardList(i).map(([ic, tx]) => `<span>${ic} ${tx}</span>`).join('')}</div></div></div>`; }).reverse().join('')}</div>`);
+    const cur = $('sheet').querySelector('.lg-item.cur'); if (cur) setTimeout(() => cur.scrollIntoView({ block: 'center' }), 50);
+  }
+  $('homeLeague').onclick = () => { SFX.tap(); openLeagues(); };
+
   /* ---------- domovská obrazovka ---------- */
   function renderHome() {
     const acc = stats.decisions ? Math.round((stats.good + stats.ok) / stats.decisions * 100) + ' %' : '–';
     applyBlinds();
     const bank = settings.bankroll ? (G.players.length && G.tableKey === tableKey() ? hero().stack : session.key === `${settings.blinds}|${settings.depth}` && session.hero ? session.hero : START) : null;
-    setText($('bankLbl'), settings.bankroll ? t('h.bankroll') : t('h.profit'));
-    setText($('bankV'), bank != null ? fmtNum(bank) : (stats.profit >= 0 ? '+' : '') + fmtNum(stats.profit));
-    setText($('accV'), acc);
-    setText($('bankS'), settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '−') + plain('[[bb:' + Math.abs(session.netBB) + ']]') }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh'));
+    homeBank = { bank, acc, lbl: settings.bankroll ? t('h.bankroll') : t('h.profit'), v: bank != null ? fmtNum(bank) : (stats.profit >= 0 ? '+' : '') + fmtNum(stats.profit),
+      sub: settings.bankroll && session.hands ? t('h.session', { n: session.hands, bb: (session.netBB >= 0 ? '+' : '−') + plain('[[bb:' + Math.abs(session.netBB) + ']]') }) : stats.hands ? t('h.total', { n: stats.hands }) : t('h.fresh') };
+    renderLeagueRow();
     setText($('playLbl'), G.handNo ? t('h.continue') : t('h.train'));
     setText($('homeLvl'), t('lv.' + settings.level)); updatePts();
     setText($('homeAchSub'), t('ui.achSub', { n: Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length, m: ACH.length }));
@@ -922,7 +1000,8 @@
       <h3>${t('set.table')}</h3><div class="grp">
         ${seg('opps', t('set.opps'), [1, 2, 3, 4, 5, 6, 7, 8].map(k => [k, k]), t('set.oppsSub', { n: nOpp + 1, x: nOpp === 5 ? ' (6-max)' : nOpp === 8 ? ' ' + t('set.full') : '' }))}
         ${seg('diff', t('set.diff'), [[0, t('diff.0')], [1, t('diff.1')], [2, t('diff.2')]], t('set.diffSub.' + settings.diff))}
-        ${seg('blinds', t('set.blinds'), BLINDS.map((b, i) => [i, b.join('/')]))}
+        ${(() => { const mb = Math.max(maxBlinds(), +settings.blinds || 0), nl = LGS.findIndex(l => (l.reward.blinds || 0) > mb);
+          return seg('blinds', t('set.blinds'), BLINDS.map((b, i) => [i, b.join('/')]).filter(([i]) => i <= mb), nl > 0 ? t('lg.stakesLock', { l: lgName(nl) }) : ''); })()}
         ${seg('depth', t('set.depth'), DEPTHS.map(d => [d, d + ' BB']), t('set.depthSub', { n: settings.depth * (BLINDS[settings.blinds] || BLINDS[0])[1] }))}
         ${tg('bankroll', t('set.bankroll'), t('set.bankrollSub'))}
         ${tg('randomDepth', t('set.random'), settings.bankroll ? t('set.randomOff') : t('set.randomSub'))}
@@ -1026,7 +1105,12 @@
     const typeCard = ty ? `<div class="pr-type"><span class="ic">${TYPE_LUMI[ty]}</span><div><b>${t('pt.' + ty)}<small>${t('pt.' + ty + '.a')}</small></b><p>${t('pt.' + ty + '.d')}</p></div></div>`
       : `<div class="pr-type more"><span class="ic">${lumiSVG(wallet.equip.lumi)}</span><div><b>${t('stx.more')}</b><p>${t('stx.moreTxt', { n: MIN_TYPE, k: MIN_TYPE - H })}</p><div class="prog"><i style="width:${Math.min(100, H / MIN_TYPE * 100)}%"></i></div></div></div>`;
     const achN = Object.keys(wallet.ach).filter(k => ACH.some(a => a.id === k)).length;
-    $('profBody').innerHTML = `<div class="pr-card"><div class="pr-hd"><b>${t('stx.type')}</b><span>${H ? t('pr.hands', { n: H }) : ''}</span></div>${radarHTML(s, ty)}${typeCard}</div>
+    const P = lgProgress(), hb = homeBank || {};
+    const bank = `<div class="bank pr-bank"><div><div class="lbl">${hb.lbl || t('h.profit')}</div><div class="v">${hb.v || '–'}</div></div><div><div class="lbl">${t('ui.accuracy')}</div><div class="v g">${hb.acc || '–'}</div></div><div class="s">${hb.sub || ''}</div></div>`;
+    const lgCard = `<button class="pr-card pr-lg" id="prLg" data-t="${P.i < 2 ? 0 : P.i < 4 ? 1 : 2}"><span class="lg-ic">${LG.logo(P.i, 64, 'p')}</span><div class="lg-t"><span class="lg-k">${t('lg.kicker')}</span><b>${lgName(P.i)}</b>
+      <span class="lg-bar"><i style="width:${Math.round(Math.min(1, P.f) * 100)}%"></i></span><small>${TROPHY_IC} ${fmtNum(wallet.trophies)}${P.nx ? ' / ' + fmtNum(P.nx.min) : ''}</small></div>
+      <div class="pr-badges">${LGS.map((l, i) => wallet.badges[l.id] ? `<span class="pr-badge" title="${lgName(i)}">${LG.logo(i, 26, 'b' + i)}</span>` : '').join('')}</div></button>`;
+    $('profBody').innerHTML = `${lgCard}${bank}<div class="pr-card"><div class="pr-hd"><b>${t('stx.type')}</b><span>${H ? t('pr.hands', { n: H }) : ''}</span></div>${radarHTML(s, ty)}${typeCard}</div>
       <div class="pr-grid">
         ${card('vpip', t('pr.vpip'), H ? pctTxt(vp) : '–', 'VPIP', seg(12, Math.round(Math.min(1, vp / 0.6) * 12)), t('pr.vpipH'))}
         ${card('pfr', t('pr.pfr'), H ? pctTxt(pf) : '–', 'PFR', seg(12, Math.round(Math.min(1, pf / 0.6) * 12)), t('pr.pfrH'))}
@@ -1039,6 +1123,7 @@
         <button data-prgo="learn"><span class="li">📘</span>${t('ui.learn')}<span class="rt">${t('pr.learnSub')}</span><span class="ch">›</span></button>
         <button data-prgo="settings"><span class="li">⚙️</span>${t('ui.settings')}<span class="rt">${t('pr.setSub')}</span><span class="ch">›</span></button>
       </div>`;
+    $('prLg').onclick = () => { SFX.tap(); openLeagues(); };
     $('profBody').querySelectorAll('[data-ic]').forEach(e => { e.innerHTML = ICON[e.dataset.ic](+e.dataset.sz || 16); });
     $('profBody').querySelectorAll('[data-prgo]').forEach(b => b.onclick = () => { SFX.tap(); nav.go(b.dataset.prgo); });
     $('profBody').querySelectorAll('[data-prq]').forEach(b => b.onclick = () => { const k = b.dataset.prq; SFX.tap();

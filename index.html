@@ -120,7 +120,7 @@
 <section class="screen tabscr" id="scr-home" data-title="Domů">
   <div class="page home">
     <div class="h-top"><img src="icons/icon-192.png" alt=""><span class="t">Red River</span><button class="icon-btn help-btn" id="homeHelp" aria-label="Nápověda" data-i18n-aria="hv.btn">?</button><button class="icon-btn" id="homeMenu" aria-label="Nastavení" data-i18n-aria="ui.settings"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg></button></div>
-    <div class="bank"><div><div class="lbl" id="bankLbl">Bankroll</div><div class="v" id="bankV">–</div></div><div><div class="lbl" data-i18n="ui.accuracy">Přesnost</div><div class="v g" id="accV">–</div></div><div class="s" id="bankS"></div></div>
+    <button class="lg-row" id="homeLeague"><span class="lg-ic" id="lgIc"></span><span class="lg-t"><span class="lg-k" data-i18n="lg.kicker">Liga</span><b id="lgName">–</b><span class="lg-bar"><i id="lgBar"></i></span><small id="lgSub"></small></span><span class="lg-tr" id="lgTr"></span><span class="fr-ch">›</span></button>
     <div class="h-chips"><button class="hchip" id="homeLvlBtn" aria-label="Úroveň" data-i18n-aria="lv.cur">🎓 <b id="homeLvl"></b></button><button class="hchip pts" id="homePtsBtn" aria-label="Body" data-i18n-aria="pts.name"><span data-ic="pts" data-sz="18"></span><b id="homePts"></b></button><button class="hchip dia" id="homeDiaBtn" aria-label="Diamanty" data-i18n-aria="dia.name"><span data-ic="dia" data-sz="18"></span><b id="homeDia"></b></button></div>
     <div class="hero-art"><div class="card lg c1"><span class="rk">A</span><span class="st">♠</span></div><div class="card lg back c2"></div><span class="lumi" id="homeLumi"></span></div>
     <button class="play" id="homePublic"><span class="pl-row"><svg class="pl-ic" viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/></svg><span class="pl-t" data-i18n="pub.title">Hrát online</span></span></button>
@@ -254,6 +254,7 @@
 
 <script src="i18n.js"></script>
 <script src="engine.js"></script>
+<script src="leagues.js"></script>
 <script src="app.js"></script>
 <script src="online/config.js"></script>
 <script src="online/core.js"></script>
@@ -271,5 +272,6 @@
     }).catch(e => console.warn('SW:', e)));
   }
 </script>
+<div class="lg-up" id="lgUp" hidden></div>
 </body>
 </html>
