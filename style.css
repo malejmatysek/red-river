@@ -1029,3 +1029,16 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 @keyframes hrSpin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.hr-rays,.hr-fx .hr-lumi{animation:none}}
 .fr-card.to[hidden]{display:none}
+/* ---------- v26: méně červené – dlaždice černé bez okrajů, sekundární akcenty bílé ---------- */
+.fr-card,.fr-card.kp,.fr-card.cl,.fr-card.to{background:#131316;box-shadow:none}
+.fr-card.to.run{box-shadow:inset 0 0 0 1px rgba(255,255,255,.35)}
+.fr-ic,.fr-card.kp .fr-ic,.fr-card.cl .fr-ic{background:rgba(255,255,255,.08);color:#fff;box-shadow:none}
+.fr-card.to .fr-ic,.fr-card.to.run .fr-ic{background:rgba(255,255,255,.08);color:#fff;box-shadow:none}
+.fr-card .new,.mi .new{background:#fff;color:#000}
+.prog i,.bar .bt i,.pr-type .prog i{background:#fff}
+.rk-n{background:#fff;color:#000}
+.lvl.on{box-shadow:inset 0 0 0 2px #fff;background:#1c1c20}
+.look.on{box-shadow:inset 0 0 0 2px #fff}
+.streak7 span.on{background:#fff;color:#000}
+.pt-ic span{box-shadow:0 0 0 2px #fff}
+.co-leak{border-left-color:#fff}.co-leak b i{background:#fff}
