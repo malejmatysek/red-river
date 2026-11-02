@@ -203,7 +203,7 @@
     }
     async points() { const r = await this.call('points'); return r.points; }
     async call(op, a) {
-      const { data, error } = await this.sb.functions.invoke(this.cfg.FUNCTION || 'table', { body: Object.assign({ op, code: this.code }, a) });
+      const { data, error } = await this.sb.functions.invoke(this.cfg.FUNCTION || 'table', Object.assign({ body: Object.assign({ op, code: this.code }, a) }, this.cfg.REGION ? { region: this.cfg.REGION } : {}));
       if (error) { let code = 'server'; try { code = (await error.context.json()).code || code; } catch (e) {} throw err(code); }
       if (data && data.error) throw err(data.error);
       return data;
