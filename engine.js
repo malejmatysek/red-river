@@ -277,8 +277,8 @@
     if (bl && bl.weak && (ca === 'aggr' || ca === 'allin') && cr !== 'aggr' && cr !== 'allin') {
       const semi = bl.semi ? 'semi' : 'pure', o = bl.outs ? ' ' + T('bf.outs', { n: bl.outs }) : '';
       if (bl.bad) return { level: 'bad', title: T('g.badBluff'), text: T('bf.bad', { why: bfWhy(bl.minus) }) + ' ' + T('e.g.better', P) };
-      if (bl.s >= 3.5) return { level: 'good', title: T('g.' + semi + 'Bluff'), text: T('bf.good', { why: bfWhy(bl.plus) }) + o };
-      if (bl.s >= 2.5) return { level: 'ok', title: T('g.' + semi + 'BluffOk'), text: T('bf.ok', { why: bfWhy(bl.plus) }) + o + (bl.minus.length ? ' ' + T('bf.but', { why: bfWhy(bl.minus) }) : '') };
+      if (bl.s >= 3.5) return { level: 'good', bluff: true, title: T('g.' + semi + 'Bluff'), text: T('bf.good', { why: bfWhy(bl.plus) }) + o };
+      if (bl.s >= 2.5) return { level: 'ok', bluff: true, title: T('g.' + semi + 'BluffOk'), text: T('bf.ok', { why: bfWhy(bl.plus) }) + o + (bl.minus.length ? ' ' + T('bf.but', { why: bfWhy(bl.minus) }) : '') };
       return { level: 'meh', title: T('g.meh'), text: T('bf.weak', { why: bfWhy(bl.minus.length ? bl.minus : ['few']) }) + ' ' + T('e.g.better', P) + ' ' + rec.why };
     }
     // hraniční ruka preflop → jen „Šlo to líp“ s vysvětlením podle pozice
@@ -322,7 +322,11 @@
     if (tight && !st) { s += 0.5; plus.push('tight'); }
     if (st) { s -= 3; minus.push('station'); }
     if (ctx.toCall > 0) { s -= semi ? 0.5 : 1.5; minus.push('raise'); }
-    const weak = ctx.eq != null && (ctx.eq < 0.42 || (semi && ctx.eq < 0.55));
+    // „slabá“ = bez hotové ruky (síla proti 3 náhodným rukám, deterministicky podle karet) – top pár a lepší už je hodnotová sázka, ne blaf
+    let seed = 7; ctx.hole.concat(ctx.board).forEach(c => { seed = (seed * 53 + c + 1) >>> 0; });
+    const srng = () => { seed = (seed + 0x6D2B79F5) >>> 0; let t = seed; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const sv = strength(ctx.hole, ctx.board, 600, srng).v;
+    const weak = sv < 0.42 || (semi && sv < 0.6);
     const bad = st > 0 || n >= 3 || (n === 2 && !semi) || s < 0.5;
     return { s, semi, plus, minus, weak, bad, outs: ctx.street < 3 ? d.outs : 0 };
   }
@@ -389,9 +393,9 @@
   function strength(hole, board, iters, rng) {
     let v;
     if (board.length < 3) { const c = chen(hole[0], hole[1]); v = Math.max(0, Math.min(1, (c - 1) / 19)); }
-    else v = equity(hole, board, [{}], iters || 400, rng).equity;
+    else v = equity(hole, board, [{}, {}, {}], iters || 400, rng).equity;   // proti 3 náhodným rukám → vysoká karta = slabá, top pár = silná
     const tier = board.length < 3 ? (v >= 0.72 ? 4 : v >= 0.5 ? 3 : v >= 0.36 ? 2 : v >= 0.22 ? 1 : 0)
-      : (v >= 0.88 ? 4 : v >= 0.72 ? 3 : v >= 0.56 ? 2 : v >= 0.4 ? 1 : 0);
+      : (v >= 0.8 ? 4 : v >= 0.58 ? 3 : v >= 0.42 ? 2 : v >= 0.25 ? 1 : 0);
     return { v, tier };
   }
   /* čtení hráče: { n: rozdané ruce, vp: dobrovolně do hrnce, fb: čelil sázce po flopu, ff: z toho fold, ag: agresivní akce, pa: pasivní akce } */

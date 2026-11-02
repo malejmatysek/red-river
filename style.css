@@ -904,3 +904,10 @@ html.ios-sa,html.ios-sa body{min-height:100vh}
 .dr-packs{display:flex;gap:6px;margin:0 0 8px}
 .dr-pack{border:0;border-radius:999px;padding:6px 14px;background:var(--panel2,#24232a);color:var(--muted,#8e8d96);font:inherit;font-size:13px;font-weight:600}
 .dr-pack.on{background:#fff;color:#000}
+.sd-strip{display:flex;flex-direction:column;gap:6px;margin:10px 0 0;padding:10px 12px;background:var(--panel,#1c1b21);border-radius:18px;animation:sdIn .35s ease}
+.sd-row{display:flex;align-items:center;gap:10px;font-size:13px;color:#b9b8c0}
+.sd-row .sd-n{width:72px;font-weight:650;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sd-row .sd-c{display:flex;gap:3px}
+.sd-row .sd-h{flex:1}
+.sd-row.win .sd-h{color:#fff;font-weight:650}.sd-row .sd-w{color:#FF2D4A;font-weight:800}
+@keyframes sdIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}

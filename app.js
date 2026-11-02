@@ -644,6 +644,14 @@
     const show = meterOn() && h && h.cards && G.revealed && !h.folded && nav.cur === 'game';
     el.hidden = !show; if (show) setHTML(el, meterHTML(h.cards, G.board));
   }
+  /* ---------- showdown: karty botů odkryté u stolu (všechny hry s boty) ---------- */
+  function renderShowdown() {
+    const el = $('sdStrip'); if (!el) return;
+    const show = G.over && G.winners && alive().length > 1 && G.board.length === 5;
+    el.hidden = !show; if (!show) { el.dataset.k = ''; return; }
+    const k = G.handNo + '|' + G.players.filter(p => p.show).length; if (el.dataset.k === k) return; el.dataset.k = k;
+    el.innerHTML = G.players.filter(p => p.show && !p.folded).map(p => `<div class="sd-row ${G.winners.includes(p) ? 'win' : ''}"><span class="sd-n">${pname(p)}</span><span class="sd-c">${p.cards.map(c => cardHTML(c, 'sm')).join('')}</span><span class="sd-h">${PE.handName(p.cards.concat(G.board))}</span>${G.winners.includes(p) ? '<span class="sd-w">✓</span>' : ''}</div>`).join('');
+  }
   /* ---------- před hrou: úroveň botů (+ ukazatel síly) pro Trénovat i Klasickou hru ---------- */
   function openSetup(mode) {
     const cl = mode === 'classic', dk = cl ? 'cDiff' : 'diff', mk = cl ? 'cMeter' : 'meter';
@@ -748,6 +756,7 @@
     $('odds').classList.toggle('off', !helpOn('odds')); $('odds').style.display = expert() || classic ? 'none' : '';
     $('kombiBtn').style.display = expert() || classic ? 'none' : ''; $('gameHelp').classList.toggle('dim', expert() || classic); updatePts();
     $('app').classList.toggle('classic', classic); renderMeter();
+    renderShowdown();
     const tb = $('ptsTable'); if (tb) { tb.hidden = !settings.bankroll; setText(tb, settings.bankroll ? t('pts.table') + ' ' + fmtPts(h.stack + h.bet) : ''); }
     const live = G.players.slice(1).filter(q => !q.folded).length;
     if (G.eq && !h.folded && G.revealed) {
@@ -1153,7 +1162,8 @@
       s.opps = s.arch.map(a => ({ minChen: a === 'station' || a === 'maniac' ? 3 : a === 'rock' ? 8 : 6 }));
       s.pfAgg = rnd() < 0.65; s.pos = pick(['BTN', 'CO', 'BB', 'SB', 'HJ']); s.ip = s.pos === 'BTN' || s.pos === 'CO';
       const eq0 = PE.equity(hole, s.board, s.opps, 800).equity;
-      if (eq0 >= 0.45) return drillNew();                       // chceme slabou ruku nebo tah
+      const sv = PE.strength(hole, s.board, 500).v, dr = PE.draws(hole, s.board), semi = street < 3 && (dr.fd || dr.sd >= 2);
+      if (eq0 >= 0.45 || !(sv < 0.42 || (semi && sv < 0.6))) return drillNew();   // chceme slabou ruku nebo tah, ne hotovou ruku
       let base = Math.round((6 * nOpp + 7) * (street === 1 ? 1 : street === 2 ? 1.6 : 2.4) * (0.8 + rnd() * 0.6));
       const stack = Math.round(200 - base / (nOpp + 1)), facing = nOpp === 1 && rnd() < 0.2;
       const bet = facing ? Math.max(DBB, Math.round(base * pick([0.33, 0.5]))) : 0;
@@ -1214,7 +1224,7 @@
     if (A) {
       const g = PE.grade(rec, A.action, c);
       $('drFb').className = 'feedback ' + g.level;
-      $('drFbT').innerHTML = `${g.title} <span class="fb-sub">· ${t('dr.best', { a: recName(rec, c) })}</span>`;
+      $('drFbT').innerHTML = `${g.title} <span class="fb-sub">· ${g.bluff ? t('bf.sub') : t('dr.best', { a: recName(rec, c) })}</span>`;
       setHTML($('drFbX'), rich(g.text));
       setText($('drEq'), t('dr.eqLine', { eq: Math.round(c.eq * 100), po: c.toCall ? Math.round(c.toCall / (c.pot + c.toCall) * 100) + ' %' : '–' }));
     }
