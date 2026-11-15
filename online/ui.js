@@ -298,22 +298,37 @@
     const h = v.hand, me = v.seats[v.me] || {}, L = h && h.legal;
     $('otCode').textContent = tableTitle(v) + (S.demo ? ' · ' + t('on.demoBadge') : '');
     $('otHand').textContent = h ? '#' + h.no : '';
-    // soupeři
-    const opps = seatOrder(v), many = opps.length > 4;
-    $('otOpps').className = 'opps' + (many ? ' compact' : '');
-    $('otOpps').style.gridTemplateColumns = many ? `repeat(${Math.ceil(opps.length / 2)},1fr)` : '';
+    // soupeři u oválného stolu (avatar ze serveru, jinak stabilní podle jména)
+    const opps = seatOrder(v), RT = window.RRT;
+    const avOf = s => (RT.valid(s.av) ? s.av : RT.botAv(s.name));
+    const winOf = i => !!(h && h.done && h.result && h.result.won && h.result.won[i] > 0);
+    $('otOpps').className = 'opps'; $('otOpps').style.gridTemplateColumns = '';
     setHTML('otOpps', opps.map(s => {
-      const cards = Array.isArray(s.cards) ? s.cards.map(c => card(c, 'sm')).join('') : s.cards === 2 ? card(null, 'sm') + card(null, 'sm') : '';
-      const win = h && h.done && h.result && h.result.won && h.result.won[s.i] > 0;
-      return `<div class="opp${s.folded ? ' folded' : ''}${s.turn ? ' turn' : ''}${win ? ' on-win' : ''}${s.sitOut ? ' on-out' : ''}" data-seat="${s.i}">
-        <div class="avatar" style="background:${s.bot ? '#3a3941;color:#ddd' : COLORS[s.i % COLORS.length]}">${esc(s.name.slice(0, 2).toUpperCase())}${s.dealer ? '<span class="dealer">D</span>' : ''}</div>
+      const open = Array.isArray(s.cards), cards = open ? s.cards.map(c => card(c, 'sm')).join('') : s.cards === 2 ? card(null, 'sm') + card(null, 'sm') : '';
+      return `<div class="opp${s.folded ? ' folded' : ''}${s.turn ? ' turn' : ''}${winOf(s.i) ? ' on-win' : ''}${s.sitOut ? ' on-out' : ''}" data-seat="${s.i}">
+        <div class="avatar">${RT.avatarSVG(avOf(s))}${s.dealer ? '<span class="dealer">D</span>' : ''}</div>
         <div class="name">${esc(s.name)}${s.bot ? ' 🤖' : ''}</div><div class="stk">${fmtPts(s.stack)}${s.allIn ? ' <em>all-in</em>' : ''}</div>
-        <div class="chip ${s.last || s.bet ? '' : 'empty'}">${esc(s.last ? actLabel(s.last) : s.bet ? fmtPts(s.bet) : '·')}</div><div class="mini">${cards}</div></div>`;
+        <div class="chip ${s.last ? '' : 'empty'}" data-k="${s.last ? RT.kind(s.last.t) : ''}">${esc(s.last ? actLabel(s.last) : '·')}</div><div class="mini${open ? ' open' : ''}">${cards}</div></div>`;
     }).join(''));
+    const meAvId = RT.myAv() || (RT.valid(me.av) ? me.av : RT.botAv(me.name || 'me'));
+    if ($('otMeAv').dataset.av !== meAvId) { $('otMeAv').dataset.av = meAvId; $('otMeAv').innerHTML = RT.avatarSVG(meAvId); }
+    const ms = $('otMeSeat'); ms.classList.toggle('turn', !!(h && !h.done && h.toAct === v.me)); ms.classList.toggle('folded', !!me.folded); ms.classList.toggle('win', winOf(v.me));
+    { const mb = $('otMeBub'); mb.textContent = me.last ? actLabel(me.last) : '-'; mb.classList.toggle('empty', !me.last); mb.dataset.k = me.last ? RT.kind(me.last.t) : ''; }
+    { const rv = h && h.done && h.result && h.result.reveal && h.result.reveal[v.me]; setHTML('otMeShow', rv && !h.result.showdown ? rv.map(c => card(c, 'sm')).join('') : ''); $('otMeShow').className = 'mini open'; }
+    const all = [me.i != null ? me : null].concat(opps);
+    setHTML('otBets', all.map(s => s ? `<div class="bet${s.bet && !(h && h.done) ? '' : ' empty'}" data-bs="${s.i}">${RT.chipStack(2)}<b>${s.bet ? fmtPts(s.bet) : ''}</b></div>` : '').join(''));
+    const felt = $('otFelt'), betEl = i => felt.querySelector(`[data-bs="${i}"]`), seatEl = i => i === v.me ? $('otMeSeat') : $('otOpps').querySelector(`[data-seat="${i}"]`);
+    if (felt.clientWidth) {
+      const n = v.seats.length, order = []; for (let k = 0; k < n; k++) { const i = (v.me + k) % n; order.push(v.seats[i] ? { el: seatEl(i), bet: betEl(i) } : null); }
+      RT.layout(felt, order);
+    }
     // board + pot
     const board = h ? h.board : [];
     setHTML('otBoard', Array.from({ length: 5 }, (_, i) => board[i] != null ? card(board[i]) : '<div class="card ghost"></div>').join(''));
     $('otPot').textContent = fmtPts(h ? h.pot : 0);
+    if (felt.clientWidth) RT.sync(felt, { hand: h ? h.no : -1, bb: v.settings.bb, pot: $('otPot'), winDelay: h && h.result && h.result.showdown ? 900 : 350,
+      seats: v.seats.map((s, i) => s && { key: i, el: (seatEl(i) || {}).querySelector ? seatEl(i).querySelector('.avatar') : null, betEl: betEl(i), bubble: i === v.me ? $('otMeBub') : seatEl(i) && seatEl(i).querySelector('.chip'),
+        cards: i === v.me ? [...$('otHero').children] : seatEl(i) ? [...seatEl(i).querySelectorAll('.mini .card')] : [], bet: h && h.done ? 0 : s.bet, last: s.last ? s.last.t + (s.last.to || s.last.a || '') : '', folded: s.folded, allIn: s.allIn, win: winOf(i) }).filter(Boolean) });
     $('otStreet').textContent = h ? (h.done ? (h.result && h.result.showdown ? t('on.showdown') : '') : t('st.' + h.street)) : '';
     // moje karty
     const mine = Array.isArray(me.cards) ? me.cards : null;
@@ -322,14 +337,14 @@
     $('otHero').classList.toggle('on-folded', !!me.folded);
     const myTurn = h && !h.done && h.toAct === v.me;
     const pend = S.pending && S.pending.code === v.code ? S.pending.a : null;
-    setHTML('otMe', `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${pend ? esc(pendLabel(pend)) : me.last ? esc(actLabel(me.last)) : ''}</div>${mine && !me.folded && window.RRMeter && window.RRMeter.on() ? `<div class="hsm">${window.RRMeter.html(mine, board)}</div>` : ''}${myTurn && !pend ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`);
+    setHTML('otMe', `<div class="lbl">${esc(me.name || '')}${me.dealer ? ' · D' : ''}${me.sb ? ' · SB' : ''}${me.bb ? ' · BB' : ''}</div><div class="stack">${fmtPts(me.stack || 0)}</div><div class="hero-last">${pend ? esc(pendLabel(pend)) : me.last ? esc(actLabel(me.last)) : ''}</div>${mine && !me.folded && window.RRMeter && window.RRMeter.on() ? `<div class="hsm">${window.RRMeter.html(mine, board, v.seats.filter(x => x && x.inHand && !x.folded && x.i !== v.me).length)}</div>` : ''}${myTurn && !pend ? '<div class="on-timer"><i id="otBar"></i></div>' : ''}`);
     // stav + akce
     const st = $('otStatus'); let stHTML = '';
     const reap = isPubView(v) && me.sitOut ? `<div class="note pub-reap" id="otReap"></div>` : '';
     if (me.sitOut && me.stack > 0) stHTML = `<div class="on-msg">${t('on.sitOut')}</div>${reap}<button class="btn primary wide" id="otSitIn">${t('on.sitIn')}</button>`;
     else if (me.stack < v.settings.bb && (!h || h.done || !me.inHand || me.folded)) stHTML = `<div class="on-msg">${t('on.busted')}</div>${reap}<button class="btn primary wide" id="otRebuy">${t('on.rebuy', { n: fmtPts(v.settings.buyIn - (me.stack || 0)) })}</button>`;
     else if (h && !h.done && !me.inHand) stHTML = `<div class="on-msg">${t('pub.nextHand')}</div>`;
-    else if (h && h.done) stHTML = `<div class="on-result">${esc(resultLine(v))}</div><div class="on-row"><span class="on-next" id="otNext"></span><button class="btn sm" id="otReview">${t('on.review')}</button>${v.isHost && !isPubView(v) ? `<button class="btn sm primary" id="otDeal">${t('on.nextNow')}</button>` : ''}</div>`;
+    else if (h && h.done) stHTML = `<div class="on-result">${esc(resultLine(v))}</div>${h.canShow && S.mucked !== h.no ? `<div class="on-row on-show"><button class="btn sm" data-osh="3">${t('sm.show')}</button><button class="btn sm" data-osh="1">${t('sm.one1')}</button><button class="btn sm" data-osh="2">${t('sm.one2')}</button><button class="btn sm" data-osh="0">${t('sm.muck')}</button></div>` : ''}<div class="on-row"><span class="on-next" id="otNext"></span><button class="btn sm" id="otReview">${t('on.review')}</button>${v.isHost && !isPubView(v) ? `<button class="btn sm primary" id="otDeal">${t('on.nextNow')}</button>` : ''}</div>`;
     else if (!h || v.waiting) stHTML = `<div class="on-msg">${t('on.waitPlayers')}</div>`;
     else if (!myTurn && h.toAct >= 0 && v.seats[h.toAct]) stHTML = `<div class="on-msg">${t('on.waitFor', { n: esc(v.seats[h.toAct].name) })} <span id="otLeft"></span></div>`;
     else if (myTurn) stHTML = `<div class="on-msg on-turn">${t('on.yourTurn')} <span id="otLeft"></span></div>`;
@@ -337,6 +352,7 @@
     if ($('otSitIn')) $('otSitIn').onclick = () => run(() => S.net.sitIn());
     if ($('otRebuy')) $('otRebuy').onclick = () => run(async () => { const r = await S.net.rebuy(); await refreshPoints(); return r; });
     if ($('otReview')) $('otReview').onclick = openReview;
+    st.querySelectorAll('[data-osh]').forEach(b => b.onclick = () => { const m = +b.dataset.osh; if (!m) S.mucked = h.no; run(() => S.net.show([!!(m & 1), !!(m & 2)])); });
     if ($('otDeal')) $('otDeal').onclick = () => run(() => S.net.next());
     renderActions(v, myTurn ? L : null);
     clock();

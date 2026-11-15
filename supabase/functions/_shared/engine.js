@@ -178,7 +178,7 @@
     const pos = ctx.position, r = ctx.raisesThisStreet, bb = ctx.bb;
     const canCheck = ctx.toCall === 0, allInTo = ctx.stack + ctx.myBet;
     const effBB = effOf(ctx) / bb;
-    const tag = T('e.tag', { lab: '[[h:' + ctx.hole[0] + ',' + ctx.hole[1] + ']]', c });
+    const tag = T('e.tag', { lab: '[[h:' + ctx.hole[0] + ',' + ctx.hole[1] + ']]', c: Math.max(1, c) });
     const hu = ctx.numOpp === 1;
     const P = Object.assign(out || {}, { tag, pos: '[[p:' + pos + ']]' });
 
@@ -389,14 +389,20 @@
     const outs = (fd ? 9 : 0) + (sd === 2 ? 8 : sd === 1 ? 4 : 0) - (fd && sd ? 2 : 0);
     return { outs, fd, sd };
   }
-  /* síla ruky jen z vlastních karet a boardu (pro ukazatel u hráče): 0..1 + stupeň 0–4 (slabá … monstrum) */
-  function strength(hole, board, iters, rng) {
-    let v;
-    if (board.length < 3) { const c = chen(hole[0], hole[1]); v = Math.max(0, Math.min(1, (c - 1) / 19)); }
-    else v = equity(hole, board, [{}, {}, {}], iters || 400, rng).equity;   // proti 3 náhodným rukám → vysoká karta = slabá, top pár = silná
-    const tier = board.length < 3 ? (v >= 0.72 ? 4 : v >= 0.5 ? 3 : v >= 0.36 ? 2 : v >= 0.22 ? 1 : 0)
-      : (v >= 0.8 ? 4 : v >= 0.58 ? 3 : v >= 0.42 ? 2 : v >= 0.25 ? 1 : 0);
-    return { v, tier };
+  /* síla ruky jen z vlastních karet a boardu (pro ukazatel u hráče): 0..1 + stupeň 0–4 (slabá … monstrum)
+     preflop: Chenovo skóre 1–20 (stejné číslo jako „síla X/20“ v textech) → pásma 12+ / 10–11 / 8–9 / 6–7 / ≤5
+     postflop: Monte Carlo equity proti počtu AKTIVNÍCH soupeřů (náhodné ruce; hotová ruka + dobírání),
+     stupeň podle poměru k férovému podílu 1/(n+1) – stejné měřítko jako „Výhra %“ */
+  function strength(hole, board, iters, rng, nOpp) {
+    const n = Math.max(1, Math.min(8, nOpp | 0 || 3));
+    if (board.length < 3) {
+      const c = Math.max(1, chen(hole[0], hole[1])), v = (c - 1) / 19;
+      return { v, tier: c >= 12 ? 4 : c >= 10 ? 3 : c >= 8 ? 2 : c >= 6 ? 1 : 0, score: c, n };
+    }
+    const opps = []; for (let i = 0; i < n; i++) opps.push({});
+    const eq = equity(hole, board, opps, iters || 500, rng).equity, fair = 1 / (n + 1);
+    const tier = eq >= fair + 0.6 * (1 - fair) ? 4 : eq >= fair + 0.35 * (1 - fair) ? 3 : eq >= fair + 0.12 * (1 - fair) ? 2 : eq >= fair * 0.85 ? 1 : 0;
+    return { v: eq, tier, eq, n };
   }
   /* čtení hráče: { n: rozdané ruce, vp: dobrovolně do hrnce, fb: čelil sázce po flopu, ff: z toho fold, ag: agresivní akce, pa: pasivní akce } */
   function readAdj(read, w) {

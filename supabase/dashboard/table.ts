@@ -182,7 +182,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     const pos = ctx.position, r = ctx.raisesThisStreet, bb = ctx.bb;
     const canCheck = ctx.toCall === 0, allInTo = ctx.stack + ctx.myBet;
     const effBB = effOf(ctx) / bb;
-    const tag = T('e.tag', { lab: '[[h:' + ctx.hole[0] + ',' + ctx.hole[1] + ']]', c });
+    const tag = T('e.tag', { lab: '[[h:' + ctx.hole[0] + ',' + ctx.hole[1] + ']]', c: Math.max(1, c) });
     const hu = ctx.numOpp === 1;
     const P = Object.assign(out || {}, { tag, pos: '[[p:' + pos + ']]' });
 
@@ -393,14 +393,20 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     const outs = (fd ? 9 : 0) + (sd === 2 ? 8 : sd === 1 ? 4 : 0) - (fd && sd ? 2 : 0);
     return { outs, fd, sd };
   }
-  /* síla ruky jen z vlastních karet a boardu (pro ukazatel u hráče): 0..1 + stupeň 0–4 (slabá … monstrum) */
-  function strength(hole, board, iters, rng) {
-    let v;
-    if (board.length < 3) { const c = chen(hole[0], hole[1]); v = Math.max(0, Math.min(1, (c - 1) / 19)); }
-    else v = equity(hole, board, [{}, {}, {}], iters || 400, rng).equity;   // proti 3 náhodným rukám → vysoká karta = slabá, top pár = silná
-    const tier = board.length < 3 ? (v >= 0.72 ? 4 : v >= 0.5 ? 3 : v >= 0.36 ? 2 : v >= 0.22 ? 1 : 0)
-      : (v >= 0.8 ? 4 : v >= 0.58 ? 3 : v >= 0.42 ? 2 : v >= 0.25 ? 1 : 0);
-    return { v, tier };
+  /* síla ruky jen z vlastních karet a boardu (pro ukazatel u hráče): 0..1 + stupeň 0–4 (slabá … monstrum)
+     preflop: Chenovo skóre 1–20 (stejné číslo jako „síla X/20“ v textech) → pásma 12+ / 10–11 / 8–9 / 6–7 / ≤5
+     postflop: Monte Carlo equity proti počtu AKTIVNÍCH soupeřů (náhodné ruce; hotová ruka + dobírání),
+     stupeň podle poměru k férovému podílu 1/(n+1) – stejné měřítko jako „Výhra %“ */
+  function strength(hole, board, iters, rng, nOpp) {
+    const n = Math.max(1, Math.min(8, nOpp | 0 || 3));
+    if (board.length < 3) {
+      const c = Math.max(1, chen(hole[0], hole[1])), v = (c - 1) / 19;
+      return { v, tier: c >= 12 ? 4 : c >= 10 ? 3 : c >= 8 ? 2 : c >= 6 ? 1 : 0, score: c, n };
+    }
+    const opps = []; for (let i = 0; i < n; i++) opps.push({});
+    const eq = equity(hole, board, opps, iters || 500, rng).equity, fair = 1 / (n + 1);
+    const tier = eq >= fair + 0.6 * (1 - fair) ? 4 : eq >= fair + 0.35 * (1 - fair) ? 3 : eq >= fair + 0.12 * (1 - fair) ? 2 : eq >= fair * 0.85 ? 1 : 0;
+    return { v: eq, tier, eq, n };
   }
   /* čtení hráče: { n: rozdané ruce, vp: dobrovolně do hrnce, fb: čelil sázce po flopu, ff: z toho fold, ag: agresivní akce, pa: pasivní akce } */
   function readAdj(read, w) {
@@ -602,16 +608,17 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     function newPubCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = 'PUB-'; for (let k = 0; k < 6; k++) c += A[randInt(A.length)]; return c; }
     const isPub = room => !!(room.settings && room.settings.pub);
     const noPub = room => { if (isPub(room)) fail('public'); };
-    function createRoom({ uid, name, code, settings }) {
+    function createRoom({ uid, name, code, settings, av }) {
       if (!uid) fail('auth');
       const st = checkSettings(settings);
       const room = { v: 1, code: code || newCode(), host: uid, status: 'lobby', settings: st, seats: Array(st.max).fill(null),
         handNo: 0, dealer: -1, hand: null, last: null, ver: 0, created: now(), updated: now(), botN: 0 };
-      join(room, uid, name);
+      join(room, uid, name, av);
       return room;
     }
     /* vrací { seat, cost }; cost = kolik bodů musí server hráči odečíst (jen virtuální body) */
-    function join(room, uid, name) {
+    const cleanAv = a => (typeof a === 'string' && /^[a-z0-9]{1,12}$/.test(a) ? a : '');
+    function join(room, uid, name, av) {
       if (!uid) fail('auth');
       if (room.status === 'closed') fail('closed');
       const have = seatOf(room, uid); if (have >= 0) return { seat: have, cost: 0 };
@@ -621,7 +628,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
         i = room.seats.findIndex((s, k) => s && s.bot && !(room.hand && !room.hand.done && P(room.hand, k)));
         if (i < 0) fail('full');
       }
-      room.seats[i] = { uid, name: cleanName(name), bot: false, stack: room.settings.buyIn, sitOut: false, timeouts: 0 };
+      room.seats[i] = { uid, name: cleanName(name), av: cleanAv(av), bot: false, stack: room.settings.buyIn, sitOut: false, timeouts: 0 };
       // přisednutí během rozehrané ruky: hráč v ní není (nemá karty) a hraje až od další ruky
       if (isPub(room) && room.waiting && !room.hand) startHand(room);
       touch(room); return { seat: i, cost: room.settings.buyIn };
@@ -895,7 +902,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
         const p = h && P(h, i);
         let cards = 0;
         if (p) { if (i === me) cards = h.holes[i].slice(); else if (rev[i]) cards = rev[i].slice(); else if (!p.folded) cards = 2; }
-        return { i, name: s.name, bot: s.bot, stack: s.stack, sitOut: !!s.sitOut, me: i === me, host: !s.bot && s.uid === room.host,
+        return { i, name: s.name, av: s.av || '', bot: s.bot, stack: s.stack, sitOut: !!s.sitOut, me: i === me, host: !s.bot && s.uid === room.host,
           inHand: !!p, bet: p ? p.bet : 0, total: p ? p.total : 0, folded: p ? p.folded : false, allIn: p ? p.allIn : false,
           outSince: s.sitOut ? (s.outSince || 0) : 0, dealer: h ? h.dealer === i : room.dealer === i, sb: h ? h.sb === i : false, bb: h ? h.bb === i : false,
           turn: !!(h && !h.done && h.toAct === i), cards, last: lastAct[i] ? { t: lastAct[i].t, a: lastAct[i].a, to: lastAct[i].to } : null };
@@ -906,13 +913,26 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
         reapMs: REAP_MS,
         me, seats, handNo: room.handNo, waiting: !!room.waiting, nextAt: room.nextAt || 0, serverNow: now(), hand: null, last: null };
       if (h) out.hand = { no: h.no, street: h.street, board: h.board.slice(), pot: h.players.reduce((s, p) => s + p.total, 0), toAct: h.toAct, deadline: h.deadline,
-        done: h.done, legal: me >= 0 ? legal(room, me) : null, result: h.done ? h.result : null };
+        done: h.done, legal: me >= 0 ? legal(room, me) : null, result: h.done ? h.result : null,
+        canShow: !!(me >= 0 && h.done && h.result && !h.result.showdown && h.result.won && h.result.won[me] > 0 && !(h.result.reveal || {})[me] && !(h.mucked || {})[me]) };
       if (room.last) {
         out.last = JSON.parse(JSON.stringify(room.last));
         const mine = me >= 0 && room.hand && room.hand.no === room.last.no && room.hand.holes[me];
         if (mine) out.last.mine = { seat: me, cards: mine.slice() };
       }
       return out;
+    }
+    /* vítěz bez showdownu (ostatní složili) může ukázat obě / jednu kartu, nebo zahodit (muck) – výběr jen jeho, ostatní uvidí jen ukázané */
+    function show(room, uid, which) {
+      const h = room.hand, me = seatOf(room, uid);
+      if (!h || !h.done || !h.result || h.result.showdown || me < 0 || !(h.result.won && h.result.won[me] > 0)) fail('bad_state');
+      if ((h.result.reveal || {})[me] || (h.mucked || {})[me]) return false;
+      const w = Array.isArray(which) ? which.slice(0, 2).map(Boolean) : [false, false];
+      if (!w[0] && !w[1]) { (h.mucked = h.mucked || {})[me] = 1; touch(room); return true; }
+      const cards = h.holes[me].map((c, k) => (w[k] ? c : null));
+      (h.result.reveal = h.result.reveal || {})[me] = cards;
+      if (room.last && room.last.no === h.no && room.last.result) (room.last.result.reveal = room.last.result.reveal || {})[me] = cards.slice();
+      touch(room); return true;
     }
     /* soukromé karty po hráčích – na serveru se ukládají do tabulky hole_cards (RLS: jen vlastník) */
     function privateCards(room) {
@@ -922,7 +942,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
     function chips(room) { return room.seats.reduce((s, x) => s + (x ? x.stack : 0), 0) + (room.hand && !room.hand.done ? room.hand.players.reduce((s, p) => s + p.total, 0) : 0); }
 
     return { BLINDS, BUYIN_BB, TIERS, PUB_MAX, REAP_MS, CoreError, newCode, newPubCode, checkSettings, createRoom, createPublic, join, leave, addBot, removeBot, rebuy, sitIn, start, next,
-      act, legal, tick, runBots, view, privateCards, chips, seatOf, startHand, reap, reportTarget, badName, cleanName, isPub, humans };
+      act, show, legal, tick, runBots, view, privateCards, chips, seatOf, startHand, reap, reportTarget, badName, cleanName, isPub, humans };
   }
 
   const api = { makeCore, CoreError, BLINDS, BUYIN_BB, TIERS, PUB_MAX, REAP_MS, badName, cryptoRandInt };
@@ -1054,7 +1074,7 @@ async function create(uid: string, body: any) {
   await debit(uid, st.buyIn, 'buyin');
   try {
     for (let k = 0; k < 20; k++) {
-      const room = core.createRoom({ uid, name: body.name, settings: body.settings, code: core.newCode() });
+      const room = core.createRoom({ uid, name: body.name, av: body.av, settings: body.settings, code: core.newCode() });
       const { data: r, error } = await admin.from('rooms').insert({ code: room.code, host: uid, status: room.status, settings: room.settings, public_state: core.view(room, null), version: room.ver }).select('id').single();
       if (error) { if (error.code === '23505') continue; throw new HttpErr('server', 500); }   // kód už existuje → jiný
       await admin.from('room_state').insert({ room_id: r.id, state: room, version: 0 });
@@ -1095,7 +1115,7 @@ async function mutate(uid: string, op: string, body: any, lim?: Promise<unknown>
             if (room.status === 'closed') throw new HttpErr('closed');
             if (!room.seats.some((s: unknown) => !s) && !room.seats.some((s: { bot: boolean } | null) => s?.bot)) throw new HttpErr('full');
             debitWhy = 'buyin'; debited = room.settings.buyIn; await debit(uid, debited, debitWhy, r.id);
-            core.join(room, uid, body.name);
+            core.join(room, uid, body.name, body.av);
           } else changed = false;
           break;
         case 'leave': refund = core.leave(room, uid).refund; break;
@@ -1104,6 +1124,7 @@ async function mutate(uid: string, op: string, body: any, lim?: Promise<unknown>
         case 'removeBot': core.removeBot(room, uid, Number(body.seat)); break;
         case 'act': core.act(room, uid, body.action ?? {}); break;
         case 'next': core.next(room, uid); break;
+        case 'show': changed = core.show(room, uid, body.which); break;
         case 'sitIn': core.sitIn(room, uid); break;
         case 'rebuy': {
           const i = core.seatOf(room, uid); const need = i >= 0 ? room.settings.buyIn - room.seats[i].stack : 0;
@@ -1169,7 +1190,7 @@ async function quickseat(uid: string, body: any) {
   if (await points(uid) < T.bb * T.buyInBB) throw new HttpErr('points');
   const join = async (code: string) => {
     for (let k = 0; k < 3; k++) {                                // 'busy' (souběh) → zkusit znovu, ne přeskočit stůl
-      try { return await mutate(uid, 'join', { code, name: body.name }); }
+      try { return await mutate(uid, 'join', { code, name: body.name, av: body.av }); }
       catch (e) { if (e instanceof HttpErr && e.code === 'busy' && k < 2) { await new Promise((r) => setTimeout(r, 80 + Math.random() * 120)); continue; } throw e; }
     }
   };

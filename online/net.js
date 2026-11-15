@@ -20,6 +20,7 @@
   const PE = root.PE || (typeof require === 'function' ? require('../engine.js') : null);
   const err = code => Object.assign(new Error(code), { code });
   const START_POINTS = 1000;
+  const myAv = () => { try { return (root.RRT && root.RRT.myAv()) || ''; } catch (e) { return ''; } };
 
   /* ---------- in-memory „server“ (sdílený všemi MockNet klienty v jednom procesu/stránce) ---------- */
   class MockServer {
@@ -56,7 +57,7 @@
       let room = open[0];
       if (!room) { room = C.createPublic({ tier: T.id, code: (() => { let c; do c = C.newPubCode(); while (this.rooms.has(c)); return c; })() }); this.rooms.set(room.code, room); }
       const buy = room.settings.buyIn; this.debit(uid, buy);
-      try { C.join(room, uid, a.name); } catch (e) { this.credit(uid, buy); throw e; }
+      try { C.join(room, uid, a.name, a.av); } catch (e) { this.credit(uid, buy); throw e; }
       if (this.demoBots && C.humans(room).length === 1) {               // jen offline ukázka
         while (room.seats.filter(Boolean).length < 4) C.addBot(room, null, true);
         if (room.waiting && !room.hand) C.startHand(room);
@@ -91,7 +92,7 @@
           case 'create': {
             const st = C.checkSettings(a.settings);
             this.debit(uid, st.buyIn);
-            try { room = C.createRoom({ uid, name: a.name, settings: a.settings, code: C.newCode(c => this.rooms.has(c)) }); }
+            try { room = C.createRoom({ uid, name: a.name, av: a.av, settings: a.settings, code: C.newCode(c => this.rooms.has(c)) }); }
             catch (e) { this.credit(uid, st.buyIn); throw e; }
             this.rooms.set(room.code, room); this.where.set(uid, room.code); break;
           }
@@ -100,7 +101,7 @@
             if (C.seatOf(room, uid) < 0) {
               if (room.status === 'closed') throw err('closed');
               this.debit(uid, room.settings.buyIn);
-              try { C.join(room, uid, a.name); } catch (e) { this.credit(uid, room.settings.buyIn); throw e; }
+              try { C.join(room, uid, a.name, a.av); } catch (e) { this.credit(uid, room.settings.buyIn); throw e; }
             }
             this.where.set(uid, room.code); break;
           }
@@ -113,6 +114,7 @@
             else if (op === 'removeBot') C.removeBot(room, uid, a.seat);
             else if (op === 'act') C.act(room, uid, a.action);
             else if (op === 'next') C.next(room, uid);
+            else if (op === 'show') C.show(room, uid, a.which);
             else if (op === 'tick') C.tick(room);
             else if (op === 'sitIn') C.sitIn(room, uid);
             else if (op === 'rebuy') { const s = room.seats[C.seatOf(room, uid)]; const need = s ? room.settings.buyIn - s.stack : 0; this.debit(uid, need); try { C.rebuy(room, uid); } catch (e) { this.credit(uid, need); throw e; } }
@@ -138,8 +140,9 @@
       this.unsub = code ? this.server.subscribe(code, this.uid, v => this.fns.forEach(f => f(v))) : null;
     }
     async op(op, a) { const r = await this.server.call(this.uid, op, Object.assign({ code: this.code }, a)); if (r.view) this.bind(r.view.status === 'closed' && op === 'leave' ? null : r.view.code); return r.view; }
-    create(settings, name) { return this.op('create', { settings, name }); }
-    join(code, name) { return this.op('join', { code: String(code).toUpperCase().trim(), name }); }
+    create(settings, name) { return this.op('create', { settings, name, av: myAv() }); }
+    join(code, name) { return this.op('join', { code: String(code).toUpperCase().trim(), name, av: myAv() }); }
+    show(which) { return this.op('show', { which }); }
     async leave() { const v = await this.op('leave'); this.bind(null); return v; }
     start() { return this.op('start'); }
     addBot() { return this.op('addBot'); }
@@ -150,7 +153,7 @@
     act(action) { return this.op('act', { action }); }
     state() { return this.op('state'); }
     tick() { return this.op('tick'); }
-    quickseat(tier, name) { return this.op('quickseat', { tier, name, code: null }); }
+    quickseat(tier, name) { return this.op('quickseat', { tier, name, av: myAv(), code: null }); }
     lobby() { return this.server.call(this.uid, 'lobby', {}); }
     report(seat, reason) { return this.server.call(this.uid, 'report', { code: this.code, seat, reason }); }
     onChange(fn) { this.fns.add(fn); return () => this.fns.delete(fn); }
@@ -238,8 +241,9 @@
         if (Date.now() - this.lastAt > (this.bcOk ? 6000 : 2500)) { this.lastAt = Date.now(); this.refresh(); }
       }, 500);
     }
-    create(settings, name) { return this.op('create', { settings, name }); }
-    join(code, name) { return this.op('join', { code: String(code).toUpperCase().trim(), name }); }
+    create(settings, name) { return this.op('create', { settings, name, av: myAv() }); }
+    join(code, name) { return this.op('join', { code: String(code).toUpperCase().trim(), name, av: myAv() }); }
+    show(which) { return this.op('show', { which }); }
     async leave() { const v = await this.op('leave'); await this.bind(null); return v; }
     start() { return this.op('start'); }
     addBot() { return this.op('addBot'); }
@@ -250,7 +254,7 @@
     act(action) { return this.op('act', { action }); }
     state() { return this.op('state'); }
     tick() { return this.op('tick'); }
-    quickseat(tier, name) { return this.op('quickseat', { tier, name, code: null }); }
+    quickseat(tier, name) { return this.op('quickseat', { tier, name, av: myAv(), code: null }); }
     lobby() { return this.call('lobby'); }
     report(seat, reason) { return this.call('report', { seat, reason }); }
     onChange(fn) { this.fns.add(fn); return () => this.fns.delete(fn); }

@@ -79,16 +79,17 @@
     function newPubCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let c = 'PUB-'; for (let k = 0; k < 6; k++) c += A[randInt(A.length)]; return c; }
     const isPub = room => !!(room.settings && room.settings.pub);
     const noPub = room => { if (isPub(room)) fail('public'); };
-    function createRoom({ uid, name, code, settings }) {
+    function createRoom({ uid, name, code, settings, av }) {
       if (!uid) fail('auth');
       const st = checkSettings(settings);
       const room = { v: 1, code: code || newCode(), host: uid, status: 'lobby', settings: st, seats: Array(st.max).fill(null),
         handNo: 0, dealer: -1, hand: null, last: null, ver: 0, created: now(), updated: now(), botN: 0 };
-      join(room, uid, name);
+      join(room, uid, name, av);
       return room;
     }
     /* vrací { seat, cost }; cost = kolik bodů musí server hráči odečíst (jen virtuální body) */
-    function join(room, uid, name) {
+    const cleanAv = a => (typeof a === 'string' && /^[a-z0-9]{1,12}$/.test(a) ? a : '');
+    function join(room, uid, name, av) {
       if (!uid) fail('auth');
       if (room.status === 'closed') fail('closed');
       const have = seatOf(room, uid); if (have >= 0) return { seat: have, cost: 0 };
@@ -98,7 +99,7 @@
         i = room.seats.findIndex((s, k) => s && s.bot && !(room.hand && !room.hand.done && P(room.hand, k)));
         if (i < 0) fail('full');
       }
-      room.seats[i] = { uid, name: cleanName(name), bot: false, stack: room.settings.buyIn, sitOut: false, timeouts: 0 };
+      room.seats[i] = { uid, name: cleanName(name), av: cleanAv(av), bot: false, stack: room.settings.buyIn, sitOut: false, timeouts: 0 };
       // přisednutí během rozehrané ruky: hráč v ní není (nemá karty) a hraje až od další ruky
       if (isPub(room) && room.waiting && !room.hand) startHand(room);
       touch(room); return { seat: i, cost: room.settings.buyIn };
@@ -372,7 +373,7 @@
         const p = h && P(h, i);
         let cards = 0;
         if (p) { if (i === me) cards = h.holes[i].slice(); else if (rev[i]) cards = rev[i].slice(); else if (!p.folded) cards = 2; }
-        return { i, name: s.name, bot: s.bot, stack: s.stack, sitOut: !!s.sitOut, me: i === me, host: !s.bot && s.uid === room.host,
+        return { i, name: s.name, av: s.av || '', bot: s.bot, stack: s.stack, sitOut: !!s.sitOut, me: i === me, host: !s.bot && s.uid === room.host,
           inHand: !!p, bet: p ? p.bet : 0, total: p ? p.total : 0, folded: p ? p.folded : false, allIn: p ? p.allIn : false,
           outSince: s.sitOut ? (s.outSince || 0) : 0, dealer: h ? h.dealer === i : room.dealer === i, sb: h ? h.sb === i : false, bb: h ? h.bb === i : false,
           turn: !!(h && !h.done && h.toAct === i), cards, last: lastAct[i] ? { t: lastAct[i].t, a: lastAct[i].a, to: lastAct[i].to } : null };
@@ -383,13 +384,26 @@
         reapMs: REAP_MS,
         me, seats, handNo: room.handNo, waiting: !!room.waiting, nextAt: room.nextAt || 0, serverNow: now(), hand: null, last: null };
       if (h) out.hand = { no: h.no, street: h.street, board: h.board.slice(), pot: h.players.reduce((s, p) => s + p.total, 0), toAct: h.toAct, deadline: h.deadline,
-        done: h.done, legal: me >= 0 ? legal(room, me) : null, result: h.done ? h.result : null };
+        done: h.done, legal: me >= 0 ? legal(room, me) : null, result: h.done ? h.result : null,
+        canShow: !!(me >= 0 && h.done && h.result && !h.result.showdown && h.result.won && h.result.won[me] > 0 && !(h.result.reveal || {})[me] && !(h.mucked || {})[me]) };
       if (room.last) {
         out.last = JSON.parse(JSON.stringify(room.last));
         const mine = me >= 0 && room.hand && room.hand.no === room.last.no && room.hand.holes[me];
         if (mine) out.last.mine = { seat: me, cards: mine.slice() };
       }
       return out;
+    }
+    /* vítěz bez showdownu (ostatní složili) může ukázat obě / jednu kartu, nebo zahodit (muck) – výběr jen jeho, ostatní uvidí jen ukázané */
+    function show(room, uid, which) {
+      const h = room.hand, me = seatOf(room, uid);
+      if (!h || !h.done || !h.result || h.result.showdown || me < 0 || !(h.result.won && h.result.won[me] > 0)) fail('bad_state');
+      if ((h.result.reveal || {})[me] || (h.mucked || {})[me]) return false;
+      const w = Array.isArray(which) ? which.slice(0, 2).map(Boolean) : [false, false];
+      if (!w[0] && !w[1]) { (h.mucked = h.mucked || {})[me] = 1; touch(room); return true; }
+      const cards = h.holes[me].map((c, k) => (w[k] ? c : null));
+      (h.result.reveal = h.result.reveal || {})[me] = cards;
+      if (room.last && room.last.no === h.no && room.last.result) (room.last.result.reveal = room.last.result.reveal || {})[me] = cards.slice();
+      touch(room); return true;
     }
     /* soukromé karty po hráčích – na serveru se ukládají do tabulky hole_cards (RLS: jen vlastník) */
     function privateCards(room) {
@@ -399,7 +413,7 @@
     function chips(room) { return room.seats.reduce((s, x) => s + (x ? x.stack : 0), 0) + (room.hand && !room.hand.done ? room.hand.players.reduce((s, p) => s + p.total, 0) : 0); }
 
     return { BLINDS, BUYIN_BB, TIERS, PUB_MAX, REAP_MS, CoreError, newCode, newPubCode, checkSettings, createRoom, createPublic, join, leave, addBot, removeBot, rebuy, sitIn, start, next,
-      act, legal, tick, runBots, view, privateCards, chips, seatOf, startHand, reap, reportTarget, badName, cleanName, isPub, humans };
+      act, show, legal, tick, runBots, view, privateCards, chips, seatOf, startHand, reap, reportTarget, badName, cleanName, isPub, humans };
   }
 
   const api = { makeCore, CoreError, BLINDS, BUYIN_BB, TIERS, PUB_MAX, REAP_MS, badName, cryptoRandInt };

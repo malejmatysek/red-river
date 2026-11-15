@@ -126,7 +126,7 @@ async function create(uid: string, body: any) {
   await debit(uid, st.buyIn, 'buyin');
   try {
     for (let k = 0; k < 20; k++) {
-      const room = core.createRoom({ uid, name: body.name, settings: body.settings, code: core.newCode() });
+      const room = core.createRoom({ uid, name: body.name, av: body.av, settings: body.settings, code: core.newCode() });
       const { data: r, error } = await admin.from('rooms').insert({ code: room.code, host: uid, status: room.status, settings: room.settings, public_state: core.view(room, null), version: room.ver }).select('id').single();
       if (error) { if (error.code === '23505') continue; throw new HttpErr('server', 500); }   // kód už existuje → jiný
       await admin.from('room_state').insert({ room_id: r.id, state: room, version: 0 });
@@ -167,7 +167,7 @@ async function mutate(uid: string, op: string, body: any, lim?: Promise<unknown>
             if (room.status === 'closed') throw new HttpErr('closed');
             if (!room.seats.some((s: unknown) => !s) && !room.seats.some((s: { bot: boolean } | null) => s?.bot)) throw new HttpErr('full');
             debitWhy = 'buyin'; debited = room.settings.buyIn; await debit(uid, debited, debitWhy, r.id);
-            core.join(room, uid, body.name);
+            core.join(room, uid, body.name, body.av);
           } else changed = false;
           break;
         case 'leave': refund = core.leave(room, uid).refund; break;
@@ -176,6 +176,7 @@ async function mutate(uid: string, op: string, body: any, lim?: Promise<unknown>
         case 'removeBot': core.removeBot(room, uid, Number(body.seat)); break;
         case 'act': core.act(room, uid, body.action ?? {}); break;
         case 'next': core.next(room, uid); break;
+        case 'show': changed = core.show(room, uid, body.which); break;
         case 'sitIn': core.sitIn(room, uid); break;
         case 'rebuy': {
           const i = core.seatOf(room, uid); const need = i >= 0 ? room.settings.buyIn - room.seats[i].stack : 0;
@@ -241,7 +242,7 @@ async function quickseat(uid: string, body: any) {
   if (await points(uid) < T.bb * T.buyInBB) throw new HttpErr('points');
   const join = async (code: string) => {
     for (let k = 0; k < 3; k++) {                                // 'busy' (souběh) → zkusit znovu, ne přeskočit stůl
-      try { return await mutate(uid, 'join', { code, name: body.name }); }
+      try { return await mutate(uid, 'join', { code, name: body.name, av: body.av }); }
       catch (e) { if (e instanceof HttpErr && e.code === 'busy' && k < 2) { await new Promise((r) => setTimeout(r, 80 + Math.random() * 120)); continue; } throw e; }
     }
   };
