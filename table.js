@@ -73,7 +73,7 @@
   function layout(felt, seats) {
     const n = seats.length; if (!felt || !n) return;
     const g = geo(felt, n), fr = felt.getBoundingClientRect();
-    const bd = felt.querySelector('.board'); let board = null;
+    const bd = felt.querySelector('.table') || felt.querySelector('.board'); let board = null;
     if (bd) { const r = bd.getBoundingClientRect(); board = { l: r.left - fr.left, r: r.right - fr.left, t: r.top - fr.top, b: r.bottom - fr.top }; }
     felt.classList.toggle('many', g.many);
     seats.forEach((s, k) => {

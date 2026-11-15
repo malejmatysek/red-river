@@ -1159,3 +1159,46 @@ body[data-cfelt="midnight"]{--f1:#1d2d63;--f2:#080d24;--rail1:#232a44;--rail2:#0
 .felt .board .card.back::before{display:none}
 .felt.many{height:clamp(276px,44vh,340px)}
 @media (max-height:740px){.felt.many{height:clamp(270px,43vh,300px)}}
+/* ===== v29 (1.9.1): minimalistický stůl – jen to podstatné, hodně prostoru ===== */
+.felt::after{border-color:rgba(255,255,255,.05)}
+.felt::before{box-shadow:0 0 0 8px var(--rail2),0 0 0 9px rgba(255,255,255,.05),inset 0 0 0 1px rgba(255,255,255,.04),inset 0 12px 34px rgba(0,0,0,.5),0 18px 40px rgba(0,0,0,.55)}
+.felt .opp .name{background:none;padding:0;margin-top:4px;font-size:10.5px;line-height:13px;color:rgba(255,255,255,.42);font-weight:500;letter-spacing:.01em}
+.felt .opp .name .pos,.felt .opp .name{font-size:10.5px}
+.felt .opp .pos{color:rgba(255,255,255,.28)!important;font-weight:500!important}
+.felt .opp .stk{background:none;padding:0;font-size:12.5px;line-height:15px;font-weight:600;color:rgba(255,255,255,.9)}
+.felt .opp .stk em{background:none;color:var(--red);font-size:9px;letter-spacing:.04em;padding:0;text-transform:uppercase}
+.felt .avatar,.seat-me .avatar{box-shadow:0 0 0 1.5px rgba(0,0,0,.6),0 6px 14px rgba(0,0,0,.45)}
+.felt .opp.turn .avatar,.seat-me.turn .avatar{box-shadow:0 0 0 2px #000,0 0 0 3.5px rgba(255,255,255,.85);animation:none}
+.felt .opp.folded{opacity:.3;filter:grayscale(1)}
+.felt .chip{background:rgba(0,0,0,.55);color:rgba(255,255,255,.85);font-weight:600;font-size:10px;padding:2px 7px;box-shadow:none}
+.felt .chip[data-k="fold"],.felt .chip[data-k="check"],.felt .chip[data-k="call"],.felt .chip[data-k="blind"],.felt .chip[data-k="raise"],.felt .chip[data-k="bet"]{background:rgba(0,0,0,.55);color:rgba(255,255,255,.8)}
+.felt .chip[data-k="fold"]{color:rgba(255,255,255,.4)}
+.felt .chip[data-k="allin"]{background:var(--red);color:#fff}
+.felt .dealer{width:14px;height:14px;font-size:8px;border-width:1.5px;right:-3px;bottom:-2px}
+.bet{background:none;padding:0;gap:3px;font-weight:600;font-size:11px;color:rgba(255,255,255,.85)}
+.felt .pot-row{background:none;padding:0;gap:6px}
+.felt .pot-row .street{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+.felt .pot{font-size:14px;font-weight:600;color:rgba(255,255,255,.9)}
+.felt .pot::before{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.3)}
+/* informační panel → jeden jemný řádek */
+#scr-game .odds{display:flex;justify-content:center;align-items:baseline;gap:18px;background:none;padding:0;margin:2px 0 0;min-height:0}
+#scr-game .odds-cell{display:flex;align-items:baseline;gap:6px}
+#scr-game .odds .lbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.32)}
+#scr-game .odds .big,#scr-game .odds .mid{font-size:14px;font-weight:600;letter-spacing:0;color:rgba(255,255,255,.88)}
+#scr-game .odds .big.win{color:var(--green)}
+#scr-game .odds .mid .gl{text-decoration:none;border:0}
+#scr-game .odds-sub{display:none}
+/* spodek: méně rámečků */
+.hero-panel{background:transparent;box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);gap:2px}
+.hero-panel.turn{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.7)}
+.hero-panel .lbl{font-size:11px;line-height:1.35;color:rgba(255,255,255,.35)}
+.hero-panel .lbl small{color:rgba(255,255,255,.25)}
+.hero-panel .stack{font-size:22px;font-weight:600}
+.hero-last{color:rgba(255,255,255,.5);font-size:11px}
+#scr-game .sd-strip{background:none;padding:2px 4px;gap:4px}
+.kbtn{box-shadow:none!important;border-color:transparent!important;background:var(--panel2)!important}
+#scr-game .sd-strip{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:4px 14px;margin-top:0}
+#scr-game .sd-strip .sd-c{display:none}
+#scr-game .sd-row{gap:6px;font-size:12px;color:rgba(255,255,255,.4);padding:0;border:0;background:none}
+#scr-game .sd-row .sd-n{color:rgba(255,255,255,.5);width:auto}
+#scr-game .sd-row.win,#scr-game .sd-row.win .sd-n{color:#fff}
