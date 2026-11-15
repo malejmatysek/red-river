@@ -1202,3 +1202,10 @@ body[data-cfelt="midnight"]{--f1:#1d2d63;--f2:#080d24;--rail1:#232a44;--rail2:#0
 #scr-game .sd-row{gap:6px;font-size:12px;color:rgba(255,255,255,.4);padding:0;border:0;background:none}
 #scr-game .sd-row .sd-n{color:rgba(255,255,255,.5);width:auto}
 #scr-game .sd-row.win,#scr-game .sd-row.win .sd-n{color:#fff}
+
+/* v30: avatary ve stylu Lumiho */
+.felt .avatar,.seat-me .avatar{background:#0c0c0f}
+@media (prefers-reduced-motion:reduce){.av-shim{display:none}}
+.felt .opp .mini.open{top:-8px}
+.av-it{background:#141417}
+.av-it[data-r="epic"] .av-r{color:#ff6b80}
