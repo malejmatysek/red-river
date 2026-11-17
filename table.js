@@ -174,6 +174,48 @@
   const kind = s => { s = String(s || '').toLowerCase(); return !s ? '' : /^all/.test(s) ? 'allin' : /^fold/.test(s) ? 'fold' : /^check/.test(s) ? 'check' : /^(raise|bet)/.test(s) ? 'raise' : /^call/.test(s) ? 'call' : /^(sb|bb)/.test(s) ? 'blind' : ''; };
   function chipStack(n) { return `<span class="cstk">${[0, 1, 2].slice(0, Math.max(1, Math.min(3, n))).map(i => `<i style="--c:${CH[i]}"></i>`).join('')}</span>`; }
 
-  const api = { kind, AV, avatarSVG, botAv, valid, myAv, layout, sync, chips, pop, shake, muck, ripple, chipStack, center, off };
+
+  /* ---------- volba velikosti sázky: velká částka, posuvník (jemný dole), −/+, rychlé volby, vlastní číslo ----------
+     o = { min, max, bb, pot, toCall, curBet, isBet, rec, t, fmt, onGo(to, allin) } – všechno v „raise na“ částkách */
+  function sizer(box, o) {
+    const T = o.t, F = o.fmt || (n => String(n)), max = Math.max(1, Math.round(o.max)), bb = Math.max(1, o.bb | 0);
+    const min = Math.min(max, Math.max(1, Math.round(o.min)));
+    const clamp = v => { v = Math.round(v); if (v >= max) return max; if (v <= min) return min; const sn = Math.round(v / bb) * bb; return Math.min(max, Math.max(min, sn)); };
+    const U = 1000, toU = v => max > min ? Math.round(Math.sqrt((v - min) / (max - min)) * U) : U;
+    const fromU = u => (u >= U ? max : clamp(min + (max - min) * Math.pow(u / U, 2)));
+    const base = o.pot + (o.isBet ? 0 : o.toCall), cb = o.isBet ? 0 : o.curBet;
+    const quick = [['bs.half', cb + base * 0.5], ['bs.3q', cb + base * 0.75], ['bs.pot', cb + base], ['bs.2x', o.isBet ? o.pot * 2 : o.curBet * 2], ['bs.allinS', max]]
+      .map(([k, v]) => [k, clamp(v)]);
+    let to = clamp(o.start != null ? o.start : o.rec || min);
+    const verb = v => (v >= max ? T('bs.allin', { n: F(v) }) : o.isBet ? T('bs.bet', { n: F(v) }) : T('bs.raiseTo', { n: F(v) }));
+    box.innerHTML = `<div class="bs">
+      <div class="bs-amt"><button class="bs-v" id="bsV" aria-label="${T('bs.type')}">${F(to)}</button><input class="bs-in" id="bsIn" type="number" inputmode="numeric" min="${min}" max="${max}" step="${bb}" hidden></div>
+      <div class="bs-info" id="bsInfo"></div>
+      <div class="bs-row no-swipe"><button class="bs-pm" id="bsMinus" aria-label="−">−</button><input type="range" class="bs-range" id="bsR" min="0" max="${U}" step="1" value="${toU(to)}"><button class="bs-pm" id="bsPlus" aria-label="+">+</button></div>
+      <div class="bs-ends"><span>${T('bs.min', { n: F(min) })}</span><span>All-in ${F(max)}</span></div>
+      <div class="bs-q">${quick.map(([k, v]) => `<button class="bs-c${v === o.rec ? ' rec' : ''}" data-q="${v}">${T(k)}</button>`).join('')}</div>
+      <button class="btn primary wide bs-go" id="bsGo"></button></div>`;
+    const $ = id => box.querySelector('#' + id);
+    const draw = (fromRange) => {
+      $('bsV').textContent = F(to); $('bsGo').textContent = verb(to); $('bsGo').classList.toggle('allin', to >= max);
+      const pct = base > 0 ? Math.round((to - cb) / base * 100) : 0;
+      $('bsInfo').textContent = T('bs.info', { x: String(Math.round(to / bb * 10) / 10).replace('.', T('bs.dec') === 'bs.dec' ? '.' : T('bs.dec')), p: pct });
+      if (!fromRange) $('bsR').value = toU(to);
+      const r = $('bsR'); r.style.setProperty('--p', (r.value / U * 100) + '%');
+      let hit = false; box.querySelectorAll('[data-q]').forEach(b => { const on = !hit && +b.dataset.q === to; if (on) hit = true; b.classList.toggle('on', on); });
+    };
+    $('bsR').oninput = e => { const n = fromU(+e.target.value); if (n !== to && navigator.vibrate && o.vib) navigator.vibrate(3); to = n; draw(true); };
+    $('bsR').onchange = () => draw(false);
+    const step = d => { const st = to >= 40 * bb ? 5 * bb : bb; to = clamp(to >= max && d < 0 ? Math.floor((max - 1) / bb) * bb : to + d * st); draw(false); };
+    $('bsMinus').onclick = () => step(-1); $('bsPlus').onclick = () => step(1);
+    box.querySelectorAll('[data-q]').forEach(b => b.onclick = () => { to = +b.dataset.q; draw(false); });
+    $('bsV').onclick = () => { const i = $('bsIn'); $('bsV').hidden = true; i.hidden = false; i.value = to; i.focus(); i.select && i.select(); };
+    const commit = () => { const i = $('bsIn'); if (i.hidden) return; const n = +i.value; if (n > 0) to = n >= max ? max : Math.min(max, Math.max(min, Math.round(n))); i.hidden = true; $('bsV').hidden = false; draw(false); };
+    $('bsIn').onblur = commit; $('bsIn').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); commit(); } };
+    $('bsGo').onclick = () => { commit(); o.onGo(to, to >= max); };
+    draw(false);
+    return { get: () => to };
+  }
+  const api = { sizer, kind, AV, avatarSVG, botAv, valid, myAv, layout, sync, chips, pop, shake, muck, ripple, chipStack, center, off };
   root.RRT = api;
 })(typeof window !== 'undefined' ? window : globalThis);

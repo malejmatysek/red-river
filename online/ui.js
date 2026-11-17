@@ -367,11 +367,14 @@
     if (L && S.pending && S.pending.code === v.code) { a.innerHTML = `<div class="on-pending"><span class="spin"></span>${esc(pendLabel(S.pending.a))}</div>`; rz.hidden = true; return; }
     if (!L) { a.innerHTML = ''; rz.hidden = true; S.raiseOpen = false; return; }
     const callTxt = L.canCheck ? t('on.a.check') : `${t('on.a.call')} ${fmtPts(L.toCall)}`;
-    a.innerHTML = `<button class="btn" id="oaFold" ${L.canCheck ? 'disabled' : ''}>${t('on.a.fold')}</button><button class="btn" id="oaCall">${callTxt}</button>${L.canRaise ? `<button class="btn ${S.raiseOpen ? 'primary' : ''}" id="oaRaise">${L.raiseIsBet ? t('on.a.bet') : t('on.a.raise')}…</button>` : ''}`;
+    a.innerHTML = `<button class="btn" id="oaFold" ${L.canCheck ? 'disabled' : ''}>${t('on.a.fold')}</button><button class="btn" id="oaCall">${callTxt}</button>${L.canRaise ? `<button class="btn" id="oaRaise">${L.raiseIsBet ? t('on.a.bet') : t('on.a.raise')}…</button>` : ''}`;
     $('oaFold').onclick = () => send({ t: 'fold' });
     $('oaCall').onclick = () => send({ t: L.canCheck ? 'check' : 'call' });
-    if ($('oaRaise')) $('oaRaise').onclick = () => { S.raiseOpen = !S.raiseOpen; S.raiseTo = S.raiseTo && S.raiseTo >= L.minTo && S.raiseTo <= L.maxTo ? S.raiseTo : L.minTo; SFX.tap(); renderActions(v, L); };
-    rz.hidden = !(S.raiseOpen && L.canRaise);
+    if ($('oaRaise')) $('oaRaise').onclick = () => { SFX.tap();
+      R.openSheet(`<h2>${t('sz.title')}</h2><div class="sub">${t('sz.sub', { min: fmtPts(L.minTo), pot: fmtPts(L.pot) })}</div><div id="bsBox"></div>`);
+      window.RRT.sizer($('bsBox'), { min: L.minTo, max: L.maxTo, bb: (v.settings && v.settings.bb) || 1, pot: L.pot, toCall: L.toCall, curBet: L.curBet, isBet: !!L.raiseIsBet, start: S.raiseTo && S.raiseTo >= L.minTo && S.raiseTo <= L.maxTo ? S.raiseTo : L.minTo, t, fmt: fmtPts,
+        onGo: (to, allin) => { S.raiseTo = to; R.closeSheet(); send(allin ? { t: 'allin' } : { t: 'raise', to }); } }); };
+    rz.hidden = true; S.raiseOpen = false;
     if (rz.hidden) return;
     const lab = n => (L.raiseIsBet ? t('on.betTo', { n: fmtPts(n) }) : t('on.raiseTo', { n: fmtPts(n) }));
     rz.innerHTML = `<div class="on-sizes">${sizes(L).map(([k, to]) => `<button class="btn sm ${to === S.raiseTo ? 'primary' : ''}" data-to="${to}">${t(k)}</button>`).join('')}</div>

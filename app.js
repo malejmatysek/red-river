@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.9.2', BUILD = 'v30';
+  const APP_VERSION = '1.9.3', BUILD = 'v31';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -1139,15 +1139,10 @@
   sheetSwipe($('sheet'), $('scrim'), () => closeSheet());
   function showSizes() {
     const c = G.ctx, h = hero(), max = h.stack + h.bet;
-    let opts;
-    if (G.street === 0) opts = G.raises === 0 ? [[2.5 * BB, bbWords(2.5)], [3 * BB, bbWords(3)], [4 * BB, bbWords(4)]] : [[G.currentBet * 2.5, '2,5×'], [G.currentBet * 3, '3×'], [G.currentBet * 4, '4×']];
-    else opts = c.toCall ? [[G.currentBet * 2.5, '2,5×'], [G.currentBet * 3, '3×'], [G.currentBet + c.pot + c.toCall, 'pot']] : [[c.pot / 3, t('sz.third')], [c.pot / 2, t('sz.half')], [c.pot * 0.66, t('sz.twoThirds')], [c.pot, 'pot']];
-    opts = opts.map(([v, l]) => [Math.min(max, Math.max(c.minRaiseTo, Math.round(v))), l]).concat([[max, 'all-in']]);
-    const recTo = helpOn('recs') && G.rec && G.rec.to;
-    const verb = c.toCall ? t('a.raiseToV') : 'Bet';
-    openSheet(`<h2>${t('sz.title')}</h2><div class="sub">${t('sz.sub', { min: c.minRaiseTo, pot: c.pot })}${recTo ? ' · ' + t('sz.rec', { n: recTo }) : ''}</div>
-      <div class="sizes">${opts.map(([v, l]) => `<button class="btn ${v === recTo ? 'rec-size' : ''} ${v === max ? 'allin' : ''}" data-to="${v}">${v === max ? 'All-in' : verb} ${v}<small>${l}</small></button>`).join('')}</div>`);
-    $('sheet').querySelectorAll('[data-to]').forEach(b => b.onclick = () => { closeSheet(); heroAct(c.toCall ? 'raise' : 'bet', +b.dataset.to); });
+    const recTo = (helpOn('recs') || G.hint) && G.rec && G.rec.to ? G.rec.to : null;
+    openSheet(`<h2>${t('sz.title')}</h2><div class="sub">${t('sz.sub', { min: Math.min(c.minRaiseTo, max), pot: c.pot })}${recTo ? ' · ' + t('sz.rec', { n: recTo }) : ''}</div><div id="bsBox"></div>`);
+    RRT.sizer($('bsBox'), { min: c.minRaiseTo, max, bb: BB, pot: c.pot, toCall: c.toCall, curBet: G.currentBet, isBet: !c.toCall, rec: recTo, start: defaultSize(), t, fmt: fmtPts, vib: settings.vibrate,
+      onGo: (to, allin) => { closeSheet(); heroAct(allin ? 'allin' : c.toCall ? 'raise' : 'bet', to); } });
   }
   const gradeOf = d => PE.grade(PE.recommend(d.ctx), d.action, d.ctx);   // přepočet → vždy v aktuálním jazyce
   function showSummary() {

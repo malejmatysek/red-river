@@ -96,11 +96,11 @@ const SHOTS = !!process.env.SHOTS;
   v = await V(); ok(v.hand.no === 2 && !v.hand.done, 'host deals hand 2');
   for (let k = 0; k < 6 && (await V()).hand.toAct !== (await V()).me; k++) { const g = await G('state'); if (g.hand.legal) await G('act', { t: g.hand.legal.canCheck ? 'check' : 'call' }); await page.waitForTimeout(80); }
   await page.click('#oaRaise'); await page.waitForTimeout(80);
-  ok(!(await page.$eval('#otRaise', e => e.hidden)), 'raise panel opens (min / ½ pot / pot / all-in)');
-  await page.click('#otRaise [data-to]:nth-child(3)'); await page.waitForTimeout(50);
+  ok(!!(await page.$('#sheet #bsR')), 'bet-size sheet opens (slider, quick chips)');
+  await page.click('#sheet .bs-c:nth-child(3)'); await page.waitForTimeout(50);
   await shot('7-raise');
-  const to = await page.evaluate(() => OnlineUI.state.raiseTo);
-  await page.click('#orGo'); await page.waitForTimeout(150);
+  const to = +(await page.$eval('#bsV', e => e.textContent.replace(/\D/g, '')));
+  await page.click('#bsGo'); await page.waitForTimeout(150);
   const g2 = await G('state');
   ok(g2.seats[hostSeat].last && /raise|bet|allin/.test(g2.seats[hostSeat].last.t) && g2.seats[hostSeat].bet === to, 'raise to ' + to + ' reached the server');
   err = await page.evaluate(async () => { try { await window.__g.act({ t: 'raise', to: 3 }); return 'no error'; } catch (e) { return e.code; } });
