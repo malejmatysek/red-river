@@ -470,7 +470,7 @@
         const v3 = 12.5 + b.tight * 0.4 - R.def * 0.4;
         if (c >= v3) return chance(b.slow * 0.5) ? { action: 'call' } : raise(ip ? 3 : 3.8);
         const callThr = 10.5 + b.tight * 0.4 - b.def - R.def - b.sticky * 10 - (pos === 'BB' ? 2.8 : pos === 'SB' ? 0.6 : ip ? 1 : 0)
-          + Math.max(0, size - 3) * 0.9 + (odds > 0.3 ? 1 : 0) - ((ctx.callers || 0) > 0 ? 0.6 : 0) - (b.skill === 0 ? 1.2 : b.skill === 1 ? 0.3 : 0);   // slabší hráči víc dorovnávají
+          + Math.max(0, size - 3) * 0.9 + (odds > 0.3 ? 1 : 0) - ((ctx.callers || 0) > 0 ? 0.6 : 0) - (b.skill === 0 ? 1.2 : b.skill === 1 ? 0.8 : 0);   // slabší hráči víc dorovnávají
         if (c >= callThr - 1.5 && c < v3 && canRaise && chance(b.three * S.bluffX * R.steal * (ip || pos === 'SB' || pos === 'BB' ? 1.2 : 0.7) + R.def * 0.04)) return raise(ip ? 3 : 3.8);   // 3-bet (i blaf)
         if (c >= callThr) return { action: 'call' };
         if (spec && deep && price <= effBB / 20 && chance(0.3 + b.def * 0.1)) return { action: 'call' };    // set-mining / implied odds
