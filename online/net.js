@@ -30,7 +30,7 @@
       this.core = Core.makeCore({ PE, now: () => this.clock(), randInt: opts.randInt });
       this.rooms = new Map(); this.points = new Map(); this.subs = new Map(); this.where = new Map();
       this.latency = opts.latency || 0;
-      this.log = []; this.reports = []; this.hits = new Map();
+      this.log = []; this.reports = []; this.hits = new Map(); this.nets = new Set(); this.emoAt = new Map();
       this.demoBots = !!opts.demoBots;          // offline ukázka veřejných stolů: doplní označené boty, aby se dalo hrát i bez lidí
       this.limits = Object.assign({ all: [240, 60], quickseat: [12, 60], report: [5, 600] }, opts.limits || {});
       if (opts.autoTick !== false && typeof setInterval === 'function') { this.timer = setInterval(() => this.tickAll(), opts.tickMs || 400); if (this.timer.unref) this.timer.unref(); }
@@ -126,12 +126,22 @@
       } catch (e) { throw err(e.code || 'server'); }
     }
     tickAll() { this.rooms.forEach(r => { if (r.status !== 'playing') return; const v = r.ver; this.core.tick(r); if (this.core.isPub(r)) this.reapRoom(r); if (r.ver !== v) this.notify(r); }); }
+    /* hlášky: jen známé id, odesílatel musí sedět u stolu, max 1 za 4 s; místo určí server */
+    emo(code, uid, id) {
+      const room = this.rooms.get(code); if (!room || !root.RREmo || !root.RREmo.valid(id)) return false;
+      const seat = this.core.seatOf(room, uid); if (seat < 0) return false;
+      const t = this.clock(), last = this.emoAt.get(uid) || 0; if (t - last < 4000) return false; this.emoAt.set(uid, t);
+      this.nets.forEach(n => { if (n.code === code && n.uid !== uid) n.efns.forEach(f => { try { f({ code, seat, id }); } catch (e) {} }); });
+      return true;
+    }
     subscribe(code, uid, fn) { if (!this.subs.has(code)) this.subs.set(code, new Set()); const sub = { uid, fn }; this.subs.get(code).add(sub); return () => this.subs.get(code).delete(sub); }
   }
 
   /* ---------- klient proti mocku ---------- */
   class MockNet {
-    constructor(server, uid) { this.kind = 'mock'; this.server = server; this.uid = uid || 'u-' + Math.random().toString(36).slice(2, 10); this.code = null; this.fns = new Set(); this.unsub = null; }
+    constructor(server, uid) { this.kind = 'mock'; this.server = server; this.uid = uid || 'u-' + Math.random().toString(36).slice(2, 10); this.code = null; this.fns = new Set(); this.unsub = null; this.efns = new Set(); server.nets.add(this); }
+    emote(id) { return this.server.emo(this.code, this.uid, id); }
+    onEmote(fn) { this.efns.add(fn); return () => this.efns.delete(fn); }
     async ready() { return { uid: this.uid, points: this.server.pts(this.uid) }; }
     async points() { return this.server.pts(this.uid); }
     bind(code) {
@@ -169,7 +179,15 @@
      Starší pohledy (nižší ver) se zahazují, takže pořadí doručení nevadí. */
   class SupabaseNet {
     constructor(cfg) { this.kind = 'supabase'; this.cfg = cfg; this.code = null; this.roomId = null; this.fns = new Set(); this.ch = null; this.sb = null; this.uid = null;
-      this.ver = -1; this.vcode = null; this.lastAt = 0; this.cardsHand = -1; this.bcOk = false; this.uch = null; this.poll = null; this.inflight = false; }
+      this.ver = -1; this.vcode = null; this.lastAt = 0; this.cardsHand = -1; this.bcOk = false; this.uch = null; this.poll = null; this.inflight = false; this.efns = new Set(); this.emoT = 0; }
+    /* hlášky přes Realtime Broadcast na kanálu stolu (bez změny serveru): jen id předvolby, příjemce ověří id a omezí četnost */
+    emote(id, seat) {
+      if (!this.ch || !root.RREmo || !root.RREmo.valid(id) || Date.now() - this.emoT < 4000) return false;
+      this.emoT = Date.now();
+      try { this.ch.send({ type: 'broadcast', event: 'emo', payload: { code: this.code, seat, id } }); } catch (e) { return false; }
+      return true;
+    }
+    onEmote(fn) { this.efns.add(fn); return () => this.efns.delete(fn); }
     seen(v) {                       // zapamatuj si nejnovější pohled; vrací false pro zastaralý
       if (!v) return false;
       if (v.code === this.vcode && typeof v.ver === 'number' && v.ver < this.ver) return false;
@@ -224,7 +242,8 @@
       clearInterval(this.poll); this.poll = null;
       this.code = code; this.roomId = roomId || null;
       if (!code || !roomId) return;
-      this.ch = this.sb.channel('room-' + roomId)
+      this.ch = this.sb.channel('room-' + roomId, { config: { broadcast: { self: false } } })
+        .on('broadcast', { event: 'emo' }, m => { const p = m && m.payload; if (p && p.code === this.code) this.efns.forEach(f => { try { f(p); } catch (e) {} }); })
         .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: 'id=eq.' + roomId }, p => {
           const n = p && p.new; if (n && typeof n.version === 'number' && this.vcode === code && n.version <= this.ver) return;   // už to mám (Broadcast)
           this.refresh();

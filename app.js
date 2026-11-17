@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.9.3', BUILD = 'v31';
+  const APP_VERSION = '1.9.4', BUILD = 'v32';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -37,7 +37,7 @@
   const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
   const navLang = ((navigator.languages && navigator.languages[0]) || navigator.language || 'cs').toLowerCase();
   const SETTINGS0 = { recs: false, odds: true, learn: true, opps: 5, shortStacks: true, v: 4, diff: 1, blinds: 0, depth: 100, randomDepth: false,
-    bankroll: true, speed: 0, sound: true, vibrate: true, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true, cDiff: 1, cMeter: false };
+    bankroll: true, speed: 0, sound: true, vibrate: true, muteEmo: false, lang: navLang.startsWith('en') ? 'en' : 'cs', level: 0, adv: false, gloss: true, cDiff: 1, cMeter: false };
   const STATS0 = { hands: 0, won: 0, netBB: 0, vpip: 0, pfr: 0, decisions: 0, good: 0, ok: 0, meh: 0, bad: 0, v: 4,
     br: 0, calls: 0, sawFlop: 0, sd: 0, sdWon: 0, allins: 0, bigPot: 0, profit: 0, recN: 0, recAgree: 0, best: -1, bestCards: [], types: {}, hist: [], histP: [], playSec: 0, days: {} };
   const fresh = o => JSON.parse(JSON.stringify(o));
@@ -72,7 +72,8 @@
     wheelDay: '', login: { last: '', streak: 0, best: 0 }, day: { d: '', hands: 0, drill: 0, dstreak: 0, done: {} } };
   for (const k in W13) if (wallet[k] == null || typeof wallet[k] !== typeof W13[k]) wallet[k] = fresh(W13[k]);
   ['back', 'felt', 'lumi', 'avatar'].forEach(k => { wallet.owned[k] = Object.assign({}, W13.owned[k], wallet.owned[k]); if (!wallet.equip[k]) wallet.equip[k] = W13.equip[k]; });
-  if (typeof wallet.showTok !== 'number') wallet.showTok = 3;   // v1.9: žetony „Ukázat“ (jen offline) – malý startovní balíček
+  if (typeof wallet.showTok !== 'number') wallet.showTok = 3;
+  if (!wallet.owned.emo) wallet.owned.emo = {};   // v1.9.4: balíčky hlášek   // v1.9: žetony „Ukázat“ (jen offline) – malý startovní balíček
   if (!wallet.wheelDay && wallet.lastDaily === today()) wallet.wheelDay = wallet.lastDaily;   // dnešní starý bonus = dnešní otočení
   const saveW = () => { save('pt_wallet', wallet); updatePts(); };
   const fmtPts = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
@@ -356,6 +357,7 @@
 
   /* ---------- průběh ruky ---------- */
   function startHand() {
+    G.emoN = 0; G.think = -1; G.thinkShow = false;
     closeSheet(); hideFx();
     if (G.dealing) return;
     if (G.tableKey === 'tour' && !(tour && tour.active)) G.tableKey = '';
@@ -429,10 +431,32 @@
         c.checked = !!me.chk;
         c.read = hero().folded ? null : G.read;
         const d = PE.botDecide(c, me.style, rnd);
-        act(seat, d.action, d.to);
+        const ms = thinkMs(c, d);
+        if (!ms) return act(seat, d.action, d.to);
+        // lidské přemýšlení: rychle u jasných tahů, déle u velkých rozhodnutí (river, all-in), občas dlouhé váhání
+        G.think = seat; G.thinkShow = false;
+        const tShow = ms > 1300 ? setTimeout(() => { if (G.think === seat && hand === G.handNo && !G.over) { G.thinkShow = true; render(); } }, 700) : 0;
+        setTimeout(() => {
+          clearTimeout(tShow); const shown = G.thinkShow; G.think = -1; G.thinkShow = false;
+          if (G.over || hand !== G.handNo || G.turn !== seat) { if (shown) render(); return; }
+          if (!FAST() && nav.cur !== 'game') { if (shown) render(); G.paused = go; return; }
+          act(seat, d.action, d.to);
+        }, ms);
       };
-      setTimeout(go, delay());
+      setTimeout(go, FAST() ? 0 : 140);
     }
+  }
+  /* doba přemýšlení bota (ms): jasné tahy 0,6–2 s, velká rozhodnutí 3–8 s, výjimečně dlouhé váhání; rychlá hra = zkráceně */
+  function thinkMs(c, d) {
+    if (FAST()) return 0;
+    const r = Math.random, sp = settings.speed | 0, a = d.action;
+    const easy = (c.street === 0 && a === 'fold' && (c.raisesThisStreet || 0) <= 1) || (a === 'check' && c.street < 3) || (c.street === 0 && a === 'call' && c.toCall <= c.bb);
+    const big = a === 'allin' || (c.toCall > 0 && c.toCall >= c.stack * 0.35) || (c.street === 3 && a !== 'check') || (c.street > 0 && c.toCall > c.pot * 0.55) || (c.street === 0 && (c.raisesThisStreet || 0) >= 2 && a !== 'fold');
+    let ms = easy ? 600 + r() * 800 : 850 + r() * 1150;
+    if (big) ms = r() < 0.55 ? 3000 + r() * 5000 : 1800 + r() * 1400;
+    if (c.street > 0 && r() < 0.025) ms += 3500 + r() * 4000;               // dlouhé váhání
+    if (sp === 2) return Math.round(Math.min(1400, ms * 0.3));
+    return Math.round(Math.min(11000, ms * (sp === 0 ? 1.15 : 1)));
   }
   function act(seat, action, to) {
     const p = G.players[seat];
@@ -458,6 +482,7 @@
       if (G.street === 0) p.pf = p.allIn && p.start <= 15 * BB ? 'shove' : G.raises >= 2 ? 'raise3' : 'raise';
       G.players.forEach((q, i) => { if (i !== seat) q.acted = false; });
       p.last = (p.allIn ? 'All-in ' : (action === 'bet' ? 'Bet ' : 'Raise ')) + to;
+      if (p.allIn && !p.hero) botEmo(seat, 'allin', 0.35, 500);
       SFX.chip(); if (p.hero) vib(8);
     }
     p.acted = true;
@@ -582,7 +607,8 @@
   }
   function finish() {
     G.over = true; G.turn = -1;
-    const live = alive();
+    const live = alive(), potAmt = pot();
+    setTimeout(() => emoAfterHand(live, potAmt), FAST() ? 0 : 1400);
     G.winners = [];
     if (live.length === 1) { live[0].stack += pot(); G.winners.push(live[0]); }
     else {
@@ -967,6 +993,7 @@
       const e = oppEls[i], seat = i + 1;
       e.o.classList.toggle('folded', p.folded); e.o.classList.toggle('turn', G.turn === seat && !G.dealing);
       e.o.classList.toggle('win', !!(G.over && G.winners && G.winners.includes(p))); e.o.classList.toggle('peek', !!p.peek);
+      e.o.classList.toggle('think', !!G.thinkShow && G.think === seat && G.turn === seat); if (e.o.dataset.think !== t('bot.think')) e.o.dataset.think = t('bot.think');
       { const k = RRT.kind(p.last); if ((e.chip.dataset.k || '') !== k) e.chip.dataset.k = k; }
       { const b = G.over ? 0 : p.bet; e.bet.classList.toggle('empty', !b); if (b) setText(e.betT, fmtPts(b)); }
       e.dl.style.visibility = G.dealer === seat ? '' : 'hidden';
@@ -1338,7 +1365,7 @@
       <h3>${t('set.game')}</h3><div class="grp">
         ${seg('lang', t('set.lang'), [['cs', 'Čeština'], ['en', 'English']])}
         ${seg('speed', t('set.speed'), [[0, t('sp.0')], [1, t('sp.1')], [2, t('sp.2')]])}
-        ${tg('sound', t('set.sound'))}${tg('vibrate', t('set.vibrate'), navigator.vibrate ? '' : t('set.vibNo'))}
+        ${tg('muteEmo', t('set.muteEmo'))}${tg('sound', t('set.sound'))}${tg('vibrate', t('set.vibrate'), navigator.vibrate ? '' : t('set.vibNo'))}
       </div>
       <h3>${t('set.other')}</h3><div class="grp">
         <button class="row link" id="setIntro"><span>${t('set.intro')}</span><span class="val"></span></button>
@@ -1877,6 +1904,45 @@
     const ml = $('meLumi'); if (ml) ml.innerHTML = lumiSVG(e.lumi);
     meAvatar('meAv'); meAvatar('otMeAv');
   }
+  /* ---------- hlášky u stolu (💬): jen předvolby, cooldown, ztlumení ostatních, reakce botů ---------- */
+  const emoOwned = k => k === 'base' || !!(wallet.owned.emo[k] || (RREmo.PACKS[k] && wallet.ach[RREmo.PACKS[k].ach]));
+  function openEmotes(onPick) {
+    const draw = () => {
+      openSheet(RREmo.pickerHTML({ lang: I18N.lang, t, owned: emoOwned, cd: RREmo.left(), price: k => `${ICON.dia(13)} ${RREmo.PACKS[k].d}` }));
+      $('sheet').classList.add('emo-sheet');
+      $('sheet').querySelectorAll('[data-emo]').forEach(b => b.onclick = () => { if (!RREmo.ready()) { SFX.fold(); return; } closeSheet(); onPick(b.dataset.emo); });
+      $('sheet').querySelectorAll('[data-emopack]').forEach(b => b.onclick = () => { if (buyEmoPack(b.dataset.emopack)) draw(); });
+    };
+    draw();
+  }
+  function buyEmoPack(k) {
+    const P = RREmo.PACKS[k]; if (!P || emoOwned(k)) return false;
+    if (wallet.diamonds < P.d) { toast(t('lk.lack', { n: P.d - wallet.diamonds })); SFX.fold(); return false; }
+    wallet.diamonds -= P.d; wallet.owned.emo[k] = 1; saveW(); SFX.win(); vib([15, 30, 15]); toast(t('emo.bought', { n: t('emo.pk.' + k) })); return true;
+  }
+  function heroEmote(id) {
+    if (!RREmo.valid(id) || !emoOwned(RREmo.packOf(id)) || !RREmo.ready()) return;
+    RREmo.mark($('emoBtn')); RREmo.show($('felt'), $('meAv'), id, I18N.lang); SFX.tap(); vib(8);
+    // boti občas odpoví podle povahy (maniak a LAG rádi, skála skoro nikdy)
+    const cand = G.players.map((p, i) => i).filter(i => i && !G.players[i].out);
+    const i = cand[Math.floor(Math.random() * cand.length)]; if (i) botEmo(i, 'taunt', RREmo.isEmoji(id) ? 0.8 : 1.2, 1200 + Math.random() * 1300, true);
+  }
+  function botEmo(seat, ev, boost, wait, force) {
+    if (settings.muteEmo || FAST() || !G.players[seat] || G.players[seat].hero) return;
+    if (!force && (G.emoN || 0) >= 2) return;
+    const p = G.players[seat], id = RREmo.botPick(p.style && p.style.arch, ev, Math.random, boost); if (!id) return;
+    G.emoN = (G.emoN || 0) + 1;
+    setTimeout(() => { const e = oppEls[seat - 1]; if (e && nav.cur === 'game' && !settings.muteEmo) RREmo.show($('felt'), e.av, id, I18N.lang); }, wait || 0);
+  }
+  function emoAfterHand(live, potAmt) {
+    if (!G.over || !G.winners || !G.winners.length) return;
+    const big = potAmt >= 20 * BB, h = hero(), heroIn = !h.folded || h.total > 0;
+    const w = G.winners.find(p => !p.hero);
+    if (w && heroIn && (big || live.length > 1 || Math.random() < 0.3)) botEmo(G.players.indexOf(w), 'win', big ? 1.3 : 0.8, 0);
+    if (G.winners.includes(h) && live.length > 1) { const l = live.find(p => !p.hero && !G.winners.includes(p)); if (l) botEmo(G.players.indexOf(l), 'lose', big ? 1.2 : 0.7, 900); }
+  }
+  window.RREmoOpen = openEmotes; window.RREmoOwned = emoOwned;
+
   /* ---------- avatary: výběr, obchod (body / diamanty), exkluzivní jen za úspěchy ---------- */
   const avCost = id => (RRT.AV.find(a => a[0] === id) || [])[2];
   const avOwned = id => { const c = avCost(id); return !!(wallet.owned.avatar[id] || c === 0 || (c && c.ach && wallet.ach[c.ach])); };
@@ -2129,6 +2195,9 @@
           <div class="sh-sm"><b><span class="sh-tok"><span class="tok-ic">👁</span>${t('tok.n')}: ${wallet.showTok}</span></b><span>${t('tok.sub')}</span><button class="sh-pill ${wallet.diamonds >= 1 ? 'r' : ''}" id="shTokD" ${wallet.diamonds >= 1 ? '' : 'disabled'}>${icx(t('tok.buy'))}</button></div>
           <div class="sh-sm"><b>${t('tok.exT')}</b><span>${icx(t('tok.exSub', { n: fmtPts(PTS.tokPts) }))}</span><button class="sh-pill ${wallet.points >= PTS.tokPts ? 'r' : ''}" id="shTokP" ${wallet.points >= PTS.tokPts ? '' : 'disabled'}>${icx(t('tok.ex', { n: fmtPts(PTS.tokPts) }))}</button></div>
         </div>
+        <div class="sh-h"><b>💬 ${t('emo.shop')}</b></div>
+        <div class="sh-two">${Object.keys(RREmo.PACKS).map(k => { const P = RREmo.PACKS[k], own = emoOwned(k);
+          return `<div class="sh-sm emo-pk"><b>${P.ic} ${t('emo.pk.' + k)}</b><span>„${RREmo.text(RREmo.PH.find(x => x[1] === k)[0], I18N.lang).replace(/[„“”"]/g, '')}“ …</span>${own ? `<button class="sh-pill" disabled>✓ ${t('emo.own')}</button>` : `<button class="sh-pill ${wallet.diamonds >= P.d ? 'r' : ''}" data-emopk="${k}">${ICON.dia(13)} ${P.d}</button>`}</div>`; }).join('')}</div>
         <div class="sh-h"><b>${t('pts.tabLook')}</b><button data-tab="look">${t('sh.all')} ›</button></div>
         <div class="sh-strip">${strip}</div>
         <div class="sh-h"><b>${t('pts.learn')}</b></div>
@@ -2143,6 +2212,7 @@
     $('shopBody').querySelectorAll('[data-lk]').forEach(b => b.onclick = () => { const [k, id] = b.dataset.lk.split(':'); buyLook(k, id); });
     bindAvGrid($('shopBody'), () => { closeSheet(); renderShop(); });
     if (shopTab === 'look') return;
+    $('shopBody').querySelectorAll('[data-emopk]').forEach(b => b.onclick = () => { if (buyEmoPack(b.dataset.emopk)) renderShop(); });
     $('shTokD').onclick = () => { if (wallet.diamonds < 1) return; wallet.diamonds--; wallet.showTok += 3; saveW(); SFX.chip(); toast(t('tok.got', { n: 3 })); renderShop(); };
     $('shTokP').onclick = () => { if (wallet.points < PTS.tokPts) return; wallet.points -= PTS.tokPts; wallet.showTok += 1; saveW(); SFX.chip(); toast(t('tok.got', { n: 1 })); renderShop(); };
     $('shWheelCard').onclick = () => { SFX.unlock(); nav.go('wheel'); };
@@ -2182,6 +2252,7 @@
     clearTimeout(toastT); if (!sticky) toastT = setTimeout(() => { $('toast').classList.add('out'); setTimeout(() => $('toast').hidden = true, 250); }, 2600);
   }
   /* sdílené pomůcky pro online stoly (online/ui.js) */
+  if ($('emoBtn')) $('emoBtn').onclick = () => { SFX.tap(); openEmotes(heroEmote); };
   window.RR = { nav, t, $, openSheet, closeSheet, toast, cardHTML, SFX, vib, fmtPts, rich, settings, applyStatic, noAnim };
   window.__rr = { updateReady: () => toast(t('upd.msg'), t('upd.btn'), () => location.reload(), true), toast };
 

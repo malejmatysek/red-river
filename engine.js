@@ -340,21 +340,21 @@
      Styl určuje, jak volně hraje, jak často sází, blafuje, dorovnává, hraje pomalu (slowplay) a dělá check-raise.
      Úroveň určuje přesnost odhadu síly ruky (šum), počet chyb, míru blafování a jestli se přizpůsobuje hráči.
      Rozhodnutí jsou smíšená (náhodná s váhami) → bot není čitelný ani se stejnými kartami. */
-  const ARCH = {
-    rock:    { tight: 1.5, aggr: 0.45, bluff: 0.04, sticky: -0.04, slow: 0.15, cr: 0.10, semi: 0.25, three: 0.02, limp: 0.10 },
-    tag:     { tight: 0,  aggr: 0.75, bluff: 0.12, sticky: 0.00,  slow: 0.12, cr: 0.18, semi: 0.55, three: 0.08, limp: 0.04 },
-    lag:     { tight: -1.8, aggr: 0.85, bluff: 0.20, sticky: 0.02,  slow: 0.08, cr: 0.22, semi: 0.65, three: 0.15, limp: 0.05 },
-    maniac:  { tight: -3, aggr: 0.95, bluff: 0.34, sticky: 0.04,  slow: 0.05, cr: 0.25, semi: 0.75, three: 0.26, limp: 0.10 },
-    station: { tight: -3, aggr: 0.25, bluff: 0.04, sticky: 0.12,  slow: 0.30, cr: 0.05, semi: 0.15, three: 0.02, limp: 0.60 }
+  const ARCH = {   // def = obrana proti raisu (uvolnění), float = call v pozici s plánem sebrat hrnec později, cb = četnost c-betu
+    rock:    { tight: 1.3,  aggr: 0.45, bluff: 0.04, sticky: -0.03, slow: 0.15, cr: 0.10, semi: 0.25, three: 0.03, limp: 0.12, def: 0.3, float: 0.05, cb: 0.50 },
+    tag:     { tight: -0.6, aggr: 0.75, bluff: 0.12, sticky: 0.00,  slow: 0.12, cr: 0.18, semi: 0.55, three: 0.09, limp: 0.06, def: 1.8, float: 0.22, cb: 0.66 },
+    lag:     { tight: -1.1, aggr: 0.85, bluff: 0.20, sticky: 0.02,  slow: 0.10, cr: 0.22, semi: 0.65, three: 0.15, limp: 0.06, def: 2.4, float: 0.35, cb: 0.74 },
+    maniac:  { tight: -1.9, aggr: 0.95, bluff: 0.32, sticky: 0.04,  slow: 0.05, cr: 0.25, semi: 0.75, three: 0.24, limp: 0.10, def: 3.3, float: 0.40, cb: 0.85 },
+    station: { tight: -1.5, aggr: 0.25, bluff: 0.04, sticky: 0.10,  slow: 0.30, cr: 0.05, semi: 0.15, three: 0.03, limp: 0.30, def: 4.2, float: 0.15, cb: 0.30 }
   };
   const ARCH_W = [   // pravděpodobnost stylů podle úrovně (začátečnický stůl je „rybí“, profíci hrají hlavně tight/loose-agresivně)
     { station: 3, rock: 2, maniac: 1, lag: 1, tag: 1 },
     { station: 2, rock: 1, maniac: 1, lag: 2, tag: 2 },
     { station: 1, rock: 1, maniac: 1, lag: 2, tag: 3 }];
-  const SKILL = [   // šum v odhadu equity, chyby, násobek blafů, váha přizpůsobení hráči
-    { noise: 0.16, mistake: 0.14, bluffX: 0.35, adapt: 0 },
-    { noise: 0.08, mistake: 0.06, bluffX: 0.80, adapt: 0.5 },
-    { noise: 0.03, mistake: 0.015, bluffX: 1.00, adapt: 1 }];
+  const SKILL = [   // šum v odhadu equity, chyby, násobek blafů, váha přizpůsobení hráči, uvolnění (začátečník = lepivý a volný), obrana podle MDF
+    { noise: 0.16, mistake: 0.12, bluffX: 0.45, adapt: 0,   loose: 0.4, sticky: 0.05, mdf: 0 },
+    { noise: 0.08, mistake: 0.05, bluffX: 0.85, adapt: 0.6, loose: 0, sticky: 0.02, mdf: 0.5 },
+    { noise: 0.03, mistake: 0.012, bluffX: 1.00, adapt: 1,  loose: 0,   sticky: 0,    mdf: 1 }];
   function pickW(w, rng) { let s = 0; for (const k in w) s += w[k]; let r = rng() * s; for (const k in w) { r -= w[k]; if (r < 0) return k; } return Object.keys(w)[0]; }
   /* nový bot: { arch, skill, ...parametry s malým rozptylem } */
   function makeBot(skill, rng, arch) {
@@ -362,12 +362,13 @@
     arch = ARCH[arch] ? arch : pickW(ARCH_W[skill], rng);
     const a = ARCH[arch], j = x => (rng() * 2 - 1) * x;
     return { arch, skill, tight: a.tight + j(0.5), aggr: clamp01(a.aggr + j(0.06)), bluff: Math.max(0.01, a.bluff + j(0.03)), sticky: a.sticky + j(0.015),
-      slow: clamp01(a.slow + j(0.04)), cr: clamp01(a.cr + j(0.04)), semi: clamp01(a.semi + j(0.08)), three: clamp01(a.three + j(0.03)), limp: clamp01(a.limp + j(0.05)) };
+      slow: clamp01(a.slow + j(0.04)), cr: clamp01(a.cr + j(0.04)), semi: clamp01(a.semi + j(0.08)), three: clamp01(a.three + j(0.03)), limp: clamp01(a.limp + j(0.05)),
+      def: a.def + j(0.3), float: clamp01(a.float + j(0.05)), cb: clamp01(a.cb + j(0.06)) };
   }
   const clamp01 = x => Math.max(0, Math.min(1, x));
   /* starý formát stylu (loose/aggr/bluff…) → nový bot */
   function botOf(style, rng) {
-    if (style && style.arch && ARCH[style.arch]) return style;
+    if (style && style.arch && ARCH[style.arch]) { if (style.def == null) { const a = ARCH[style.arch]; style.def = a.def; style.float = a.float; style.cb = a.cb; } return style; }
     const s = style || {}, skill = s.noise != null ? (s.noise >= 0.2 ? 0 : s.noise >= 0.09 ? 1 : 2) : 1;
     const arch = (s.loose || 0) > 0.05 ? 'station' : (s.aggr || 0) > 0.08 ? 'lag' : (s.loose || 0) < -0.02 ? 'rock' : 'tag';
     return makeBot(skill, rng || Math.random, arch);
@@ -406,12 +407,13 @@
   }
   /* čtení hráče: { n: rozdané ruce, vp: dobrovolně do hrnce, fb: čelil sázce po flopu, ff: z toho fold, ag: agresivní akce, pa: pasivní akce } */
   function readAdj(read, w) {
-    const R = { fold: 1, thin: 0, sticky: 0, steal: 1 };
+    const R = { fold: 1, thin: 0, sticky: 0, steal: 1, def: 0 };
     if (!read || !w || !(read.n >= 6)) return R;
     const k = w * Math.min(1, read.n / 15);
     if (read.fb >= 4) { const ftb = read.ff / read.fb; R.fold = 1 + k * Math.max(-0.7, Math.min(1, (ftb - 0.45) * 2.5)); if (ftb < 0.35) R.thin = k * 0.25; }
     const acts = (read.ag || 0) + (read.pa || 0); if (acts >= 6) { const af = read.ag / acts; R.sticky = k * Math.max(-0.03, Math.min(0.08, (af - 0.35) * 0.25)); }
     const vp = read.vp / read.n; if (vp < 0.2) R.steal = 1 + k; else if (vp > 0.5) R.steal = 1 - 0.5 * k;
+    const pr = (read.pr || 0) / read.n; if (pr > 0.22) R.def = k * Math.min(2.5, (pr - 0.22) * 10); else if (pr < 0.08 && read.n >= 10) R.def = -k * 1;   // hráč otevírá moc → bránit / 3-betovat víc; skála → respekt
     return R;
   }
   const BIG = { BTN: 1.5, CO: 1, HJ: 0.5, SB: 0.3, BB: 0 };
@@ -442,33 +444,41 @@
         if (r.action !== 'fold' && b.arch === 'rock' && chance(0.2)) return fold();
         return r.action === 'allin' || r.action === 'raise' || r.action === 'bet' ? { action: r.action, to: r.to } : r.action === 'fold' ? fold() : passive();
       }
-      const c = chen(ctx.hole[0], ctx.hole[1]) - b.tight + (BIG[pos] || -0.5) + (rng() - 0.5) * S.noise * 12;
-      const r = ctx.raisesThisStreet || 0;
+      const c = chen(ctx.hole[0], ctx.hole[1]) - b.tight + S.loose + (BIG[pos] || -0.5) + (rng() - 0.5) * S.noise * 12;
+      const r = ctx.raisesThisStreet || 0, spec = specHand(ctx.hole), deep = effBB >= 40;
       if (r === 0) {
         const thr = OPEN_THR[pos] || 9, limpers = ctx.limpers || 0;
         if (c >= thr) {
           if (c >= 15 && chance(b.slow * 0.35)) return passive();                       // slowplay esa (limp / jen check)
-          if (c < thr + 3 && chance(b.limp)) return passive();                          // pasivní styl: limp
-          const to = bb * (2.5 + rng()) + limpers * bb;
+          if (c < thr + 3 && chance(b.limp * (limpers ? 1.3 : 1))) return passive();    // pasivní styl: limp
+          const to = bb * (2.2 + rng() * 0.8 + (pos === 'SB' ? 0.5 : 0)) + limpers * bb; // 2,2–3 BB (+1 BB za limpera)
           return sizeTo(to) || { action: 'raise', to: clampTo(to, ctx) };
         }
-        if ((pos === 'BTN' || pos === 'CO' || pos === 'SB') && !limpers && chance(b.bluff * 1.4 * S.bluffX * R.steal))   // krádež blindů
-          return sizeTo(bb * 2.5) || { action: 'raise', to: clampTo(bb * 2.5, ctx) };
+        if ((pos === 'BTN' || pos === 'CO' || pos === 'SB') && !limpers && c >= thr - 4 && chance(b.bluff * 1.6 * S.bluffX * R.steal))   // krádež blindů
+          return sizeTo(bb * 2.3) || { action: 'raise', to: clampTo(bb * 2.3, ctx) };
         if (!ctx.toCall) return { action: 'check' };
-        if (c >= thr - 2.5 && chance(b.limp + 0.15)) return { action: 'call' };
+        if (limpers && c >= thr - 1.5 && chance(0.35 * b.aggr)) { const to = bb * (3 + limpers); return sizeTo(to) || { action: 'raise', to: clampTo(to, ctx) }; }   // izolace limperů
+        // limp / overlimp se spekulativní rukou (páry, suited konektory, suited eso) – lidé to dělají běžně
+        if (c >= thr - 2 - (limpers ? 0.5 : 0) && chance(b.limp + 0.08 + (limpers ? 0.12 : 0))) return { action: 'call' };
+        if (spec && c >= thr - 4 && chance(b.limp * 0.6 + (limpers ? 0.15 : 0.03) + S.loose * 0.08)) return { action: 'call' };
+        if (pos === 'SB' && c >= thr - 2.5 && chance(0.12 + b.limp * 0.5)) return { action: 'call' };   // dorovnat malý blind
         return chance(S.mistake * (b.arch === 'station' ? 3 : 1)) ? { action: 'call' } : { action: 'fold' };
       }
-      const price = ctx.toCall / bb, ip = pos === 'BTN' || pos === 'CO';
+      const price = ctx.toCall / bb, ip = pos === 'BTN' || pos === 'CO', size = ctx.currentBet / bb, odds = ctx.toCall / (ctx.pot + ctx.toCall);
+      const reraised = ctx.myBet > bb;                                                   // už jsem otevřel a dostal 3-bet
       if (r === 1) {
-        const v3 = 12.5 + b.tight * 0.5;
-        if (c >= v3) return chance(b.slow * 0.5) ? { action: 'call' } : raise(ip ? 3 : 3.6);
-        if (c >= 7 && c < v3 && canRaise && chance(b.three * S.bluffX * R.steal)) return raise(ip ? 3 : 3.6);   // lehký 3-bet (blaf)
-        const callThr = 9 + b.tight * 0.5 - b.sticky * 15 - (pos === 'BB' ? 1.5 : 0) + (price > 6 ? 1.5 : 0);
+        const v3 = 12.5 + b.tight * 0.4 - R.def * 0.4;
+        if (c >= v3) return chance(b.slow * 0.5) ? { action: 'call' } : raise(ip ? 3 : 3.8);
+        const callThr = 10.5 + b.tight * 0.4 - b.def - R.def - b.sticky * 10 - (pos === 'BB' ? 2.8 : pos === 'SB' ? 0.6 : ip ? 1 : 0)
+          + Math.max(0, size - 3) * 0.9 + (odds > 0.3 ? 1 : 0) - ((ctx.callers || 0) > 0 ? 0.6 : 0) - (b.skill === 0 ? 1.2 : b.skill === 1 ? 0.3 : 0);   // slabší hráči víc dorovnávají
+        if (c >= callThr - 1.5 && c < v3 && canRaise && chance(b.three * S.bluffX * R.steal * (ip || pos === 'SB' || pos === 'BB' ? 1.2 : 0.7) + R.def * 0.04)) return raise(ip ? 3 : 3.8);   // 3-bet (i blaf)
         if (c >= callThr) return { action: 'call' };
+        if (spec && deep && price <= effBB / 20 && chance(0.3 + b.def * 0.1)) return { action: 'call' };    // set-mining / implied odds
         return chance(S.mistake * 1.5) ? { action: 'call' } : fold();
       }
       if (c >= 15 + b.tight * 0.3) return effBB < 40 || chance(0.4) ? { action: 'allin', to: allInTo } : raise(2.3);
-      if (c >= 12 + b.tight * 0.5 - b.sticky * 10) return { action: 'call' };
+      if (c >= 12 + b.tight * 0.5 - b.sticky * 10 - (reraised ? 1.5 : 0) - R.def * 0.3 - (ip ? 0.5 : 0)) return { action: 'call' };
+      if (reraised && spec && deep && price <= effBB / 12 && chance(0.4)) return { action: 'call' };
       if (canRaise && chance(b.three * 0.25 * S.bluffX)) return raise(2.3);
       return fold();
     }
@@ -477,23 +487,26 @@
     const rel = (eq - fair) / (1 - fair);                       // 0 = průměr, 1 = jistota
     const dr = ctx.street < 3 ? draws(ctx.hole, ctx.board) : { outs: 0 };
     const bluffP = p => p * S.bluffX * R.fold * (n === 1 ? 1 : n === 2 ? 0.55 : 0.25) * (ctx.ip ? 1.15 : 1);
+    const wet = boardWet(ctx.board);
     if (ctx.toCall === 0) {
       if (rel > 0.62) {
         const monster = rel > 0.82;
-        if (monster && ctx.street < 3 && chance(b.slow + (b.cr * 0.5))) return { action: 'check' };   // slowplay / past na check-raise
+        if (monster && ctx.street < 3 && !wet && chance(b.slow + (b.cr * 0.5))) return { action: 'check' };   // slowplay / past na check-raise (na suchém boardu)
         if (!ctx.ip && n <= 2 && chance(b.cr * 0.8)) return { action: 'check' };                      // silná ruka mimo pozici: check s plánem check-raise
-        if (chance(0.55 + 0.45 * b.aggr)) return bet((monster ? 0.66 : 0.5) + rng() * 0.25 + R.thin * 0.6);
+        if (chance(0.6 + 0.4 * b.aggr)) return bet((monster ? 0.66 : 0.5) + (wet ? 0.12 : 0) + (ctx.street === 3 && monster ? 0.2 : 0) + rng() * 0.2 + R.thin * 0.6);
         return { action: 'check' };
       }
       if (rel > 0.25) {
-        if (ctx.pfAgg && ctx.street === 1 && chance(0.45 + 0.35 * b.aggr)) return bet(0.33 + rng() * 0.2);   // c-bet
-        if (chance(0.25 * b.aggr + R.thin)) return bet(0.33 + rng() * 0.25);                                 // tenká hodnota / ochrana
+        if (ctx.pfAgg && ctx.street === 1 && chance(b.cb * (n === 1 ? 1 : 0.7))) return bet((wet ? 0.5 : 0.33) + rng() * 0.15);   // c-bet
+        if (chance(0.3 * b.aggr + (ctx.ip && n === 1 && ctx.street >= 2 ? 0.15 : 0) + R.thin)) return bet(0.33 + rng() * 0.25);                                 // tenká hodnota / ochrana
         return { action: 'check' };
       }
       if (dr.outs >= 8 && chance(b.semi * S.bluffX * (n === 1 ? 1 : 0.6))) return bet(0.5 + rng() * 0.25);   // semi-blaf
       if (dr.outs >= 4 && chance(b.semi * 0.4 * S.bluffX)) return bet(0.4 + rng() * 0.2);
-      if (ctx.pfAgg && ctx.street === 1 && chance(bluffP(0.35 + 0.4 * b.aggr))) return bet(0.33 + rng() * 0.2);  // c-bet blaf
-      if (chance(bluffP(b.bluff * (ctx.street === 3 ? 1.3 : 1)))) return bet(0.5 + rng() * 0.3);               // čistý blaf
+      if (ctx.pfAgg && ctx.street === 1 && chance(bluffP(b.cb * (wet ? 0.6 : 0.9)))) return bet(0.33 + rng() * 0.15);  // c-bet blaf (raději na suchém boardu)
+      if (ctx.pfAgg && ctx.street === 2 && n === 1 && chance(bluffP(b.bluff * 1.2))) return bet(0.5 + rng() * 0.2);    // druhá hlaveň
+      if (!ctx.pfAgg && ctx.ip && n === 1 && ctx.street >= 2 && chance(bluffP(b.float * 0.9))) return bet(0.45 + rng() * 0.2);   // soupeř ukázal slabost → sebrat hrnec (po floatu)
+      if (chance(bluffP(b.bluff * (ctx.street === 3 ? 1.3 : 1)))) return bet(ctx.street === 3 ? 0.66 + rng() * 0.3 : 0.5 + rng() * 0.3);   // čistý blaf
       return { action: 'check' };
     }
     const need = ctx.toCall / (ctx.pot + ctx.toCall), crBonus = ctx.checked ? b.cr * 2 : 0;
@@ -503,20 +516,37 @@
     }
     if (rel > 0.55) { if (canRaise && chance(0.12 * b.aggr + (ctx.checked ? b.cr * 0.6 : 0))) return raise(2.5 + rng() * 0.5); return { action: 'call' }; }
     const implied = dr.outs >= 8 ? 0.07 : dr.outs >= 4 ? 0.025 : 0;
-    const callEq = eq + b.sticky + R.sticky + implied + (b.skill === 0 ? (rel > 0 ? 0.08 : 0) : 0);   // začátečník přehlíží pot odds
+    const callEq = eq + b.sticky + S.sticky + R.sticky + implied + (b.skill === 0 ? (rel > 0 ? 0.06 : 0) : 0);   // začátečník přehlíží pot odds
     if (dr.outs >= 8 && canRaise && chance(b.semi * 0.3 * S.bluffX * (ctx.checked ? 1.5 : 1))) return raise(2.5 + rng() * 0.5);   // semi-blaf raise
     if (callEq >= need + (b.skill === 2 ? 0.01 : 0.03)) return chance(S.mistake * 0.5) ? { action: 'fold' } : { action: 'call' };
     if (canRaise && n === 1 && chance(bluffP(b.bluff * 0.22))) return raise(2.6 + rng() * 0.6);                        // blaf raise
+    // float: v pozici, heads-up, malá sázka na flopu, něco do ruky (overkarty / backdoor) → call s plánem sebrat hrnec později
+    if (ctx.street === 1 && ctx.ip && n === 1 && need <= 0.3 && (rel > -0.2 || dr.outs >= 4) && chance(b.float * (R.fold < 1 ? 0.6 : 1) + R.sticky * 2)) return { action: 'call' };
+    // obrana podle MDF (dobrý hráč se nenechá vyblafovat): heads-up chytá blafy s hraničními rukama
+    if (n === 1 && S.mdf && eq >= need * 0.7 && chance(S.mdf * (0.3 + R.sticky * 4) * (1 - need))) return { action: 'call' };
     return chance(S.mistake) ? { action: 'call' } : { action: 'fold' };
+  }
+  /* spekulativní ruka: pár, suited konektor / gapper, suited eso */
+  function specHand(h) {
+    const r0 = rankOf(h[0]), r1 = rankOf(h[1]), s = suitOf(h[0]) === suitOf(h[1]), g = Math.abs(r0 - r1);
+    return r0 === r1 || (s && (g <= 2 || Math.max(r0, r1) === 12)) || (g === 1 && Math.min(r0, r1) >= 7);
+  }
+  /* mokrý board: 2+ stejné barvy nebo 3 karty blízko u sebe */
+  function boardWet(bd) {
+    if (!bd || bd.length < 3) return false;
+    const sc = [0, 0, 0, 0]; bd.forEach(c => sc[suitOf(c)]++); if (Math.max(...sc) >= (bd.length >= 4 ? 3 : 2)) return true;
+    const rs = [...new Set(bd.map(rankOf))].sort((a, b) => a - b);
+    for (let i = 0; i + 2 < rs.length; i++) if (rs[i + 2] - rs[i] <= 4) return true;
+    return false;
   }
   /* čtení hráče: zápis jedné akce (street, typ, čelil sázce) */
   function readNote(read, street, action, facing, voluntary) {
     if (!read) return;
-    if (street === 0) { if (voluntary && (action === 'call' || action === 'raise' || action === 'bet' || action === 'allin')) read.vpH = 1; return; }
+    if (street === 0) { if (voluntary && (action === 'call' || action === 'raise' || action === 'bet' || action === 'allin')) read.vpH = 1; if (voluntary && (action === 'raise' || action === 'bet' || action === 'allin')) read.prH = 1; return; }
     if (facing) { read.fb = (read.fb || 0) + 1; if (action === 'fold') read.ff = (read.ff || 0) + 1; }
     if (action === 'bet' || action === 'raise' || action === 'allin') read.ag = (read.ag || 0) + 1; else if (action === 'call' || action === 'check') read.pa = (read.pa || 0) + 1;
   }
-  function readHand(read) { if (!read) return; read.n = (read.n || 0) + 1; if (read.vpH) read.vp = (read.vp || 0) + 1; read.vpH = 0; }
+  function readHand(read) { if (!read) return; read.n = (read.n || 0) + 1; if (read.vpH) read.vp = (read.vp || 0) + 1; if (read.prH) read.pr = (read.pr || 0) + 1; read.vpH = 0; read.prH = 0; }
 
   const api = { RANKS, RCH, SUITS, SUIT_SYM, rankOf, suitOf, cardStr, parseCard, parseCards, evaluate, handCategory,
     handName, HAND_NAMES, chen, handLabel, equity, exactHeadsUp, recommend, grade, botDecide, actName, makeBot, botOf, draws, strength, posName, readNote, readHand, ARCH };

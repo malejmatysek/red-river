@@ -9,7 +9,7 @@ const W = ms => new Promise(r => setTimeout(r, ms));
     const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
     const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message)); p.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
     await p.addInitScript(x => { window.__NOSPLASH = true; window.__RR_MOCK = true; localStorage.setItem('pt_onboarded', '1');
-      localStorage.setItem('pt_settings', JSON.stringify(Object.assign({ v: 4, lang: 'cs', level: 1, opps: 5, learn: false, sound: false, vibrate: false, meter: true }, x))); }, extra || {});
+      localStorage.setItem('pt_settings', JSON.stringify(Object.assign({ v: 4, lang: 'cs', level: 1, opps: 5, learn: false, sound: false, vibrate: false, meter: true, speed: 2 }, x))); }, extra || {});
     await p.goto('file://' + __dirname + '/index.html'); await W(400); return p;
   };
   const p = await mk(390, 844);

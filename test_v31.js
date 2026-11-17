@@ -8,7 +8,7 @@ const W = ms => new Promise(r => setTimeout(r, ms));
   const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
   const p = await ctx.newPage(); p.on('pageerror', e => errors.push(e.message));
   await p.addInitScript(() => { window.__NOSPLASH = true; localStorage.setItem('pt_onboarded', '1');
-    localStorage.setItem('pt_settings', JSON.stringify({ v: 4, lang: 'cs', level: 1, opps: 5, learn: false, sound: false, vibrate: false, meter: true })); });
+    localStorage.setItem('pt_settings', JSON.stringify({ v: 4, lang: 'cs', level: 1, opps: 5, learn: false, sound: false, vibrate: false, meter: true, speed: 2 })); });
   await p.goto('file://' + __dirname + '/index.html'); await W(400);
   await p.evaluate(() => { __poker.nav.go('game'); }); await W(300);
   const waitTurn = async (ms = 15000) => { const t0 = Date.now(); while (Date.now() - t0 < ms) { const s = await p.evaluate(() => ({ t: __poker.G.turn, d: __poker.G.dealing, o: __poker.G.over, c: !!__poker.G.ctx })); if (s.o) return 'over'; if (s.t === 0 && !s.d && s.c) return 'turn'; await W(60); } return 'timeout'; };

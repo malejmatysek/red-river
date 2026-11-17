@@ -85,7 +85,21 @@
   function useNet(net) {
     if (S.off) S.off(); S.net = net; S.demo = net.kind === 'mock';
     S.off = net.onChange(v => setView(v));
+    if (S.eoff) S.eoff(); S.eoff = net.onEmote ? net.onEmote(onEmo) : null;
     return net;
+  }
+  /* hlášky ostatních: jen známé id, sedící člověk (ne já, ne bot), max 1 za 4 s na místo, ztlumení v nastavení */
+  const emoSeen = {};
+  function onEmo(p) {
+    const v = S.view, E = window.RREmo; if (!v || !p || !E || !E.valid(p.id) || R.settings.muteEmo) return;
+    const i = p.seat | 0, s = v.seats && v.seats[i]; if (!s || s.bot || i === v.me || i !== +p.seat) return;
+    const t0 = Date.now(); if (t0 - (emoSeen[i] || 0) < 3500) return; emoSeen[i] = t0;
+    const el = $('otOpps').querySelector(`[data-seat="${i}"] .avatar`); if (el) E.show($('otFelt'), el, p.id, I18N.lang);
+  }
+  function sendEmo(id) {
+    const v = S.view, E = window.RREmo; if (!v || v.me == null || v.me < 0 || !S.net || !S.net.emote || !E.ready()) return;
+    if (S.net.emote(id, v.me) === false) { SFX.fold(); return; }
+    E.mark($('otEmoBtn')); E.show($('otFelt'), $('otMeAv'), id, I18N.lang); SFX.tap();
   }
   /* připojení: Supabase, při nedostupnosti ukázkový mock (s upozorněním) */
   function ensure() {
@@ -451,6 +465,7 @@
   window.OnlineUI = OnlineUI;
   $('homeOnline').onclick = () => { SFX.tap(); nav.go('online'); };
   if ($('homePublic')) $('homePublic').onclick = () => { SFX.tap(); nav.go('public'); };
+  if ($('otEmoBtn')) $('otEmoBtn').onclick = () => { SFX.tap(); if (window.RREmoOpen) window.RREmoOpen(sendEmo); };
   $('otMenu').onclick = () => {
     const pub = isPubView(S.view);
     R.openSheet(`<h2>${esc(S.view ? tableTitle(S.view) : '')}</h2><div class="menu-list"><button class="btn wide" id="omReview">${t('on.review')}</button>${pub ? `<button class="btn wide" id="omReport">${t('pub.report')}</button>` : `<button class="btn wide" id="omCopy">${t('on.copy')}</button>`}<button class="btn wide" id="omLeave">${t('on.leave')}</button></div><div class="note">${t('on.noHints')}</div>`);
