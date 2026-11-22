@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.9.4', BUILD = 'v32';
+  const APP_VERSION = '1.9.5', BUILD = 'v33';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -75,10 +75,19 @@
   if (typeof wallet.showTok !== 'number') wallet.showTok = 3;
   if (!wallet.owned.emo) wallet.owned.emo = {};   // v1.9.4: balíčky hlášek   // v1.9: žetony „Ukázat“ (jen offline) – malý startovní balíček
   if (!wallet.wheelDay && wallet.lastDaily === today()) wallet.wheelDay = wallet.lastDaily;   // dnešní starý bonus = dnešní otočení
+  /* v1.9.5: skrytý neomezený režim (jen offline měny: body, diamanty, žetony Ukázat) – kód v Nastavení (7× klepnout na verzi).
+     Skutečné zůstatky zůstávají uložené beze změny; v režimu ∞ se čte obří zůstatek a utrácení ho nesnižuje. Online stoly mají body na serveru → beze změny. */
+  const INF_KEY = 'pt_inf', INF_CODE = 'REDRIVER-INF', INF_V = 1e9;
+  let INF = false; try { INF = localStorage.getItem(INF_KEY) === '1'; } catch (e) {}
+  const REAL = {};
+  ['points', 'diamonds', 'showTok'].forEach(k => { REAL[k] = wallet[k];
+    Object.defineProperty(wallet, k, { enumerable: true, configurable: true, get: () => (INF ? INF_V : REAL[k]), set: v => { if (!INF) REAL[k] = v; } }); });   // v režimu ∞ se skutečné zůstatky nemění (ani výdaje, ani nákupy za ∞)
+  Object.defineProperty(wallet, 'toJSON', { enumerable: false, value() { const o = Object.assign({}, this); for (const k in REAL) o[k] = REAL[k]; return o; } });
+  const balTxt = v => (INF ? '∞' : fmtPts(v));
   const saveW = () => { save('pt_wallet', wallet); updatePts(); };
   const fmtPts = v => String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
   function updatePts() {
-    [['ptsV', wallet.points], ['homePts', wallet.points], ['diaV', wallet.diamonds], ['homeDia', wallet.diamonds]].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.textContent = fmtPts(v); });
+    [['ptsV', wallet.points], ['homePts', wallet.points], ['diaV', wallet.diamonds], ['homeDia', wallet.diamonds]].forEach(([id, v]) => { const e = document.getElementById(id); if (e) e.textContent = balTxt(v); });
     const wb = document.getElementById('homeWheelBadge'); if (wb) wb.hidden = wallet.wheelDay === today();
     const ws = document.getElementById('homeWheelSub'); if (ws && typeof I18N !== 'undefined') ws.textContent = wallet.wheelDay === today() ? I18N.t('wh.next', { t: untilMidnight(true) }) : I18N.t('ui.wheelSub');
   }
@@ -643,7 +652,7 @@
       if (sc > stats.best) { stats.best = sc; stats.bestCards = h0.cards.concat(G.board); }
     }
     if (!settings.bankroll && !T) { wallet.points += net; saveW(); }
-    stats.hist.push(Math.round(wallet.points + (settings.bankroll ? h0.stack : 0)));
+    stats.hist.push(Math.round((INF ? REAL.points : wallet.points) + (settings.bankroll ? h0.stack : 0)));
     if (!stats.histP.length) stats.histP.push(stats.profit - net);
     stats.histP.push(stats.profit);
     const thin = a => a.length > 400 ? a.filter((_, i, x) => i % 2 === 0 || i === x.length - 1) : a;
@@ -1084,7 +1093,7 @@
     }
     else if (G.over && G.tableKey === 'tour' && !(tour && tour.active)) html = `<div class="waiting">${t('to.over')}</div>`;
     else if (G.over && G.foldWin && G.showPick == null) html = `<button class="btn two" data-show="3">${t('sm.show')}</button><button class="btn two" data-show="1">${t('sm.one1')}</button><button class="btn two" data-show="2">${t('sm.one2')}</button><button class="btn two primary" data-show="0">${t('sm.muck')}</button>`;
-    else if (G.over) html = (peekable() ? `<button class="btn two" id="peekBtn"><span class="sh-tok"><span class="tok-ic">👁</span>${wallet.showTok}</span><small>${t('tok.peek')}</small></button>` : expert() ? `<button class="btn" id="revBtn">${t('m.review')}</button>` : '') + `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
+    else if (G.over) html = (peekable() ? `<button class="btn two" id="peekBtn"><span class="sh-tok"><span class="tok-ic">👁</span>${balTxt(wallet.showTok)}</span><small>${t('tok.peek')}</small></button>` : expert() ? `<button class="btn" id="revBtn">${t('m.review')}</button>` : '') + `<button class="btn primary" id="nextBtn">${t('g.nextHand')}</button>`;
     else if (G.turn !== 0 || G.dealing || !G.ctx || !G.rec) html = `<div class="waiting">${G.dealing ? t('g.dealing') + '…' : hero().folded ? t('g.foldedWait') : G.turn > 0 ? t('g.thinking', { a: G.players[G.turn].name }) : t('g.dealing') + '…'}</div>`;
     else {
       const c = G.ctx, h = hero(), r = helpOn('recs') || G.hint ? G.rec.action : '';
@@ -1212,7 +1221,7 @@
   function needPoints(need) {
     G.dealing = false; render();
     const wOk = wallet.wheelDay !== today(), exOk = wallet.diamonds > 0 && wallet.points < START, rfOk = wallet.points < PTS.refillMin;
-    openSheet(`<h2>${t('pts.need')}</h2><div class="sub">${t('pts.needTxt', { n: fmtPts(need), h: fmtPts(wallet.points) })}</div>
+    openSheet(`<h2>${t('pts.need')}</h2><div class="sub">${t('pts.needTxt', { n: fmtPts(need), h: balTxt(wallet.points) })}</div>
       <div class="np-opts">
         <button class="btn wide ${wOk ? 'primary' : ''}" id="npWheel" ${wOk ? '' : 'disabled'}>${wheelMini()} ${wOk ? t('wh.go') : t('wh.next', { t: untilMidnight(true) })}</button>
         ${exOk ? `<button class="btn wide" id="npEx">${icx(t('dia.exBtn', { n: fmtPts(PTS.diaRate) }))} ${ICON.pts(15)}</button>` : ''}
@@ -1339,6 +1348,19 @@
   const tg = (k, title, sub) => `<div class="row"><div>${title}${sub ? `<small>${sub}</small>` : ''}</div><label class="tg"><input type="checkbox" data-k="${k}" ${settings[k] ? 'checked' : ''}><i></i></label></div>`;
   const seg = (k, title, opts, sub) => `<div class="row col"><div>${title}${sub ? `<small>${sub}</small>` : ''}</div><div class="seg full">${opts.map(([v, l]) => `<button data-s="${k}" data-v="${v}" class="${String(settings[k]) === String(v) ? 'on' : ''}">${l}</button>`).join('')}</div></div>`;
   let confirmReset = false;
+  function openInfCode() {
+    openSheet(`<h2>${t('inf.title')}</h2><div class="sub">${INF ? t('inf.on') : t('inf.sub')}</div>
+      <input class="inf-in" id="infIn" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="${t('inf.ph')}">
+      <button class="btn primary wide" id="infGo">${t('inf.ok')}</button>`);
+    const go = () => {
+      const v = String($('infIn').value || '').trim().toUpperCase();
+      if (v !== INF_CODE) { SFX.fold(); vib([30, 40, 30]); $('infIn').classList.add('bad'); return; }
+      INF = !INF; try { if (INF) localStorage.setItem(INF_KEY, '1'); else localStorage.removeItem(INF_KEY); } catch (e) {}
+      closeSheet(); SFX.win(); toast(t(INF ? 'inf.done' : 'inf.off')); updatePts(); renderSettings(); lastActions = ''; if (G.players.length) render();
+    };
+    $('infGo').onclick = go; $('infIn').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); go(); } };
+    setTimeout(() => { try { $('infIn').focus(); } catch (e) {} }, 250);
+  }
   function renderSettings() {
     const nOpp = settings.opps;
     $('setBody').innerHTML = `
@@ -1371,11 +1393,12 @@
         <button class="row link" id="setIntro"><span>${t('set.intro')}</span><span class="val"></span></button>
         <button class="row link" id="setSession"><span>${t('set.newSession')}<small>${t('set.newSessionSub')}</small></span><span class="val"></span></button>
         <button class="row link" id="setReset"><span class="danger">${confirmReset ? t('set.resetConfirm') : t('set.reset')}</span></button>
-        <div class="row"><span>${t('set.about')}</span><span class="muted">Red River ${APP_VERSION} · ${BUILD}</span></div>
+        <div class="row" id="setVer"><span>${t('set.about')}</span><span class="muted">Red River ${APP_VERSION} · ${BUILD}${INF ? ' · ∞' : ''}</span></div>
       </div>
       <div class="about">${t('set.aboutTxt')}</div>`;
     const B = $('setBody');
     $('setAv').onclick = () => { SFX.tap(); openAvatars(renderSettings); };
+    { let n = 0, tm = 0; $('setVer').onclick = () => { clearTimeout(tm); tm = setTimeout(() => { n = 0; }, 2500); if (++n >= 7) { n = 0; openInfCode(); } }; }
     B.querySelectorAll('[data-k]').forEach(i => i.onchange = () => { settings[i.dataset.k] = i.checked; save('pt_settings', settings); SFX.tap(); if (i.dataset.k === 'bankroll') renderSettings(); lastActions = ''; if (i.dataset.k === 'adv' || i.dataset.k === 'gloss') setLang(I18N.lang); else if (G.players.length) render(); });
     B.querySelectorAll('[data-lv]').forEach(b => b.onclick = () => { applyLevel(+b.dataset.lv); SFX.tap(); setLang(I18N.lang); renderSettings(); });
     B.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
@@ -2020,7 +2043,7 @@
     dayTick();
     const done = ACH.filter(a => wallet.ach[a.id]).length, L = wallet.login;
     const bar = (c, g) => `<div class="prog"><i style="width:${Math.min(100, c / g * 100)}%"></i></div>`;
-    $('achBody').innerHTML = `<div class="pts-hero dia-hero"><div class="lbl">${t('dia.name')}</div><div class="v">${ICON.dia(30)} <span id="achDia">${fmtPts(wallet.diamonds)}</span></div><div class="sub">${t('dia.what')}</div></div>
+    $('achBody').innerHTML = `<div class="pts-hero dia-hero"><div class="lbl">${t('dia.name')}</div><div class="v">${ICON.dia(30)} <span id="achDia">${balTxt(wallet.diamonds)}</span></div><div class="sub">${t('dia.what')}</div></div>
       <h3>${t('ach.streak')}</h3><div class="grp"><div class="row col"><div class="streak7">${[1, 2, 3, 4, 5, 6, 7].map(i => `<span class="${i <= ((L.streak - 1) % 7) + 1 ? 'on' : ''}">${i === 7 ? ICON.dia(14) : i}</span>`).join('')}</div><small>${icx(t('ach.streakTxt', { n: L.streak, d: PTS.login7 }))}</small></div></div>
       <h3>${t('ach.chal')} <small class="muted h3s">· ${t('ach.chalSub')}</small></h3><div class="grp">${CHAL.map(([k, g, d]) => { const c = Math.min(g, wallet.day[k] || 0), ok = wallet.day.done[k];
         return `<div class="row ach ${ok ? 'done' : ''}" data-ch="${k}"><div class="ach-t"><b>${t('ch.' + k)}</b>${bar(c, g)}<small>${c} / ${g}</small></div><span class="ach-r">${ok ? '✓' : '+' + d} ${ICON.dia(14)}</span></div>`; }).join('')}</div>
@@ -2053,7 +2076,7 @@
     clearInterval(wheelTimer);
     const used = wallet.wheelDay === today();
     const res = wheelLast ? (wheelLast.j ? t('wh.jack', { n: wheelLast.j }) : wheelLast.k ? t('wh.tok', { n: wheelLast.k }) : t('wh.won', { n: fmtPts(wheelLast.p) })) : '';
-    $('wheelBody').innerHTML = `<div class="bal-row"><span>${ICON.pts(18)} <b id="whPts">${fmtPts(wallet.points)}</b></span><span>${ICON.dia(18)} <b id="whDia">${fmtPts(wallet.diamonds)}</b></span></div>
+    $('wheelBody').innerHTML = `<div class="bal-row"><span>${ICON.pts(18)} <b id="whPts">${balTxt(wallet.points)}</b></span><span>${ICON.dia(18)} <b id="whDia">${balTxt(wallet.diamonds)}</b></span></div>
       <div class="sub center">${t('wh.sub')}</div>${wheelSVG()}
       <div class="wh-res ${wheelLast && wheelLast.j ? 'jack' : ''}" id="whRes">${icx(res)}</div>
       <button class="btn primary wide" id="whSpin" ${used || wheelBusy ? 'disabled' : ''}>${wheelBusy ? t('wh.spinning') : used ? t('wh.next', { t: `<span id="whCd">${untilMidnight()}</span>` }) : t('wh.spin')}</button>
@@ -2171,8 +2194,8 @@
   function refill() { if (wallet.points >= PTS.refillMin) return; addPts(PTS.refillTo - wallet.points, t('pts.got', { n: PTS.refillTo - wallet.points })); }
   function renderShop() {
     const wOk = wallet.wheelDay !== today(), refillOk = wallet.points < PTS.refillMin, exOk = wallet.diamonds > 0 && wallet.points < START;
-    const hero = `<div class="sh-bal"><div><span>${t('pts.bal')}</span><b>${ICON.pts(24)}${fmtPts(wallet.points)}</b>${settings.bankroll && session.hero > 0 && session.bank ? `<small>${t('pts.table')}: ${fmtPts(session.hero)}</small>` : ''}</div>
-      <div><span>${t('dia.name')}</span><b class="d">${ICON.dia(24)}${fmtPts(wallet.diamonds)}</b></div></div>`;
+    const hero = `<div class="sh-bal"><div><span>${t('pts.bal')}</span><b>${ICON.pts(24)}${balTxt(wallet.points)}</b>${settings.bankroll && session.hero > 0 && session.bank ? `<small>${t('pts.table')}: ${fmtPts(session.hero)}</small>` : ''}</div>
+      <div><span>${t('dia.name')}</span><b class="d">${ICON.dia(24)}${balTxt(wallet.diamonds)}</b></div></div>`;
     const lookBtn = (k, id, price) => { const own = !!wallet.owned[k][id], on = wallet.equip[k] === id;
       return `<button class="sh-it ${on ? 'on' : ''}" data-lk="${k}:${id}"><span class="pv">${lookPreview(k, id)}</span><b>${t(`lk.${k}.${id}`)}</b><small>${t('lk.' + k)}</small><span class="pr">${on ? '✓ ' + t('lk.using') : own ? t('lk.use') : `${ICON.dia(13)} ${price}`}</span></button>`; };
     let body;
@@ -2192,7 +2215,7 @@
           <div class="sh-sm"><b>${t('dia.ex')}</b><span>${icx(t('dia.exSub', { n: fmtPts(PTS.diaRate), m: fmtPts(START) }))}</span><button class="sh-pill ${exOk ? 'r' : ''}" id="shEx" ${exOk ? '' : 'disabled'}>${exOk ? icx(t('dia.exBtn', { n: fmtPts(PTS.diaRate) })) : wallet.diamonds ? t('dia.exNo', { m: fmtPts(START) }) : t('dia.exNone')}</button></div>
         </div>
         <div class="sh-two">
-          <div class="sh-sm"><b><span class="sh-tok"><span class="tok-ic">👁</span>${t('tok.n')}: ${wallet.showTok}</span></b><span>${t('tok.sub')}</span><button class="sh-pill ${wallet.diamonds >= 1 ? 'r' : ''}" id="shTokD" ${wallet.diamonds >= 1 ? '' : 'disabled'}>${icx(t('tok.buy'))}</button></div>
+          <div class="sh-sm"><b><span class="sh-tok"><span class="tok-ic">👁</span>${t('tok.n')}: ${balTxt(wallet.showTok)}</span></b><span>${t('tok.sub')}</span><button class="sh-pill ${wallet.diamonds >= 1 ? 'r' : ''}" id="shTokD" ${wallet.diamonds >= 1 ? '' : 'disabled'}>${icx(t('tok.buy'))}</button></div>
           <div class="sh-sm"><b>${t('tok.exT')}</b><span>${icx(t('tok.exSub', { n: fmtPts(PTS.tokPts) }))}</span><button class="sh-pill ${wallet.points >= PTS.tokPts ? 'r' : ''}" id="shTokP" ${wallet.points >= PTS.tokPts ? '' : 'disabled'}>${icx(t('tok.ex', { n: fmtPts(PTS.tokPts) }))}</button></div>
         </div>
         <div class="sh-h"><b>💬 ${t('emo.shop')}</b></div>
@@ -2267,5 +2290,5 @@
 
   applyLook(); loginTick(); checkAch(true); updatePts();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { loginTick(); updatePts(); if (nav.cur === 'wheel') renderWheel(); } });
-  window.__poker = { tourStart: bi => tourStart(bi), tour: () => tour, openTour, showCoach, CS: () => CS, startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
+  window.__poker = { inf: () => INF, tourStart: bi => tourStart(bi), tour: () => tour, openTour, showCoach, CS: () => CS, startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
 })();

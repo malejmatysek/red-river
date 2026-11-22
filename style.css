@@ -1263,3 +1263,8 @@ body[data-cfelt="midnight"]{--f1:#1d2d63;--f2:#080d24;--rail1:#232a44;--rail2:#0
 .felt.many .opp.think::after{top:-19px}
 @keyframes thinkP{50%{opacity:.45}}
 @media (prefers-reduced-motion:reduce){.felt .opp.think::after{animation:none}}
+/* v33 – kód (neomezený režim) */
+.inf-in{width:100%;box-sizing:border-box;margin:14px 0 12px;height:52px;border-radius:14px;border:1px solid #2e2d35;background:#16151a;color:#fff;font:inherit;font-size:18px;letter-spacing:.12em;text-align:center;outline:none;text-transform:uppercase}
+.inf-in:focus{border-color:#55545c}
+.inf-in.bad{border-color:var(--red);animation:infShake .3s}
+@keyframes infShake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
