@@ -216,6 +216,29 @@
     draw(false);
     return { get: () => to };
   }
-  const api = { sizer, kind, AV, avatarSVG, botAv, valid, myAv, layout, sync, chips, pop, shake, muck, ripple, chipStack, center, off };
+
+  /* ---------- hrnce: hlavní + vedlejší (stejný algoritmus jako server) ----------
+     ps = [{ id, total, folded }] → [{ amount, elig: [id] }] (sousední úrovně se stejnými hráči se slučují) */
+  function splitPots(ps) {
+    const levels = [...new Set(ps.map(p => p.total).filter(x => x > 0))].sort((a, b) => a - b), out = [];
+    let prev = 0;
+    for (const lv of levels) {
+      const amt = ps.reduce((s, p) => s + Math.min(p.total, lv) - Math.min(p.total, prev), 0);
+      const el = ps.filter(p => !p.folded && p.total >= lv).map(p => p.id);
+      const last = out[out.length - 1];
+      if (last && last.elig.join() === el.join()) last.amount += amt; else if (amt) out.push({ amount: amt, elig: el });
+      prev = lv;
+    }
+    return out;
+  }
+  /* popisky jen když jsou aspoň 2 hrnce, o které se hrálo (hrnec s 1 hráčem = vrácený přebytek, ne vedlejší pot)
+     pots = [{ amount, elig, winners }] → [{ key:'main'|'side', n, amount, winners }] nebo [] */
+  function potLabels(pots, T) {
+    const real = (pots || []).filter(p => p.elig && p.elig.length >= 2 && p.winners && p.winners.length);
+    if (real.length < 2) return [];
+    let side = 0; const sides = real.length - 1;
+    return real.map((p, i) => ({ key: i ? 'side' : 'main', label: i ? T('pot.side') + (sides > 1 ? ' ' + (++side) : '') : T('pot.main'), amount: p.amount, winners: p.winners }));
+  }
+  const api = { splitPots, potLabels, sizer, kind, AV, avatarSVG, botAv, valid, myAv, layout, sync, chips, pop, shake, muck, ripple, chipStack, center, off };
   root.RRT = api;
 })(typeof window !== 'undefined' ? window : globalThis);

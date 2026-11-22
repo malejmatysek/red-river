@@ -302,6 +302,13 @@
     const won = r.won || {}, ids = Object.keys(won).map(Number).filter(i => won[i] > 0);
     const main = r.pots && r.pots[0];
     const cat = r.showdown && main && main.cat >= 0 ? ' · ' + t('hand.' + main.cat) : (r.showdown ? '' : ' · ' + t('on.foldWin'));
+    // více hrnců (hlavní + vedlejší): kdo vyhrál který; způsobilost odvozená ze seats (stejný algoritmus jako server)
+    if (r.showdown && r.pots && r.pots.length > 1 && window.RRT) {
+      const sp = RRT.splitPots(v.seats.filter(s => s && s.inHand).map(s => ({ id: s.i, total: s.total, folded: s.folded })));
+      const L = sp.length === r.pots.length ? RRT.potLabels(r.pots.map((p, k) => ({ amount: p.amount, winners: p.winners, elig: sp[k].elig })), t) : [];
+      const nm = i => i === v.me ? t('you') : (v.seats[i] ? v.seats[i].name : '?');
+      if (L.length) return L.map(p => t('pot.who', { p: p.label, a: fmtPts(p.amount), w: p.winners.map(nm).join(' + ') })).join(' · ');
+    }
     if (won[v.me] > 0 && ids.length === 1) return t('on.youWon', { a: fmtPts(won[v.me]) }) + cat;
     return ids.map(i => t('on.won', { n: v.seats[i] ? v.seats[i].name : '?', a: fmtPts(won[i]) })).join(' · ') + cat;
   }

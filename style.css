@@ -1268,3 +1268,7 @@ body[data-cfelt="midnight"]{--f1:#1d2d63;--f2:#080d24;--rail1:#232a44;--rail2:#0
 .inf-in:focus{border-color:#55545c}
 .inf-in.bad{border-color:var(--red);animation:infShake .3s}
 @keyframes infShake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+/* v34 – hlavní / vedlejší pot u vítězů */
+.sd-row .sd-p{font-size:11px;font-weight:600;color:#cfcdd6;background:rgba(255,255,255,.07);border-radius:999px;padding:1px 7px;white-space:nowrap}
+#scr-game .sd-row .sd-p{font-size:10.5px}
+.sum-pots{font-size:13px;color:#cfcdd6;margin:-4px 0 10px;line-height:1.4}

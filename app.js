@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const t = (k, p) => I18N.t(k, p);
-  const APP_VERSION = '1.9.5', BUILD = 'v33';
+  const APP_VERSION = '1.9.6', BUILD = 'v34';
   const FAST = () => !!window.__FAST;
   const reduced = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const noAnim = () => FAST() || reduced();
@@ -618,7 +618,7 @@
     G.over = true; G.turn = -1;
     const live = alive(), potAmt = pot();
     setTimeout(() => emoAfterHand(live, potAmt), FAST() ? 0 : 1400);
-    G.winners = [];
+    G.winners = []; G.pots = null;
     if (live.length === 1) { live[0].stack += pot(); G.winners.push(live[0]); }
     else {
       while (G.board.length < 5) G.board.push(G.deck.pop());
@@ -634,6 +634,11 @@
         const share = Math.floor(part / ws.length);
         ws.forEach((w, i) => { w.stack += share + (i === 0 ? part - share * ws.length : 0); if (!G.winners.includes(w)) G.winners.push(w); });
       }
+      // hlavní / vedlejší hrnce pro popisky (kdo co vyhrál)
+      G.pots = RRT.splitPots(G.players.map((p, i) => ({ id: i, total: p.total, folded: p.folded }))).map(pt => {
+        const el = pt.elig.map(i => G.players[i]), best = Math.max(...el.map(p => p.score));
+        return { amount: pt.amount, elig: pt.elig, winners: el.filter(p => p.score === best).map(p => G.players.indexOf(p)) };
+      });
     }
     const net = hero().stack - hero().start, h0 = hero(), heroWon = G.winners.includes(h0), sdHand = live.length > 1;
     G.heroNet = net; G.foldWin = live.length === 1 && !!live[0].hero && !FAST(); G.showPick = null; G.peek = false;
@@ -696,12 +701,19 @@
     el.hidden = !show; if (show) setHTML(el, meterHTML(h.cards, G.board, G.players.filter(p => !p.hero && !p.folded).length));
   }
   /* ---------- showdown: karty botů odkryté u stolu (všechny hry s boty) ---------- */
+  /* popisky hrnců u vítězů: „Hlavní pot 18“ / „Vedlejší pot 80“ (jen při více hrncích) */
+  const potsOf = () => RRT.potLabels(G.pots, t);
+  function potTag(i) {
+    const L = potsOf().filter(p => p.winners.includes(i)); if (!L.length) return '';
+    return `<span class="sd-p">${L.map(p => `${p.label} ${fmtPts(Math.floor(p.amount / p.winners.length))}${p.winners.length > 1 ? ' · ' + t('pot.split') : ''}`).join(' + ')}</span>`;
+  }
+  const potLine = () => potsOf().map(p => t('pot.who', { p: p.label, a: fmtPts(p.amount), w: p.winners.map(i => pname(G.players[i])).join(' + ') })).join(' · ');
   function renderShowdown() {
     const el = $('sdStrip'); if (!el) return;
     const show = G.over && G.winners && alive().length > 1 && G.board.length === 5;
     el.hidden = !show; if (!show) { el.dataset.k = ''; return; }
-    const k = G.handNo + '|' + G.players.filter(p => p.show).length; if (el.dataset.k === k) return; el.dataset.k = k;
-    el.innerHTML = G.players.filter(p => p.show && !p.folded).map(p => `<div class="sd-row ${G.winners.includes(p) ? 'win' : ''}"><span class="sd-n">${pname(p)}</span><span class="sd-c">${p.cards.map(c => cardHTML(c, 'sm')).join('')}</span><span class="sd-h">${PE.handName(p.cards.concat(G.board))}</span>${G.winners.includes(p) ? '<span class="sd-w">✓</span>' : ''}</div>`).join('');
+    const k = G.handNo + '|' + G.players.filter(p => p.show).length + '|' + I18N.lang; if (el.dataset.k === k) return; el.dataset.k = k;
+    el.innerHTML = G.players.filter(p => p.show && !p.folded).map(p => `<div class="sd-row ${G.winners.includes(p) ? 'win' : ''}"><span class="sd-n">${pname(p)}</span><span class="sd-c">${p.cards.map(c => cardHTML(c, 'sm')).join('')}</span><span class="sd-h">${PE.handName(p.cards.concat(G.board))}</span>${G.winners.includes(p) ? '<span class="sd-w">✓</span>' + potTag(G.players.indexOf(p)) : ''}</div>`).join('');
   }
   /* ---------- před hrou: úroveň botů (+ ukazatel síly) pro Trénovat i Klasickou hru ---------- */
   function openSetup(mode) {
@@ -1187,7 +1199,7 @@
     const title = net > 0 ? t('s.won', { n: net }) : net < 0 ? t('s.lost', { n: -net }) : (G.winners.length > 1 ? t('s.split') : t('s.even'));
     const wn = G.winners.map(w => w.hero ? t('you').toLowerCase() : w.name).join(', ');
     const sd = alive().length > 1;
-    let html = `<h2>${title}</h2><div class="sub">${sd ? t('s.sd', { w: wn, h: PE.handName(G.winners[0].cards.concat(G.board)).toLowerCase() }) : t('s.folds', { w: wn })} · pot ${pot()}</div>`;
+    let html = `<h2>${title}</h2><div class="sub">${sd ? t('s.sd', { w: wn, h: PE.handName(G.winners[0].cards.concat(G.board)).toLowerCase() }) : t('s.folds', { w: wn })} · pot ${pot()}</div>${sd && potsOf().length ? `<div class="sum-pots">${potLine()}</div>` : ''}`;
     if (sd) {
       html += `<h3>${t('s.cards')}</h3><div class="sum-board">${G.board.map(c => cardHTML(c, 'sm')).join('')}</div>` + G.players.filter(p => p.show).map(p =>
         `<div class="showline ${G.winners.includes(p) ? 'winner' : ''}"><span class="who">${pname(p)}</span>${p.cards.map(c => cardHTML(c, 'sm')).join('')}<span class="hn">${PE.handName(p.cards.concat(G.board))}</span></div>`).join('');
@@ -2290,5 +2302,5 @@
 
   applyLook(); loginTick(); checkAch(true); updatePts();
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { loginTick(); updatePts(); if (nav.cur === 'wheel') renderWheel(); } });
-  window.__poker = { inf: () => INF, tourStart: bi => tourStart(bi), tour: () => tour, openTour, showCoach, CS: () => CS, startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
+  window.__poker = { inf: () => INF, showSummary, t, tourStart: bi => tourStart(bi), tour: () => tour, openTour, showCoach, CS: () => CS, startHand, heroAct, coachGo, coachRetry, buyHint, openGuide, openCombo, quizDeal, G, settings, drillNew, drillAnswer, D, nav, setLang, render, wallet, stats: () => stats, applyLevel, rich, plain, openGloss, checkAch, spinWheel: () => spinWheel(), ACH, today, exchangeDia, buyLook: (k, id) => buyLook(k, id, true), needPoints, openHelpOverlay, openRanks, openScreenHelp, pickSeg: () => SEG[pickSeg()] };
 })();
